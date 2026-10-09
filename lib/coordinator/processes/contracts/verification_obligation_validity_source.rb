@@ -4,7 +4,6 @@ module Coordinator::Processes
   module Contracts
     class VerificationObligationValiditySource < Dry::Validation::Contract
       ALLOWED_TYPES = %w[
-        DecisionPartitionAdvanced
         DecisionAddedToPartition
         DecisionRemovedFromPartition
         VerificationObligationCreated

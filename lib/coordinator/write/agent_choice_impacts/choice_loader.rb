@@ -39,12 +39,9 @@ module Coordinator::Write
       private
 
       def validate_history!(choice_id, expected_accepted, events, payloads)
-        valid_pair = [
-          [ Events::AgentChoiceRecordedV1, Events::AgentChoiceAcceptedV1 ],
+        valid_pair = payloads.first(2).map(&:class) ==
           [ Events::AgentChoiceRecordedV2, Events::AgentChoiceAcceptedV2 ]
-        ].include?(payloads.first(2).map(&:class))
         valid_invalidation = payloads.length == 2 ||
-          payloads.last.is_a?(Events::AgentChoiceInvalidatedByDecisionV1) ||
           payloads.last.is_a?(Events::AgentChoiceInvalidatedByDecisionV2)
         unless payloads.length.between?(2, 3) && valid_pair && valid_invalidation
           invalid!("choice_lifecycle_invalid", choice_id:, event_types: events.map(&:type))
@@ -54,12 +51,11 @@ module Coordinator::Write
         accepted = payloads.fetch(1)
         recorded_reference = reference(events.fetch(0))
         accepted_reference = reference(events.fetch(1))
-        context_digest = accepted_context_digest(accepted, events.fetch(1))
+        context_digest = events.fetch(1).metadata["context_digest"]
         valid_identity = recorded.choice_id == choice_id &&
                          accepted.choice_id == choice_id &&
                          recorded_reference.stream_revision == 0 &&
                          accepted_reference.stream_revision == 1 &&
-                         (!accepted.respond_to?(:recorded_event) || accepted.recorded_event == recorded_reference) &&
                          accepted_reference == expected_accepted
         unless valid_identity
           invalid!(
@@ -71,7 +67,8 @@ module Coordinator::Write
         end
 
         validate_context!(recorded, context_digest:)
-        validate_invalidation!(choice_id, accepted_reference, events, payloads)
+        invalidation = payloads.fetch(2, nil)
+        validate_current_invalidation!(choice_id, accepted_reference, events.fetch(2), invalidation) if invalidation
       end
 
       def validate_context!(recorded, context_digest:)
@@ -83,7 +80,6 @@ module Coordinator::Write
                              document.partitions.all? { valid_observation?(_1) }
         unless document.query_context == recorded.context &&
                context_digest == canonical_digest &&
-               (!context.respond_to?(:digest) || context.digest == canonical_digest) &&
                observations_valid
           invalid!(
             "recorded_context_invalid",
@@ -91,12 +87,6 @@ module Coordinator::Write
             context_digest:
           )
         end
-      end
-
-      def accepted_context_digest(accepted, event)
-        return accepted.context_digest if accepted.is_a?(Events::AgentChoiceAcceptedV1)
-
-        event.metadata["context_digest"]
       end
 
       def valid_observation?(observation)
@@ -107,7 +97,7 @@ module Coordinator::Write
         event = observation.event
         heads = observation.active_decisions
         event &&
-          %w[DecisionPartitionAdvanced DecisionAddedToPartition DecisionRemovedFromPartition].include?(event.type) &&
+          %w[DecisionAddedToPartition DecisionRemovedFromPartition].include?(event.type) &&
           event.stream_context == "HumanGuidance" &&
           event.stream_name == "DecisionPartition" &&
           event.stream_id == observation.partition.partition_id &&
@@ -122,40 +112,6 @@ module Coordinator::Write
           head.event.stream_context == "HumanGuidance" &&
           head.event.stream_name == "Decision" &&
           head.event.stream_id == head.decision_id
-      end
-
-      def validate_invalidation!(choice_id, accepted_reference, events, payloads)
-        invalidation = payloads.fetch(2, nil)
-        return unless invalidation
-
-        if invalidation.is_a?(Events::AgentChoiceInvalidatedByDecisionV2)
-          validate_current_invalidation!(
-            choice_id,
-            accepted_reference,
-            events.fetch(2),
-            invalidation
-          )
-          return
-        end
-
-        invalidation_reference = reference(events.fetch(2))
-        assessment_event = read_reference(invalidation.assessment_event)
-        assessment = assessment_event && load(assessment_event)
-        valid = invalidation_reference.stream_revision == 2 &&
-                invalidation.choice_id == choice_id &&
-                invalidation.accepted_choice == accepted_reference &&
-                invalidation.assessment_event.type == "AgentChoiceImpactAssessed" &&
-                invalidation.assessment_event.stream_context == "AgentGovernance" &&
-                invalidation.assessment_event.stream_name == "AgentChoiceImpact" &&
-                assessment.is_a?(Events::AgentChoiceImpactAssessedV1) &&
-                assessment.choice_id == choice_id &&
-                assessment.accepted_choice == accepted_reference &&
-                assessment.decision_change.source_event == invalidation.decision_change_event &&
-                assessment.assessment.outcome == "invalidated" &&
-                assessment.assessment.before_context_digest == invalidation.previous_context_digest &&
-                assessment.assessment.after_context_digest == invalidation.resulting_context_digest &&
-                assessment.assessment.reason == invalidation.reason
-        invalid!("choice_invalidation_invalid", choice_id:) unless valid
       end
 
       def validate_current_invalidation!(choice_id, accepted_reference, event, invalidation)
@@ -209,18 +165,6 @@ module Coordinator::Write
         %w[DecisionActivated DecisionDefinitionCorrected].include?(source.type) &&
           source.stream_context == "HumanGuidance" &&
           source.stream_name == "Decision"
-      end
-
-      def read_reference(reference)
-        event = @event_store.read_at(
-          StreamReference.new(
-            context: reference.stream_context,
-            stream_name: reference.stream_name,
-            stream_id: reference.stream_id
-          ),
-          reference.stream_revision
-        )
-        event if event && self.reference(event) == reference
       end
 
       def load(event)

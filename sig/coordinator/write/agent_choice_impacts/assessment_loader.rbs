@@ -6,7 +6,7 @@ module Coordinator
           event_store: _EventStore,
           ?stream_factory: StreamFactory,
           ?schema_registry: EventSchemaRegistry,
-          ?assessment_contract: Contracts::AgentChoiceImpactAssessment
+          ?marker_builder: AssessmentMarkerBuilder
         ) -> void
         def call: (Commands::AssessAgentChoiceDecisionImpact command) -> PgEventstore::Event?
       end

@@ -212,7 +212,6 @@ module Coordinator::Write
 
     DECISION_PARTITION_STATE = EventReadCriteria.new(
       event_types: [
-        "DecisionPartitionAdvanced",
         "DecisionAddedToPartition",
         "DecisionRemovedFromPartition"
       ],
@@ -222,7 +221,6 @@ module Coordinator::Write
 
     DECISION_PARTITION_LATEST = GroupedEventReadCriteria.new(
       event_types: [
-        "DecisionPartitionAdvanced",
         "DecisionAddedToPartition",
         "DecisionRemovedFromPartition"
       ],
@@ -262,7 +260,7 @@ module Coordinator::Write
     )
 
     AGENT_CHOICE_IMPACT_ASSESSMENT = EventReadCriteria.new(
-      event_types: [ "AgentChoiceImpactAssessed", "AgentChoiceImpactAssessmentRecorded" ],
+      event_types: [ "AgentChoiceImpactAssessmentRecorded" ],
       maximum_count: 1,
       direction: :asc
     )

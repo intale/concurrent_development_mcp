@@ -520,7 +520,7 @@ RSpec.describe Coordinator::Read::Projectors::VerificationObligationsV1, :read_m
       anchor_id: change_set_id
     )
     partition_event = source_reference(
-      "DecisionPartitionAdvanced", "DecisionPartition", partition.partition_id, 0, context: "HumanGuidance"
+      "DecisionAddedToPartition", "DecisionPartition", partition.partition_id, 0, context: "HumanGuidance"
     )
     decision_event = source_reference(
       "DecisionActivated", "Decision", "D-obligation-policy", 1, context: "HumanGuidance"

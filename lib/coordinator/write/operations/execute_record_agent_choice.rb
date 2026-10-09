@@ -168,11 +168,6 @@ module Coordinator::Write
           events.each do |event|
             payload = load_event(event)
             case payload
-            when Events::DecisionPartitionAdvancedV1
-              invalid = invalid_partition_snapshot(partition, event, payload)
-              return invalid if invalid
-
-              active = payload.active_decisions.to_h { [ _1.decision_id, _1 ] }
             when Events::DecisionAddedToPartitionV1
               unless payload.partition_id == partition.partition_id &&
                      payload.partition_revision == event.stream_revision
@@ -213,33 +208,6 @@ module Coordinator::Write
         )
       end
 
-      def invalid_partition_snapshot(partition, event, payload)
-        heads = payload.active_decisions
-        unique_and_ordered = heads.map(&:decision_id).uniq.length == heads.length &&
-                             heads == heads.sort_by { _1.decision_id.b }
-        exact_heads = heads.all? do |head|
-          head.decision_revision == head.event.stream_revision &&
-            head.event.stream_context == "HumanGuidance" &&
-            head.event.stream_name == "Decision" &&
-            head.event.stream_id == head.decision_id
-        end
-        return if payload.partition == partition &&
-                  payload.partition_revision == event.stream_revision &&
-                  unique_and_ordered && exact_heads
-
-        Failure(
-          OutcomeError.new(
-            code: :decision_partition_state_invalid,
-            message: "DecisionPartition snapshot violates its authoritative invariant",
-            details: {
-              partition_id: partition.partition_id,
-              stream_revision: event.stream_revision,
-              reason: "snapshot_invariant_violated"
-            }
-          )
-        )
-      end
-
       def exact_heads(observations)
         observations.flat_map(&:active_decisions)
           .uniq { [ _1.decision_id, _1.event.event_id ] }
@@ -268,7 +236,6 @@ module Coordinator::Write
         return invalid_decision_head(expected_head, nil) unless recorded_event && activated_event
 
         recorded = load_event(recorded_event)
-        activation = load_event(activated_event)
         correction = correction_event && load_event(correction_event)
         head_event = correction_event || activated_event
         current = Decisions::DecisionCurrentStateV1.new(
@@ -279,10 +246,8 @@ module Coordinator::Write
             decision_revision: head_event.stream_revision,
             event: event_reference(head_event)
           ),
-          slot: current_slot(correction:, activation:, definition_payload: correction ? correction.definition : recorded.definition),
+          slot: current_slot(definition_payload: correction ? correction.definition : recorded.definition),
           partitions: current_partitions(
-            correction:,
-            activation:,
             definition_payload: correction ? correction.definition : recorded.definition
           )
         )
@@ -292,18 +257,13 @@ module Coordinator::Write
       end
 
       def normalize_definition(value)
-        return value if value.is_a?(Decisions::DecisionDefinitionV1)
-
         Decisions::DecisionDefinitionV1.new(
           document: value,
           digest: @canonical_json.sha256(value.to_h)
         )
       end
 
-      def current_slot(correction:, activation:, definition_payload:)
-        return correction.slot if correction.is_a?(Events::DecisionDefinitionCorrectedV1)
-        return activation.slot if !correction && activation.is_a?(Events::DecisionActivatedV1)
-
+      def current_slot(definition_payload:)
         proposed = @decision_slot_builder.call(normalize_definition(definition_payload))
         return unless proposed
 
@@ -326,18 +286,13 @@ module Coordinator::Write
         )
       end
 
-      def current_partitions(correction:, activation:, definition_payload:)
-        return correction.partitions if correction.is_a?(Events::DecisionDefinitionCorrectedV1)
-        return activation.partitions if !correction && activation.is_a?(Events::DecisionActivatedV1)
-
+      def current_partitions(definition_payload:)
         @decision_partition_builder.call(normalize_definition(definition_payload))
       end
 
       def decision_slot_identity_from(event, proposed)
         opening = load_event(event)
         case opening
-        when Events::DecisionSlotOpenedV1
-          opening.slot.slot_id if opening.slot.document == proposed.document
         when Events::DecisionSlotOpenedV2
           opening.slot_id if opening.slot == proposed.document
         end
@@ -347,11 +302,10 @@ module Coordinator::Write
       end
 
       def load_decision_head(decision_id)
-        event = @event_store.read_grouped(
+        event = @event_store.read_latest(
           @stream_factory.decision(decision_id),
-          EventQueries::DECISION_CORRECTION_STATE
-        ).select { %w[DecisionDefinitionCorrected DecisionActivated].include?(_1.type) }
-          .max_by(&:stream_revision)
+          LatestEventReadCriteria.new(event_types: %w[DecisionDefinitionCorrected DecisionActivated])
+        )
         return unless event
 
         Decisions::DecisionHeadV1.new(

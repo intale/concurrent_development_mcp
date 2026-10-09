@@ -22,8 +22,6 @@ module Coordinator::Write
         events.each do |event|
           payload = load_event(event)
           case payload
-          when Events::DecisionPartitionAdvancedV1
-            active = payload.active_decisions.to_h { [ _1.decision_id, _1 ] }
           when Events::DecisionAddedToPartitionV1
             head = load_decision_head(payload.decision_id)
             active[payload.decision_id] = head if head
@@ -43,11 +41,10 @@ module Coordinator::Write
       private
 
       def load_decision_head(decision_id)
-        event = @event_store.read_grouped(
+        event = @event_store.read_latest(
           @stream_factory.decision(decision_id),
-          EventQueries::DECISION_CORRECTION_STATE
-        ).select { %w[DecisionDefinitionCorrected DecisionActivated].include?(_1.type) }
-          .max_by(&:stream_revision)
+          LatestEventReadCriteria.new(event_types: %w[DecisionDefinitionCorrected DecisionActivated])
+        )
         return unless event
 
         DecisionHeadV1.new(

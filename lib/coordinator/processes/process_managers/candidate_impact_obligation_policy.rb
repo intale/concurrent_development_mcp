@@ -44,8 +44,7 @@ module Coordinator::Processes
       def call(event)
         source = @source_builder.call(event)
         case source.payload
-        when Coordinator::Write::Events::DecisionPartitionAdvancedV1,
-             Coordinator::Write::Events::DecisionAddedToPartitionV1,
+        when Coordinator::Write::Events::DecisionAddedToPartitionV1,
              Coordinator::Write::Events::DecisionRemovedFromPartitionV1
           start_registry_sweep(source)
         when Coordinator::Write::Events::CandidateImpactSurfaceAssignedV1

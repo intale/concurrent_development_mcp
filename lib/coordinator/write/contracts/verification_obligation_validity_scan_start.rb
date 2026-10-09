@@ -19,8 +19,7 @@ module Coordinator::Write
         failures << "source must be the exact superseding partition" unless source.reference == command.superseding_partition_event
         failures << "source event must match the invocation" unless source.event == invocation.source_event
         failures << "source global position must match" unless command.source_global_position == source.event.global_position
-        unless payload.is_a?(Events::DecisionPartitionAdvancedV1) ||
-               payload.is_a?(Events::DecisionAddedToPartitionV1) ||
+        unless payload.is_a?(Events::DecisionAddedToPartitionV1) ||
                payload.is_a?(Events::DecisionRemovedFromPartitionV1)
           failures << "source must be a Decision partition membership event"
         end
@@ -37,15 +36,7 @@ module Coordinator::Write
       private
 
       def candidate_partition?(payload, change_set_id)
-        if payload.is_a?(Events::DecisionPartitionAdvancedV1)
-          partition = payload.partition
-          partition.topic_root == "candidate" &&
-            partition.anchor_kind == "changeset" &&
-            partition.anchor_id == change_set_id &&
-            partition.partition_id == "changeset:#{change_set_id}:candidate"
-        else
-          payload.partition_id == "changeset:#{change_set_id}:candidate"
-        end
+        payload.partition_id == "changeset:#{change_set_id}:candidate"
       end
     end
   end

@@ -9,13 +9,10 @@ RSpec.describe Coordinator::Write::Domain::VerificationObligationInvalidations::
     CandidateObligationExamples.partition_reference.new(stream_revision: 1)
   end
   let(:superseding_partition) do
-    payload = Coordinator::Write::Events::DecisionPartitionAdvancedV1.new(
-      partition: CandidateObligationExamples.partition,
+    payload = Coordinator::Write::Events::DecisionAddedToPartitionV1.new(
+      partition_id: CandidateObligationExamples.partition.partition_id,
       partition_revision: 1,
-      decision: CandidateObligationExamples.decision_head,
-      active_decisions: [ CandidateObligationExamples.decision_head ],
-      change_kind: "corrected",
-      advanced_at: CandidateObligationExamples::TIMESTAMP
+      decision_id: CandidateObligationExamples.decision_head.decision_id
     )
     Coordinator::Write::CandidateObligations::PersistedEventV1.new(
       event: PgEventstore::Event.new,

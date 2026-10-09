@@ -61,19 +61,10 @@ module Coordinator::Read
 
       def verify_stream_identity!(event, payload)
         expected_id = case payload
-        when Coordinator::Write::Events::DecisionRecordedV1,
-             Coordinator::Write::Events::DecisionActivatedV1,
-             Coordinator::Write::Events::DecisionDefinitionCorrectedV1,
-             Coordinator::Write::Events::DecisionRecordedV2,
+        when Coordinator::Write::Events::DecisionRecordedV2,
              Coordinator::Write::Events::DecisionActivatedV2,
              Coordinator::Write::Events::DecisionDefinitionCorrectedV2
           payload.decision_id
-        when Coordinator::Write::Events::DecisionSlotOpenedV1
-          payload.slot.slot_id
-        when Coordinator::Write::Events::DecisionSlotHeadChangedV1
-          payload.slot_id
-        when Coordinator::Write::Events::DecisionPartitionAdvancedV1
-          payload.partition.partition_id
         when Coordinator::Write::Events::DecisionSlotOpenedV2,
              Coordinator::Write::Events::DecisionSlotHeadChangedV2
           payload.slot_id
@@ -88,36 +79,24 @@ module Coordinator::Read
 
       def project(event, payload)
         case payload
-        when Coordinator::Write::Events::DecisionRecordedV1
-          @governance.store_decision(event:, decision: payload)
-        when Coordinator::Write::Events::DecisionActivatedV1
-          @governance.activate_decision(event:, activation: payload)
-        when Coordinator::Write::Events::DecisionDefinitionCorrectedV1
-          @governance.correct_decision(event:, correction: payload)
-        when Coordinator::Write::Events::DecisionSlotOpenedV1
-          @governance.open_slot(event:, opening: payload)
-        when Coordinator::Write::Events::DecisionSlotHeadChangedV1
-          @governance.change_slot_head(event:, change: payload)
-        when Coordinator::Write::Events::DecisionPartitionAdvancedV1
-          @governance.advance_partition(event:, advancement: payload)
         when Coordinator::Write::Events::DecisionRecordedV2
-          @governance.store_decision_v2(
+          @governance.store_decision(
             event:,
             decision: payload,
             interpretation: @interpretation_evidence_loader.call(payload.interpretation_id)
           )
         when Coordinator::Write::Events::DecisionActivatedV2
-          @governance.activate_decision_v2(event:, activation: payload)
+          @governance.activate_decision(event:, activation: payload)
         when Coordinator::Write::Events::DecisionDefinitionCorrectedV2
-          @governance.correct_decision_v2(
+          @governance.correct_decision(
             event:,
             correction: payload,
             interpretation: @interpretation_evidence_loader.call(payload.interpretation_id)
           )
         when Coordinator::Write::Events::DecisionSlotOpenedV2
-          @governance.open_slot_v2(event:, opening: payload)
+          @governance.open_slot(event:, opening: payload)
         when Coordinator::Write::Events::DecisionSlotHeadChangedV2
-          @governance.change_slot_head_v2(event:, change: payload)
+          @governance.change_slot_head(event:, change: payload)
         when Coordinator::Write::Events::DecisionAddedToPartitionV1,
              Coordinator::Write::Events::DecisionRemovedFromPartitionV1
           @governance.apply_partition_delta(event:, delta: payload)

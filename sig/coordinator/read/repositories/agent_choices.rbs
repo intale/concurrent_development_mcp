@@ -5,9 +5,9 @@ module Coordinator
         def initialize: (?canonical_json: Shared::CanonicalJson) -> void
         def fetch: (String choice_id) -> AgentChoiceViewV1?
         def fetch_many: (Array[String] choice_ids) -> Array[AgentChoiceViewV1]
-        def store_recorded: (event: PgEventstore::Event, choice: Write::Events::AgentChoiceRecordedV1 | Write::Events::AgentChoiceRecordedV2) -> AgentChoice
-        def accept: (event: PgEventstore::Event, acceptance: Write::Events::AgentChoiceAcceptedV1 | Write::Events::AgentChoiceAcceptedV2) -> AgentChoice
-        def invalidate: (event: PgEventstore::Event, invalidation: Write::Events::AgentChoiceInvalidatedByDecisionV1) -> AgentChoice
+        def store_recorded: (event: PgEventstore::Event, choice: Write::Events::AgentChoiceRecordedV2) -> AgentChoice
+        def accept: (event: PgEventstore::Event, acceptance: Write::Events::AgentChoiceAcceptedV2) -> AgentChoice
+        def invalidate: (event: PgEventstore::Event, invalidation: Write::Events::AgentChoiceInvalidatedByDecisionV2, assessment: ::Coordinator::Read::AgentChoiceImpacts::AssessmentViewV2) -> AgentChoice
       end
     end
   end

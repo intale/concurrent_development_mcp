@@ -1905,7 +1905,6 @@ module Coordinator
         }
         partition_event = {
           anyOf: %w[
-            DecisionPartitionAdvanced
             DecisionAddedToPartition
             DecisionRemovedFromPartition
           ].map do |type|

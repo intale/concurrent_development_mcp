@@ -25,7 +25,6 @@ module Coordinator::Processes
           )
         ],
         event_types: %w[
-          DecisionPartitionAdvanced
           DecisionAddedToPartition
           DecisionRemovedFromPartition
           CandidateImpactSurfaceAssigned

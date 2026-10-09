@@ -92,6 +92,16 @@ Then("the choice Task succeeds with accepted authoritative facts") do
     agent_choice_events(@choice_id).map(&:type),
     "AgentChoice event plan"
   )
+  expected_payloads = {
+    "AgentChoiceRecorded" => %w[choice_id choice_type selected alternatives reason_summary context decision_context],
+    "AgentChoiceAccepted" => %w[choice_id assessment]
+  }
+  agent_choice_events(@choice_id).each do |event|
+    assert_acceptance_equal(2, event.metadata.fetch("schema_version"), "#{event.type} current schema")
+    assert_acceptance_equal(
+      expected_payloads.fetch(event.type).sort, event.data.keys.sort, "#{event.type} narrow fact"
+    )
+  end
   assert_acceptance_equal(
     %w[CommandRegistered CommandSucceeded],
     command_events(@choice_command_id).map(&:type),
@@ -257,6 +267,14 @@ Then(
   )
   assert_acceptance_equal("blocking_policy_introduced", payload.assessment.reason, "Impact reason")
   assert_acceptance_equal(1, invalidations.length, "Terminal invalidation count")
+  assert_acceptance_equal(
+    %w[assessment_id choice_id attempt_id assessment].sort, assessment.data.keys.sort,
+    "Narrow linked impact assessment"
+  )
+  assert_acceptance_equal(
+    %w[choice_id reason].sort, invalidations.sole.data.keys.sort, "Narrow terminal invalidation"
+  )
+  assert_acceptance_equal(2, invalidations.sole.metadata.fetch("schema_version"), "Current invalidation schema")
   accepted = impact_choice_events(choice_id).find { _1.type == "AgentChoiceAccepted" }
   process_step = process_step_event(
     source_event: @impact_saga.fetch(:started),

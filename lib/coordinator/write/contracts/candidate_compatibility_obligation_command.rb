@@ -45,7 +45,7 @@ module Coordinator::Write
       def valid_partition_reference?(command, change_set_id)
         reference = command.policy_partition_event
         expected_id = "changeset:#{change_set_id}:candidate"
-        %w[DecisionPartitionAdvanced DecisionAddedToPartition DecisionRemovedFromPartition].include?(reference.type) &&
+        %w[DecisionAddedToPartition DecisionRemovedFromPartition].include?(reference.type) &&
           reference.stream_context == "HumanGuidance" &&
           reference.stream_name == "DecisionPartition" &&
           reference.stream_id == expected_id

@@ -65,7 +65,7 @@ RSpec.describe Coordinator::Read::Projectors::AgentChoicesV1, :read_model do
   end
 
   it "reconstructs projection-only context fields from narrow V2 evidence" do
-    recorded, accepted = choice_events_v2
+    recorded, accepted = choice_events
 
     projector.call(recorded)
     projector.call(accepted)
@@ -84,44 +84,6 @@ RSpec.describe Coordinator::Read::Projectors::AgentChoicesV1, :read_model do
   end
 
   def choice_events
-    recorded = ProjectionEventFactory.build(
-      payload: recorded_payload,
-      stream:,
-      stream_revision: 0,
-      global_position: 100,
-      command_id: "cmd-choice-project-choice",
-      actor_id: "agent-a",
-      policy_version: "testing-framework-resolution/v1",
-      correlation_id:,
-      markers: [ "choice:#{choice_id}", "repository:#{repository_id}" ]
-    )
-    accepted_payload = Coordinator::Write::Events::AgentChoiceAcceptedV1.new(
-      choice_id:,
-      recorded_event: event_reference(recorded),
-      context_digest: decision_context.digest,
-      assessment: Coordinator::Write::AgentChoices::ChoiceAssessmentV1.new(
-        basis: "no_policy",
-        based_on_decisions: [],
-        warnings: []
-      ),
-      accepted_at: "2026-08-30T12:01:00.000000Z"
-    )
-    accepted = ProjectionEventFactory.build(
-      payload: accepted_payload,
-      stream:,
-      stream_revision: 1,
-      global_position: 200,
-      command_id: "cmd-choice-project-choice",
-      actor_id: "agent-a",
-      policy_version: "testing-framework-resolution/v1",
-      correlation_id:,
-      causation_id: recorded.id,
-      markers: [ "choice:#{choice_id}", "attempt:A-choice-project" ]
-    )
-    [ recorded, accepted ]
-  end
-
-  def choice_events_v2
     recorded = ProjectionEventFactory.build(
       payload: Coordinator::Write::Events::AgentChoiceRecordedV2.new(
         choice_id:,
@@ -165,22 +127,6 @@ RSpec.describe Coordinator::Read::Projectors::AgentChoicesV1, :read_model do
       )
     )
     [ recorded, accepted ]
-  end
-
-  def recorded_payload
-    Coordinator::Write::Events::AgentChoiceRecordedV1.new(
-      choice_id:,
-      choice_type: "testing.framework",
-      selected: Coordinator::Write::AgentChoices::ChoiceOptionV1.new(
-        option_id: "rspec",
-        summary: "Use RSpec"
-      ),
-      alternatives: [],
-      reason_summary: "RSpec is already established in the project.",
-      context: query_context,
-      decision_context:,
-      recorded_at: "2026-08-30T12:00:00.000000Z"
-    )
   end
 
   def query_context

@@ -19,8 +19,7 @@ module Coordinator::Write
         failures << "obligation reference must resolve exactly" unless loaded.reference == command.obligation_event
         failures << "obligation identity must match the command" unless definition.obligation_id == command.obligation_id
         failures << "superseding partition reference must resolve exactly" unless superseding.reference == command.superseding_partition_event
-        unless partition.is_a?(Events::DecisionPartitionAdvancedV1) ||
-               partition.is_a?(Events::DecisionAddedToPartitionV1) ||
+        unless partition.is_a?(Events::DecisionAddedToPartitionV1) ||
                partition.is_a?(Events::DecisionRemovedFromPartitionV1)
           failures << "superseding event must be a Decision partition membership fact"
         end
@@ -32,16 +31,7 @@ module Coordinator::Write
 
       def matching_candidate_partition?(definition, partition_event)
         prior = definition.policy.partition_event
-        partition_id = if partition_event.is_a?(Events::DecisionPartitionAdvancedV1)
-          current = partition_event.partition
-          return false unless current.topic_root == "candidate" &&
-                              current.anchor_kind == "changeset" &&
-                              current.anchor_id == definition.change_set_id
-
-          current.partition_id
-        else
-          partition_event.partition_id
-        end
+        partition_id = partition_event.partition_id
         partition_id == "changeset:#{definition.change_set_id}:candidate" &&
           partition_id == prior.stream_id &&
           prior.stream_context == "HumanGuidance" &&

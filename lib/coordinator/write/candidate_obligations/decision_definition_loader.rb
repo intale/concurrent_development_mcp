@@ -22,10 +22,6 @@ module Coordinator::Write
         persisted = @exact_loader.call(head.event)
 
         case persisted.payload
-        when Events::DecisionActivatedV1
-          definition_from_activation(head, persisted.payload, partition)
-        when Events::DecisionDefinitionCorrectedV1
-          definition_from_correction(head, persisted.payload, partition)
         when Events::DecisionActivatedV2
           definition_from_cohesive_activation(head, persisted.payload)
         when Events::DecisionDefinitionCorrectedV2
@@ -49,31 +45,6 @@ module Coordinator::Write
         invalid!("candidate_impact_policy_head_invalid", decision_head: head.to_h)
       end
 
-      def definition_from_activation(head, activation, partition)
-        recorded = @exact_loader.call(activation.recorded_event)
-        definition_event = payload!(recorded, Events::DecisionRecordedV1)
-        valid = activation.decision_id == head.decision_id &&
-                activation.partitions.include?(partition) &&
-                definition_event.decision_id == head.decision_id &&
-                definition_event.definition.digest == activation.definition_digest &&
-                recorded.reference.stream_context == "HumanGuidance" &&
-                recorded.reference.stream_name == "Decision" &&
-                recorded.reference.stream_id == head.decision_id
-        return definition_event.definition if valid
-
-        invalid!("candidate_impact_policy_activation_invalid", decision_head: head.to_h)
-      end
-
-      def definition_from_correction(head, correction, partition)
-        valid = correction.decision_id == head.decision_id &&
-                correction.previous_head.decision_id == head.decision_id &&
-                correction.previous_head.decision_revision < head.decision_revision &&
-                correction.partitions.include?(partition)
-        return correction.definition if valid
-
-        invalid!("candidate_impact_policy_correction_invalid", decision_head: head.to_h)
-      end
-
       def definition_from_cohesive_activation(head, activation)
         definition_event = cohesive_definition_event(head)
         valid = activation.decision_id == head.decision_id &&
@@ -92,12 +63,16 @@ module Coordinator::Write
       end
 
       def cohesive_definition_event(head)
-        @event_store.read_grouped(
+        return if head.decision_revision.zero?
+
+        event = @event_store.read_latest(
           @stream_factory.decision(head.decision_id),
-          EventQueries::DECISION_CORRECTION_STATE
-        ).select { _1.stream_revision < head.decision_revision }
-          .map { load_event(_1) }
-          .find { _1.is_a?(Events::DecisionRecordedV2) || _1.is_a?(Events::DecisionDefinitionCorrectedV2) }
+          LatestEventReadCriteria.new(
+            event_types: %w[DecisionRecorded DecisionDefinitionCorrected],
+            from_revision: head.decision_revision - 1
+          )
+        )
+        event && load_event(event)
       end
 
       def wrap_definition(document)
@@ -112,17 +87,6 @@ module Coordinator::Write
           type: event.type,
           schema_version: event.metadata.fetch("schema_version"),
           data: event.data
-        )
-      end
-
-      def payload!(persisted, expected_class)
-        return persisted.payload if persisted.payload.is_a?(expected_class)
-
-        invalid!(
-          "referenced_event_type_invalid",
-          reference: persisted.reference.to_h,
-          expected_class: expected_class.name,
-          actual_class: persisted.payload.class.name
         )
       end
 

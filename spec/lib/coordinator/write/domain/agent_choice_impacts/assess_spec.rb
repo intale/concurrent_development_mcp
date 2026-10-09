@@ -125,38 +125,28 @@ RSpec.describe Coordinator::Write::Domain::AgentChoiceImpacts::Assess do
   end
 
   def choice_snapshot(invalidated:)
-    recorded = Coordinator::Write::Events::AgentChoiceRecordedV1.new(
+    recorded = Coordinator::Write::Events::AgentChoiceRecordedV2.new(
       choice_id: "CHO-assess",
       choice_type: "testing.framework",
       selected: { option_id: "rspec", summary: "RSpec" },
       alternatives: [ { option_id: "minitest", summary: "Minitest" } ],
       reason_summary: "Follow the exact testing framework policy.",
       context: query_context,
-      decision_context: recorded_context,
-      recorded_at: "2026-08-23T10:00:00.000000Z"
+      decision_context: Coordinator::Write::DecisionContexts::EvidenceV2.new(document: recorded_context.document)
     )
-    accepted = Coordinator::Write::Events::AgentChoiceAcceptedV1.new(
+    accepted = Coordinator::Write::Events::AgentChoiceAcceptedV2.new(
       choice_id: "CHO-assess",
-      recorded_event: recorded_reference,
-      context_digest: recorded_context.digest,
       assessment: {
         basis: "no_policy",
         based_on_decisions: [],
         warnings: []
-      },
-      accepted_at: "2026-08-23T10:00:00.000000Z"
+      }
     )
     invalidation =
       if invalidated
-        Coordinator::Write::Events::AgentChoiceInvalidatedByDecisionV1.new(
+        Coordinator::Write::Events::AgentChoiceInvalidatedByDecisionV2.new(
           choice_id: "CHO-assess",
-          accepted_choice: accepted_reference,
-          assessment_event: assessment_reference,
-          decision_change_event: decision_change.source_event,
-          previous_context_digest: "sha256:#{'b' * 64}",
-          resulting_context_digest: "sha256:#{'a' * 64}",
-          reason: "blocking_policy_introduced",
-          invalidated_at: "2026-08-23T10:30:00.000000Z"
+          reason: "blocking_policy_introduced"
         )
       end
     Coordinator::Write::AgentChoiceImpacts::ChoiceSnapshotV1.new(
@@ -332,7 +322,7 @@ RSpec.describe Coordinator::Write::Domain::AgentChoiceImpacts::Assess do
   def assessment_reference
     event_reference(
       event_id: "0198e03a-d112-7000-8000-000000000013",
-      type: "AgentChoiceImpactAssessed",
+      type: "AgentChoiceImpactAssessmentRecorded",
       stream_name: "AgentChoiceImpact",
       stream_id: "0198e03a-d112-7000-8000-000000000013",
       stream_revision: 0
@@ -353,7 +343,7 @@ RSpec.describe Coordinator::Write::Domain::AgentChoiceImpacts::Assess do
   def source_advancement
     Coordinator::Write::EventReference.new(
       event_id: "0198e03a-d112-7000-8000-000000000015",
-      type: "DecisionPartitionAdvanced",
+      type: "DecisionAddedToPartition",
       stream_context: "HumanGuidance",
       stream_name: "DecisionPartition",
       stream_id: "repo:#{RepositoryScenario::DEFAULT_REPOSITORY_ID}:testing",

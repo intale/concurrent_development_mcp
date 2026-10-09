@@ -50,7 +50,7 @@ module Coordinator::Write
               required(:event_id).filled(:string)
               required(:type).filled(
                 :string,
-                included_in?: %w[DecisionPartitionAdvanced DecisionAddedToPartition DecisionRemovedFromPartition]
+                included_in?: %w[DecisionAddedToPartition DecisionRemovedFromPartition]
               )
               required(:stream_context).filled(:string, eql?: "HumanGuidance")
               required(:stream_name).filled(:string, eql?: "DecisionPartition")

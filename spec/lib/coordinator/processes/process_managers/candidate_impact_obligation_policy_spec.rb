@@ -89,7 +89,6 @@ RSpec.describe Coordinator::Processes::ProcessManagers::CandidateImpactObligatio
           { context: "DevelopmentIntegration", stream_name: "CandidateImpactPairScan" }
         ],
         event_types: %w[
-             DecisionPartitionAdvanced
              DecisionAddedToPartition
              DecisionRemovedFromPartition
           CandidateImpactSurfaceAssigned

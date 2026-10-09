@@ -269,7 +269,7 @@ module CandidateObligationExamples
   def partition_reference
     @partition_reference ||= reference(
       id: Coordinator::Shared::IdGenerator.new.uuid_v7,
-      type: "DecisionPartitionAdvanced",
+      type: "DecisionAddedToPartition",
       stream_context: "HumanGuidance",
       stream_name: "DecisionPartition",
       stream_id: partition.partition_id,

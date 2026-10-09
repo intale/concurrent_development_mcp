@@ -69,11 +69,9 @@ module Coordinator::Read
 
       def project(event, payload)
         case payload
-        when Coordinator::Write::Events::AgentChoiceRecordedV1,
-             Coordinator::Write::Events::AgentChoiceRecordedV2
+        when Coordinator::Write::Events::AgentChoiceRecordedV2
           @choices.store_recorded(event:, choice: payload)
-        when Coordinator::Write::Events::AgentChoiceAcceptedV1,
-             Coordinator::Write::Events::AgentChoiceAcceptedV2
+        when Coordinator::Write::Events::AgentChoiceAcceptedV2
           @choices.accept(event:, acceptance: payload)
         end
       end

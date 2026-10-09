@@ -85,12 +85,6 @@ module Coordinator::Write
 
       def partition_payload_valid?(payload, expected, reference)
         case payload
-        when Events::DecisionPartitionAdvancedV1
-          heads = payload.active_decisions
-          payload.partition == expected &&
-            payload.partition_revision == reference.stream_revision &&
-            heads == heads.uniq(&:decision_id).sort_by { _1.decision_id.b } &&
-            heads.include?(payload.decision)
         when Events::DecisionAddedToPartitionV1, Events::DecisionRemovedFromPartitionV1
           payload.partition_id == expected.partition_id &&
             payload.partition_revision == reference.stream_revision

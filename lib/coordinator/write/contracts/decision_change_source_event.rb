@@ -14,7 +14,7 @@ module Coordinator::Write
                        source.stream&.stream_id
         valid_position = source.stream_revision && source.stream_revision >= 0 &&
                          source.global_position && source.global_position >= 0
-        valid_schema = [ 1, 2 ].include?(source.metadata["schema_version"]) &&
+        valid_schema = source.metadata["schema_version"] == 2 &&
                        source.metadata["command_id"] &&
                        Types::ACTOR_KINDS.include?(source.metadata["actor_kind"]) &&
                        Types::IDENTIFIER_PATTERN.match?(source.metadata["actor_id"].to_s)

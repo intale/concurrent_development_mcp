@@ -95,7 +95,6 @@ RSpec.describe Coordinator::Processes::ProcessManagers::VerificationObligationVa
           { context: "DevelopmentIntegration", stream_name: "VerificationObligationValidityScan" }
         ],
         event_types: %w[
-          DecisionPartitionAdvanced
           DecisionAddedToPartition
           DecisionRemovedFromPartition
           VerificationObligationCreated

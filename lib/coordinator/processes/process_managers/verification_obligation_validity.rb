@@ -40,8 +40,7 @@ module Coordinator::Processes
       def call(event)
         source = @source_builder.call(event)
         case source.payload
-        when Coordinator::Write::Events::DecisionPartitionAdvancedV1,
-             Coordinator::Write::Events::DecisionAddedToPartitionV1,
+        when Coordinator::Write::Events::DecisionAddedToPartitionV1,
              Coordinator::Write::Events::DecisionRemovedFromPartitionV1
           start_scan(source) if candidate_partition?(source.payload)
         when Coordinator::Write::Events::VerificationObligationCreatedV2
@@ -118,19 +117,10 @@ module Coordinator::Processes
       end
 
       def candidate_partition?(partition_event)
-        if partition_event.is_a?(Coordinator::Write::Events::DecisionPartitionAdvancedV1)
-          partition = partition_event.partition
-          partition.topic_root == "candidate" &&
-            partition.anchor_kind == "changeset" &&
-            partition.partition_id == "changeset:#{partition.anchor_id}:candidate"
-        else
-          /\Achangeset:[^:]+:candidate\z/.match?(partition_event.partition_id)
-        end
+        /\Achangeset:[^:]+:candidate\z/.match?(partition_event.partition_id)
       end
 
       def change_set_id(partition_event)
-        return partition_event.partition.anchor_id if partition_event.is_a?(Coordinator::Write::Events::DecisionPartitionAdvancedV1)
-
         partition_event.partition_id.delete_prefix("changeset:").delete_suffix(":candidate")
       end
 

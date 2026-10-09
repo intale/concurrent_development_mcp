@@ -24,18 +24,14 @@ module Coordinator::Processes
         end
         unique_and_ordered = heads.map(&:decision_id).uniq.length == heads.length &&
                              heads == heads.sort_by { _1.decision_id.b }
-        valid_payload = if payload.is_a?(Coordinator::Write::Events::DecisionPartitionAdvancedV1)
-          payload.partition == partition &&
-            payload.partition_revision == event.stream_revision &&
-            heads == payload.active_decisions
-        elsif payload.is_a?(Coordinator::Write::Events::DecisionAddedToPartitionV1) ||
+        valid_payload = if payload.is_a?(Coordinator::Write::Events::DecisionAddedToPartitionV1) ||
               payload.is_a?(Coordinator::Write::Events::DecisionRemovedFromPartitionV1)
           payload.partition_id == partition.partition_id &&
             payload.partition_revision == event.stream_revision
         else
           false
         end
-        valid = %w[DecisionPartitionAdvanced DecisionAddedToPartition DecisionRemovedFromPartition].include?(event.type) &&
+        valid = %w[DecisionAddedToPartition DecisionRemovedFromPartition].include?(event.type) &&
                 event.stream&.context == "HumanGuidance" &&
                 event.stream&.stream_name == "DecisionPartition" &&
                 event.stream&.stream_id == partition.partition_id &&

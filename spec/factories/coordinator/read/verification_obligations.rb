@@ -62,7 +62,7 @@ FactoryBot.define do
       )
       head = { "decision_id" => decision_id, "decision_revision" => 1, "event" => decision_event }
       partition_event = reference.call(
-        "DecisionPartitionAdvanced",
+        "DecisionAddedToPartition",
         "DecisionPartition",
         partition.fetch("partition_id"),
         0

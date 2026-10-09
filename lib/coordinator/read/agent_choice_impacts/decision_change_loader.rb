@@ -68,12 +68,12 @@ module Coordinator::Read
       def affected_partitions(event, payload, definition)
         partitions = if payload.is_a?(Coordinator::Write::Events::DecisionActivatedV2)
                        @partition_builder.call(definition)
-                     else
+        else
                        previous = definition_before(event)
                        raise InvalidProjectionSource, "Corrected Decision has no previous definition" unless previous
 
                        @partition_builder.call(previous) + @partition_builder.call(definition)
-                     end
+        end
         partitions.uniq(&:partition_id).sort_by { _1.partition_id.b }.freeze
       end
 
@@ -82,20 +82,20 @@ module Coordinator::Read
       end
 
       def definition_before(event)
+        return if event.stream_revision.zero?
+
         stream = Coordinator::Write::StreamReference.new(
           context: event.stream.context,
           stream_name: event.stream.stream_name,
           stream_id: event.stream.stream_id
         )
-        physical = @event_store.read(
+        physical = @event_store.read_latest(
           stream,
-          Coordinator::Write::EventReadCriteria.new(
+          Coordinator::Write::LatestEventReadCriteria.new(
             event_types: %w[DecisionRecorded DecisionDefinitionCorrected],
-            maximum_count: 2_048,
-            direction: :asc,
-            to_revision: event.stream_revision - 1
+            from_revision: event.stream_revision - 1
           )
-        ).last
+        )
         physical && normalize_definition(load_event(physical).definition)
       end
 

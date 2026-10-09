@@ -96,7 +96,6 @@ module Coordinator::Processes
       end
 
       def partition_for(event)
-        return event.partition if event.is_a?(Coordinator::Write::Events::DecisionPartitionAdvancedV1)
         return unless event.is_a?(Coordinator::Write::Events::DecisionAddedToPartitionV1) ||
                       event.is_a?(Coordinator::Write::Events::DecisionRemovedFromPartitionV1)
         return unless event.partition_id.start_with?("changeset:") && event.partition_id.end_with?(":candidate")

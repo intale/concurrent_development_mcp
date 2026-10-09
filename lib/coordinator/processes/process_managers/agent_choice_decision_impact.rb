@@ -34,16 +34,13 @@ module Coordinator::Processes
       def call(event)
         source = @source_builder.call(event)
         case source.payload
-        when Coordinator::Write::Events::DecisionActivatedV1,
-             Coordinator::Write::Events::DecisionActivatedV2,
-             Coordinator::Write::Events::DecisionDefinitionCorrectedV1,
+        when Coordinator::Write::Events::DecisionActivatedV2,
              Coordinator::Write::Events::DecisionDefinitionCorrectedV2
           start_scan(source)
         when Coordinator::Write::Events::AgentChoiceImpactScanStartedV2,
              Coordinator::Write::Events::AgentChoiceImpactScanProgressedV2
           process_page(source)
-        when Coordinator::Write::Events::AgentChoiceAcceptedV1,
-             Coordinator::Write::Events::AgentChoiceAcceptedV2
+        when Coordinator::Write::Events::AgentChoiceAcceptedV2
           repair_choice(source)
         end
         nil

@@ -320,7 +320,7 @@ RSpec.describe Coordinator::Processes::ProcessManagers::AgentChoiceDecisionImpac
       Coordinator::Write::GlobalMarkedEventReadCriteria.new(
         stream_context: "AgentGovernance",
         stream_name: "AgentChoiceImpact",
-        event_types: [ "AgentChoiceImpactAssessed", "AgentChoiceImpactAssessmentRecorded" ],
+        event_types: [ "AgentChoiceImpactAssessmentRecorded" ],
         markers: [ marker ],
         maximum_count: 1,
         direction: :asc

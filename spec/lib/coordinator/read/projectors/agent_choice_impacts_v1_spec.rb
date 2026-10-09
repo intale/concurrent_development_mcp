@@ -1,20 +1,16 @@
 # frozen_string_literal: true
 
-RSpec.describe Coordinator::Read::Projectors::AgentChoiceImpactsV1, :read_model do
+RSpec.describe Coordinator::Read::Projectors::AgentChoiceImpactsV1, :read_model, :event_store do
   subject(:projector) { described_class.new(assessment_loader:) }
 
   let(:choice_id) { "CHO-impact-project" }
   let(:attempt_id) { "A-impact-project" }
   let(:assessment_id) { SecureRandom.uuid_v7 }
   let(:correlation_id) { SecureRandom.uuid_v7 }
-  let(:decision_changed_at) { "2026-08-30T11:59:00.000000Z" }
-  let(:assessment_loader) do
-    assessment = assessment_view
-    Class.new do
-      define_method(:initialize) { |view| @view = view }
-      define_method(:call) { |identifier| @view if identifier == @view.assessment_id }
-    end.new(assessment)
-  end
+  let(:event_store) { Coordinator::Write::EventStore.new(client: PgEventstore.client) }
+  let(:streams) { Coordinator::Write::StreamFactory.new }
+  let(:decision_changed_at) { decision_source_event.created_at.utc.iso8601(6) }
+  let(:assessment_loader) { Coordinator::Read::AgentChoiceImpacts::AssessmentLoader.new(event_store:) }
 
   it "projects exact assessment sources and invalidation evidence idempotently" do
     create_accepted_choice
@@ -86,23 +82,17 @@ RSpec.describe Coordinator::Read::Projectors::AgentChoiceImpactsV1, :read_model 
     accepted_link = source_link_event(
       role: "accepted_choice",
       source: accepted_choice_reference,
-      revision: 1,
-      global_position: 201
     )
     decision_link = source_link_event(
       role: "decision_change",
       source: decision_change.source_event,
-      revision: 2,
-      global_position: 202
     )
-    invalidation = ProjectionEventFactory.build(
+    invalidation = append_fixture(
       payload: Coordinator::Write::Events::AgentChoiceInvalidatedByDecisionV2.new(
         choice_id:,
         reason: "blocking_policy_introduced"
       ),
       stream: Coordinator::Write::StreamFactory.new.agent_choice(choice_id),
-      stream_revision: 2,
-      global_position: 203,
       policy_version: "agent-choice-decision-impact/v1",
       metadata: Coordinator::Write::Metadata::AgentChoiceInvalidationV2.new(
         command_id: "cmd-impact-assessment",
@@ -114,14 +104,14 @@ RSpec.describe Coordinator::Read::Projectors::AgentChoiceImpactsV1, :read_model 
         resulting_context_digest: after_context_digest
       ),
       correlation_id:,
-      causation_id: assessment.id,
+      caused_by: accepted_choice_event,
       markers: assessment_markers
     )
     [ assessment, accepted_link, decision_link, invalidation ]
   end
 
   def assessment_event
-    @assessment_event ||= ProjectionEventFactory.build(
+    @assessment_event ||= append_fixture(
       payload: Coordinator::Write::Events::AgentChoiceImpactAssessmentRecordedV1.new(
         assessment_id:,
         choice_id:,
@@ -129,8 +119,6 @@ RSpec.describe Coordinator::Read::Projectors::AgentChoiceImpactsV1, :read_model 
         assessment: impact_assessment
       ),
       stream: Coordinator::Write::StreamFactory.new.agent_choice_impact(assessment_id),
-      stream_revision: 0,
-      global_position: 200,
       policy_version: "agent-choice-decision-impact/v1",
       metadata: Coordinator::Write::Metadata::AgentChoiceImpactAssessmentV2.new(
         command_id: "cmd-impact-assessment",
@@ -142,41 +130,26 @@ RSpec.describe Coordinator::Read::Projectors::AgentChoiceImpactsV1, :read_model 
         after_context_digest:
       ),
       correlation_id:,
-      causation_id: SecureRandom.uuid_v7,
+      caused_by: decision_source_event,
       markers: assessment_markers
     )
   end
 
-  def source_link_event(role:, source:, revision:, global_position:)
-    ProjectionEventFactory.build(
+  def source_link_event(role:, source:)
+    append_fixture(
       payload: Coordinator::Write::Events::AgentChoiceImpactSourceLinkedV1.new(
         assessment_id:,
         role:,
         source:
       ),
       stream: Coordinator::Write::StreamFactory.new.agent_choice_impact(assessment_id),
-      stream_revision: revision,
-      global_position:,
       command_id: "cmd-impact-assessment",
       actor_kind: "system",
       actor_id: "agent-choice-decision-impact",
       policy_version: "agent-choice-decision-impact/v1",
       correlation_id:,
-      causation_id: assessment_event.id,
+      caused_by: assessment_event,
       markers: assessment_markers
-    )
-  end
-
-  def assessment_view
-    Coordinator::Read::AgentChoiceImpacts::AssessmentViewV2.new(
-      assessment_id:,
-      choice_id:,
-      attempt_id:,
-      assessment: impact_assessment,
-      accepted_choice: accepted_choice_reference,
-      decision_change:,
-      decision_changed_at:,
-      assessment_event:
     )
   end
 
@@ -208,27 +181,6 @@ RSpec.describe Coordinator::Read::Projectors::AgentChoiceImpactsV1, :read_model 
     )
   end
 
-  def decision_change
-    @decision_change ||= Coordinator::Write::AgentChoiceImpacts::DecisionChangeEvidenceV2.new(
-      source_event: source_reference("DecisionDefinitionCorrected", "Decision", "D-impact-project", 2),
-      source_global_position: 100,
-      source_command_id: "cmd-decision-change",
-      source_actor: Coordinator::Write::Commands::Actor.new(kind: "orchestrator", id: "guidance-host"),
-      decision_id: "D-impact-project",
-      change_kind: "corrected",
-      definition_digest: "sha256:#{'c' * 64}",
-      retroactivity: "active_attempts",
-      affected_partitions: [
-        Coordinator::Write::Decisions::DecisionPartitionV1.new(
-          partition_id: "attempt:#{attempt_id}:testing",
-          topic_root: "testing",
-          anchor_kind: "attempt",
-          anchor_id: attempt_id
-        )
-      ]
-    )
-  end
-
   def create_accepted_choice
     create(
       :coordinator_read_agent_choice,
@@ -238,10 +190,6 @@ RSpec.describe Coordinator::Read::Projectors::AgentChoiceImpactsV1, :read_model 
       accepted_event: accepted_choice_reference.to_h.deep_stringify_keys,
       accepted_correlation_id: correlation_id
     )
-  end
-
-  def accepted_choice_reference
-    @accepted_choice_reference ||= source_reference("AgentChoiceAccepted", "AgentChoice", choice_id, 1)
   end
 
   def assessment_markers
@@ -256,17 +204,6 @@ RSpec.describe Coordinator::Read::Projectors::AgentChoiceImpactsV1, :read_model 
     "sha256:#{'b' * 64}"
   end
 
-  def source_reference(type, stream_name, stream_id, revision)
-    Coordinator::Write::EventReference.new(
-      event_id: SecureRandom.uuid_v7,
-      type:,
-      stream_context: type.start_with?("AgentChoice") ? "AgentGovernance" : "HumanGuidance",
-      stream_name:,
-      stream_id:,
-      stream_revision: revision
-    )
-  end
-
   def event_reference(event)
     Coordinator::Write::EventReference.new(
       event_id: event.id,
@@ -276,6 +213,93 @@ RSpec.describe Coordinator::Read::Projectors::AgentChoiceImpactsV1, :read_model 
       stream_id: event.stream.stream_id,
       stream_revision: event.stream_revision
     )
+  end
+
+  def decision_source_event
+    @decision_source_event ||= begin
+      base = native_definition("rspec")
+      recorded = append_fixture(
+        payload: Coordinator::Write::Events::DecisionRecordedV2.new(
+          decision_id: "D-impact-project", interpretation_id: "I-impact-base", source_message_id: "M-impact-base",
+          definition: base.document
+        ),
+        stream: streams.decision("D-impact-project"), policy_version: "decision-governance/v1",
+        actor_kind: "orchestrator", actor_id: "guidance-host"
+      )
+      activated = append_fixture(
+        payload: Coordinator::Write::Events::DecisionActivatedV2.new(
+          decision_id: "D-impact-project", interpretation_id: "I-impact-base", rationale: "Activate the accepted policy."
+        ),
+        stream: streams.decision("D-impact-project"), policy_version: "decision-governance/v1",
+        actor_kind: "orchestrator", actor_id: "guidance-host", caused_by: recorded
+      )
+      append_fixture(
+        payload: Coordinator::Write::Events::DecisionDefinitionCorrectedV2.new(
+          decision_id: "D-impact-project", interpretation_id: "I-impact-next", source_message_id: "M-impact-next",
+          definition: native_definition("minitest").document, rationale: "Apply the accepted correction."
+        ),
+        stream: streams.decision("D-impact-project"), policy_version: "decision-governance/v1",
+        command_id: "cmd-decision-change", actor_kind: "orchestrator", actor_id: "guidance-host", caused_by: activated
+      )
+    end
+  end
+
+  def native_definition(option_id)
+    input = InterpretationInput.build(
+      value: InterpretationInput.named_choice(option_id),
+      scope: InterpretationInput.scope(repository_ids: [], attempt_id:),
+      enforcement: { level: "merge_gate", retroactivity: "active_attempts", on_violation: "block" }
+    )
+    proposal = Coordinator::Write::Events::DecisionInterpretationProposedV2.new(
+      interpretation_id: "I-impact-definition", source_message_id: "M-impact-definition", source_span: "RSpec",
+      proposed_decision: input.fetch(:proposed_decision), assessment: "accepted_for_activation", ambiguities: []
+    )
+    Coordinator::Write::Decisions::DecisionDefinitionBuilder.new.call(
+      proposal:, valid_from_default: "2026-08-30T12:00:00.000000Z"
+    )
+  end
+
+  def decision_change
+    Coordinator::Read::AgentChoiceImpacts::DecisionChangeLoader.new(event_store:)
+      .call(event_reference(decision_source_event)).evidence
+  end
+
+  def accepted_choice_event
+    @accepted_choice_event ||= begin
+      attributes = attributes_for(:coordinator_read_agent_choice, choice_id:).deep_symbolize_keys
+      recorded = append_fixture(
+        payload: Coordinator::Write::Events::AgentChoiceRecordedV2.new(
+          choice_id:, choice_type: attributes.fetch(:choice_type), selected: attributes.fetch(:selected),
+          alternatives: attributes.fetch(:alternatives), reason_summary: attributes.fetch(:reason_summary),
+          context: attributes.fetch(:context),
+          decision_context: { document: attributes.fetch(:decision_context).fetch(:document) }
+        ),
+        stream: streams.agent_choice(choice_id), policy_version: "testing-framework-resolution/v1"
+      )
+      append_fixture(
+        payload: Coordinator::Write::Events::AgentChoiceAcceptedV2.new(
+          choice_id:, assessment: { basis: "no_policy", based_on_decisions: [], warnings: [] }
+        ),
+        stream: streams.agent_choice(choice_id), policy_version: "testing-framework-resolution/v1",
+        caused_by: recorded
+      )
+    end
+  end
+
+  def accepted_choice_reference
+    event_reference(accepted_choice_event)
+  end
+
+  def append_fixture(payload:, stream:, policy_version:, metadata: nil, command_id: "cmd-impact-fixture",
+                     actor_kind: "agent", actor_id: "fixture-agent", caused_by: nil, markers: [], correlation_id: self.correlation_id)
+    event = Coordinator::Write::EventFactory.new.build!(
+      event: payload, event_id: SecureRandom.uuid_v7,
+      metadata: metadata || Coordinator::Write::EventMetadata.new(
+        command_id:, actor_kind:, actor_id:, recorded_by: "coordinator", policy_version:
+      ),
+      markers:, caused_by:, correlation_id:
+    )
+    event_store.append(stream, [ event ]).sole
   end
 
   def impact_repository

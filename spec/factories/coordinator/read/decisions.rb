@@ -338,7 +338,7 @@ FactoryBot.define do
     event do
       {
         "event_id" => SecureRandom.uuid_v7,
-        "type" => "DecisionPartitionAdvanced",
+        "type" => "DecisionAddedToPartition",
         "stream_context" => "HumanGuidance",
         "stream_name" => "DecisionPartition",
         "stream_id" => partition_id,

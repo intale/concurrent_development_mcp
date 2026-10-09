@@ -224,7 +224,7 @@ RSpec.describe Coordinator::Read::DecisionResolution::Resolver do
         anchor_id:
       },
       partition_revision: 0,
-      event: reference(partition_id, "DecisionPartition", "DecisionPartitionAdvanced", 0, sequence),
+      event: reference(partition_id, "DecisionPartition", "DecisionAddedToPartition", 0, sequence),
       active_decisions:
     )
   end

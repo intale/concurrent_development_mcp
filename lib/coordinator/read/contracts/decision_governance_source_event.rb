@@ -4,12 +4,11 @@ module Coordinator::Read
   module Contracts
     class DecisionGovernanceSourceEvent < Dry::Validation::Contract
       EVENT_SCHEMAS = {
-        "DecisionRecorded" => [ "Decision", [ 1, 2 ] ],
-        "DecisionActivated" => [ "Decision", [ 1, 2 ] ],
-        "DecisionDefinitionCorrected" => [ "Decision", [ 1, 2 ] ],
-        "DecisionSlotOpened" => [ "DecisionSlot", [ 1, 2 ] ],
-        "DecisionSlotHeadChanged" => [ "DecisionSlot", [ 1, 2 ] ],
-        "DecisionPartitionAdvanced" => [ "DecisionPartition", [ 1 ] ],
+        "DecisionRecorded" => [ "Decision", [ 2 ] ],
+        "DecisionActivated" => [ "Decision", [ 2 ] ],
+        "DecisionDefinitionCorrected" => [ "Decision", [ 2 ] ],
+        "DecisionSlotOpened" => [ "DecisionSlot", [ 2 ] ],
+        "DecisionSlotHeadChanged" => [ "DecisionSlot", [ 2 ] ],
         "DecisionAddedToPartition" => [ "DecisionPartition", [ 1 ] ],
         "DecisionRemovedFromPartition" => [ "DecisionPartition", [ 1 ] ]
       }.freeze

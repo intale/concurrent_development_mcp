@@ -197,6 +197,38 @@ RSpec.describe Coordinator::Write::Operations::ExecuteAssessAgentChoiceDecisionI
     )
   end
 
+  it "reconstructs an earlier correction without allowing a later correction to change its assessment" do
+    prepared = AgentChoiceImpactScenario.prepare_attempt(prefix: "impact-historical-bound")
+    scope = repository_scope("billing")
+    activation = AgentChoiceImpactScenario.activate_decision(
+      suffix: "impact-historical-base", decision_id: "D-impact-historical", option_id: "rspec", scope:
+    )
+    choice = AgentChoiceImpactScenario.record_choice(prepared:, option_id: "rspec")
+    source = AgentChoiceImpactScenario.correct_decision(
+      suffix: "impact-historical-first", decision_id: "D-impact-historical", option_id: "minitest", scope:
+    )
+    AgentChoiceImpactScenario.correct_decision(
+      suffix: "impact-historical-later", decision_id: "D-impact-historical", option_id: "rspec", scope:
+    )
+
+    activation_evidence = Coordinator::Write::AgentChoiceImpacts::DecisionChangeEvidenceBuilder.new(event_store:)
+      .call(activation).value!
+    original_digest = AgentChoiceImpactScenario.load(
+      AgentChoiceImpactScenario.decision_events("D-impact-historical").find { _1.type == "DecisionRecorded" }
+    ).definition
+    expect(activation_evidence.definition_digest).to eq(Coordinator::Write::CanonicalJson.new.sha256(original_digest.to_h))
+    invocation = AgentChoiceImpactScenario.assessment_invocation(choice:, source:)
+    result = operation.call(invocation)
+
+    expect(result).to be_success
+    expect(load(result.value!).assessment).to have_attributes(
+      outcome: "invalidated", before_evaluation: have_attributes(status: "allowed"),
+      after_evaluation: have_attributes(status: "blocked")
+    )
+    links = AgentChoiceImpactScenario.assessment_history(invocation.command.assessment_id).drop(1).map { load(_1) }
+    expect(links.find { _1.role == "decision_change" }.source).to eq(AgentChoiceImpactScenario.reference(source))
+  end
+
   it "leaves a mismatched target/source pair as operator-visible poison" do
     prepared = AgentChoiceImpactScenario.prepare_attempt(prefix: "impact-poison")
     choice = AgentChoiceImpactScenario.record_choice(prepared:, option_id: "rspec")

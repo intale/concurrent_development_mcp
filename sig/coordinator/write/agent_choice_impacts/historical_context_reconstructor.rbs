@@ -14,7 +14,7 @@ module Coordinator
           ?policy_evaluator: Domain::AgentChoices::PolicyEvaluator
         ) -> void
         def call: (
-          recorded_choice: Events::AgentChoiceRecordedV1 | Events::AgentChoiceRecordedV2,
+          recorded_choice: Events::AgentChoiceRecordedV2,
           decision_change: DecisionChangeEvidenceV2
         ) -> ReconstructionV1
       end

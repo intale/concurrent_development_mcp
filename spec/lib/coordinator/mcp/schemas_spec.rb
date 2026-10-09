@@ -92,7 +92,6 @@ RSpec.describe Coordinator::Mcp::Schemas do
       .dig(:properties, :partition_event, :anyOf)
 
     expect(variants.map { _1.dig(:properties, :type, :const) }).to contain_exactly(
-      "DecisionPartitionAdvanced",
       "DecisionAddedToPartition",
       "DecisionRemovedFromPartition"
     )

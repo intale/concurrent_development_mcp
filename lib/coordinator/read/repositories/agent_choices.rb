@@ -44,7 +44,7 @@ module Coordinator::Read
           recorded_correlation_id: event.correlation_id,
           accepted_causation_id: nil,
           accepted_correlation_id: nil,
-          recorded_at_domain: choice.respond_to?(:recorded_at) ? choice.recorded_at : event.created_at,
+          recorded_at_domain: event.created_at,
           accepted_at_domain: nil,
           recorded_at_store: event.created_at,
           accepted_at_store: nil
@@ -65,7 +65,7 @@ module Coordinator::Read
           accepted_metadata: event.metadata,
           accepted_causation_id: event.causation_id,
           accepted_correlation_id: event.correlation_id,
-          accepted_at_domain: acceptance.respond_to?(:accepted_at) ? acceptance.accepted_at : event.created_at,
+          accepted_at_domain: event.created_at,
           accepted_at_store: event.created_at
         })
         record
@@ -98,22 +98,13 @@ module Coordinator::Read
       private
 
       def verify_acceptance!(record, event, acceptance)
-        if acceptance.is_a?(Coordinator::Write::Events::AgentChoiceAcceptedV2)
-          return if event.metadata["context_digest"] == record.context_digest
+        return if event.metadata["context_digest"] == record.context_digest
 
-          raise ProjectionStateError, "AgentChoiceAccepted does not match the projected Decision context"
-        end
-
-        recorded_event = Coordinator::Write::EventReference.new(symbolize(record.recorded_event))
-        return if recorded_event == acceptance.recorded_event && record.context_digest == acceptance.context_digest
-
-        raise ProjectionStateError, "AgentChoiceAccepted does not reference the projected recorded choice"
+        raise ProjectionStateError, "AgentChoiceAccepted does not match the projected Decision context"
       end
 
       def projected_decision_context(event, choice)
         context = choice.decision_context
-        return context if context.is_a?(Coordinator::Write::DecisionContexts::ContextV1)
-
         document = context.document
         Coordinator::Write::DecisionContexts::ContextV1.new(
           document:,

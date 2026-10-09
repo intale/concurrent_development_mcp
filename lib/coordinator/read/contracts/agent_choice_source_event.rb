@@ -13,7 +13,7 @@ module Coordinator::Read
 
       params do
         required(:event_type).filled(:string, included_in?: EVENT_TYPES)
-        required(:schema_version).filled(:integer, included_in?: [ 1, 2 ])
+        required(:schema_version).filled(:integer, eql?: 2)
         required(:stream_context).filled(:string, eql?: "AgentGovernance")
         required(:stream_name).filled(:string, eql?: "AgentChoice")
         required(:stream_id).filled(:string)
@@ -44,7 +44,7 @@ module Coordinator::Read
       end
 
       rule(:event_type, :schema_version, :context_digest) do
-        next unless values[:event_type] == "AgentChoiceAccepted" && values[:schema_version] == 2
+        next unless values[:event_type] == "AgentChoiceAccepted"
 
         digest = values[:context_digest]
         unless digest && Types::SHA256_DIGEST_PATTERN.match?(digest)

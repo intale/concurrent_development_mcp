@@ -100,8 +100,6 @@ module Coordinator::Processes
       private
 
       def change_set_id(payload)
-        return payload.partition.anchor_id if payload.is_a?(Coordinator::Write::Events::DecisionPartitionAdvancedV1)
-
         payload.partition_id.delete_prefix("changeset:").delete_suffix(":candidate")
       end
 

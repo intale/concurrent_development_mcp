@@ -46,42 +46,7 @@ module Coordinator::Read
         end
       end
 
-      def store_decision(event:, decision:)
-        create_from_event(Coordinator::Read::DecisionDefinition, event:, attributes: {
-          decision_id: decision.decision_id,
-          interpretation_id: decision.interpretation_id,
-          source_message_id: decision.source_message_id,
-          policy_status: "recorded",
-          definition_digest: decision.definition.digest,
-          definition: decision.definition.to_h,
-          slot: nil,
-          partitions: [],
-          classifier: decision.classifier.to_h,
-          scope_provenance: decision.scope_provenance.to_h,
-          source_event: decision.source_event.to_h,
-          proposal_event: decision.proposal_event.to_h,
-          acceptance_event: decision.acceptance_event.to_h,
-          recorded_event: event_reference(event).to_h,
-          activated_event: nil,
-          rationale: nil,
-          recorded_actor: actor(event).to_h,
-          activated_actor: nil,
-          recorded_markers: event.markers,
-          activated_markers: nil,
-          recorded_metadata: event.metadata,
-          activated_metadata: nil,
-          recorded_causation_id: event.causation_id,
-          recorded_correlation_id: event.correlation_id,
-          activated_causation_id: nil,
-          activated_correlation_id: nil,
-          recorded_at_domain: decision.recorded_at,
-          activated_at_domain: nil,
-          recorded_at_store: event.created_at,
-          activated_at_store: nil
-        })
-      end
-
-      def store_decision_v2(event:, decision:, interpretation:)
+      def store_decision(event:, decision:, interpretation:)
         definition = normalize_definition(decision.definition)
         create_from_event(Coordinator::Read::DecisionDefinition, event:, attributes: {
           decision_id: decision.decision_id,
@@ -119,24 +84,6 @@ module Coordinator::Read
 
       def activate_decision(event:, activation:)
         record = Coordinator::Read::DecisionDefinition.find(activation.decision_id)
-        save_from_event(record, event:, attributes: {
-          policy_status: "active",
-          slot: activation.slot&.to_h,
-          partitions: activation.partitions.map(&:to_h),
-          activated_event: event_reference(event).to_h,
-          rationale: activation.rationale.to_h,
-          activated_actor: actor(event).to_h,
-          activated_markers: event.markers,
-          activated_metadata: event.metadata,
-          activated_causation_id: event.causation_id,
-          activated_correlation_id: event.correlation_id,
-          activated_at_domain: activation.activated_at,
-          activated_at_store: event.created_at
-        })
-      end
-
-      def activate_decision_v2(event:, activation:)
-        record = Coordinator::Read::DecisionDefinition.find(activation.decision_id)
         definition = definition_from(record)
         save_from_event(record, event:, attributes: {
           policy_status: "active",
@@ -156,35 +103,7 @@ module Coordinator::Read
         })
       end
 
-      def correct_decision(event:, correction:)
-        record = Coordinator::Read::DecisionDefinition.find(correction.decision_id)
-        save_from_event(record, event:, attributes: {
-          interpretation_id: correction.interpretation_id,
-          source_message_id: correction.source_message_id,
-          definition_digest: correction.definition.digest,
-          definition: correction.definition.to_h,
-          slot: correction.slot&.to_h,
-          partitions: correction.partitions.map(&:to_h),
-          classifier: correction.classifier.to_h,
-          scope_provenance: correction.scope_provenance.to_h,
-          source_event: correction.source_event.to_h,
-          proposal_event: correction.proposal_event.to_h,
-          acceptance_event: correction.acceptance_event.to_h,
-          previous_definition_digest: correction.previous_definition_digest,
-          correction_rationale: correction.rationale.to_h,
-          corrected_event: event_reference(event).to_h,
-          corrected_actor: actor(event).to_h,
-          corrected_markers: event.markers,
-          corrected_metadata: event.metadata,
-          corrected_causation_id: event.causation_id,
-          corrected_correlation_id: event.correlation_id,
-          corrected_at_domain: correction.corrected_at,
-          corrected_at_store: event.created_at,
-          correction_count: record.correction_count + 1
-        })
-      end
-
-      def correct_decision_v2(event:, correction:, interpretation:)
+      def correct_decision(event:, correction:, interpretation:)
         record = Coordinator::Read::DecisionDefinition.find(correction.decision_id)
         previous_definition_digest = record.definition_digest
         definition = normalize_definition(correction.definition)
@@ -219,25 +138,6 @@ module Coordinator::Read
       end
 
       def open_slot(event:, opening:)
-        create_from_event(Coordinator::Read::DecisionSlotHead, event:, attributes: {
-          slot_id: opening.slot.slot_id,
-          decision_id: opening.opened_by.decision_id,
-          slot: opening.slot.to_h,
-          head: opening.opened_by.to_h,
-          opened_event: event_reference(event).to_h,
-          changed_event: nil,
-          actor: actor(event).to_h,
-          markers: event.markers,
-          metadata: event.metadata,
-          causation_id: event.causation_id,
-          correlation_id: event.correlation_id,
-          opened_at_domain: opening.opened_at,
-          changed_at_domain: nil,
-          event_created_at: event.created_at
-        })
-      end
-
-      def open_slot_v2(event:, opening:)
         decision = Coordinator::Read::DecisionDefinition.find(opening.opened_by)
         generated = slot_builder.call(definition_from(decision))
         unless generated && generated.document == opening.slot
@@ -270,22 +170,6 @@ module Coordinator::Read
 
       def change_slot_head(event:, change:)
         record = Coordinator::Read::DecisionSlotHead.find(change.slot_id)
-        save_from_event(record, event:, attributes: {
-          decision_id: change.head&.decision_id,
-          head: change.head&.to_h,
-          changed_event: event_reference(event).to_h,
-          actor: actor(event).to_h,
-          markers: event.markers,
-          metadata: event.metadata,
-          causation_id: event.causation_id,
-          correlation_id: event.correlation_id,
-          changed_at_domain: change.changed_at,
-          event_created_at: event.created_at
-        })
-      end
-
-      def change_slot_head_v2(event:, change:)
-        record = Coordinator::Read::DecisionSlotHead.find(change.slot_id)
         previous_decision_id = record.decision_id
         save_from_event(record, event:, attributes: {
           decision_id: change.head&.decision_id,
@@ -308,31 +192,6 @@ module Coordinator::Read
 
         decision = Coordinator::Read::DecisionDefinition.find(change.head.decision_id)
         save_from_event(decision, event:, attributes: { slot: record.slot }) unless newer?(decision, event)
-      end
-
-      def advance_partition(event:, advancement:)
-        record = Coordinator::Read::DecisionPartitionHead.find_or_initialize_by(
-          partition_id: advancement.partition.partition_id
-        )
-        return if record.persisted? && record.partition_revision >= advancement.partition_revision
-
-        record.assign_attributes(
-          decision_id: advancement.decision.decision_id,
-          partition: advancement.partition.to_h,
-          partition_revision: advancement.partition_revision,
-          decision: advancement.decision.to_h,
-          active_decisions: advancement.active_decisions.map(&:to_h),
-          change_kind: advancement.change_kind,
-          event: event_reference(event).to_h,
-          actor: actor(event).to_h,
-          markers: event.markers,
-          metadata: event.metadata,
-          causation_id: event.causation_id,
-          correlation_id: event.correlation_id,
-          advanced_at_domain: advancement.advanced_at,
-          event_created_at: event.created_at
-        )
-        save_from_event(record, event:)
       end
 
       def apply_partition_delta(event:, delta:)

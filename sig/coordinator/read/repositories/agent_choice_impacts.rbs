@@ -4,7 +4,7 @@ module Coordinator
       class AgentChoiceImpacts
         def fetch: (String assessment_id) -> AgentChoiceImpactViewV1?
         def fetch_many: (Array[String] assessment_ids) -> Array[AgentChoiceImpactViewV1]
-        def store_assessment: (event: PgEventstore::Event, impact: Write::Events::AgentChoiceImpactAssessedV1) -> AgentChoiceImpact
+        def store_assessment: (event: PgEventstore::Event, ?projection_event: PgEventstore::Event, impact: ::Coordinator::Read::AgentChoiceImpacts::AssessmentViewV2) -> AgentChoiceImpact
         def page: (AgentChoiceImpactListQueryV1 query) -> AgentChoiceImpactPageV1
       end
     end

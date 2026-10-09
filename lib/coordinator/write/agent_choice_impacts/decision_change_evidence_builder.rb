@@ -48,16 +48,6 @@ module Coordinator::Write
 
       def definition_for(event, payload)
         case payload
-        when Events::DecisionActivatedV1
-          recorded = read_reference(payload.recorded_event)
-          return invalid_source("recorded_event_not_found", payload.recorded_event.to_h) unless recorded
-
-          recorded_payload = load(recorded)
-          return Success(recorded_payload.definition) if recorded_payload.is_a?(Events::DecisionRecordedV1)
-
-          invalid_source("recorded_event_type_invalid", payload.recorded_event.to_h)
-        when Events::DecisionDefinitionCorrectedV1
-          Success(payload.definition)
         when Events::DecisionActivatedV2
           definition = definition_before(event)
           return invalid_source("recorded_event_not_found", {}) unless definition
@@ -68,20 +58,6 @@ module Coordinator::Write
         else
           invalid_source("lifecycle_event_type_invalid", {})
         end
-      end
-
-      def read_reference(reference)
-        event = @event_store.read_at(
-          StreamReference.new(
-            context: reference.stream_context,
-            stream_name: reference.stream_name,
-            stream_id: reference.stream_id
-          ),
-          reference.stream_revision
-        )
-        return unless event && event.id == reference.event_id && event.type == reference.type
-
-        event
       end
 
       def build_evidence(event, payload, definition)
@@ -104,8 +80,6 @@ module Coordinator::Write
       def affected_partitions(event, payload, definition)
         partitions =
           case payload
-          when Events::DecisionActivatedV1 then payload.partitions
-          when Events::DecisionDefinitionCorrectedV1 then payload.previous_partitions + payload.partitions
           when Events::DecisionActivatedV2 then @partition_builder.call(definition)
           when Events::DecisionDefinitionCorrectedV2
             previous = definition_before(event)
@@ -117,7 +91,7 @@ module Coordinator::Write
       end
 
       def change_kind(payload)
-        if payload.is_a?(Events::DecisionActivatedV1) || payload.is_a?(Events::DecisionActivatedV2)
+        if payload.is_a?(Events::DecisionActivatedV2)
           "activated"
         else
           "corrected"
@@ -132,14 +106,13 @@ module Coordinator::Write
           stream_name: event.stream.stream_name,
           stream_id: event.stream.stream_id
         )
-        definition_event = @event_store.read(
+        definition_event = @event_store.read_latest(
           stream,
-          EventReadCriteria.new(
+          LatestEventReadCriteria.new(
             event_types: %w[DecisionRecorded DecisionDefinitionCorrected],
-            maximum_count: 2_048,
-            direction: :asc
+            from_revision: event.stream_revision - 1
           )
-        ).select { _1.stream_revision < event.stream_revision }.max_by(&:stream_revision)
+        )
         return unless definition_event
 
         payload = load(definition_event)
@@ -147,8 +120,6 @@ module Coordinator::Write
       end
 
       def normalize_definition(value)
-        return value if value.is_a?(Decisions::DecisionDefinitionV1)
-
         Decisions::DecisionDefinitionV1.new(
           document: value,
           digest: @canonical_json.sha256(value.to_h)

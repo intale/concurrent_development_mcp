@@ -151,6 +151,23 @@ Then("the activation Task succeeds with one complete consistency boundary") do
     decision_partition_events.map(&:type),
     "Decision partition event plan"
   )
+  expected_payloads = {
+    "DecisionRecorded" => %w[decision_id interpretation_id source_message_id definition],
+    "DecisionActivated" => %w[decision_id interpretation_id rationale],
+    "DecisionSlotOpened" => %w[slot_id slot opened_by],
+    "DecisionSlotHeadChanged" => %w[slot_id head],
+    "DecisionAddedToPartition" => %w[partition_id partition_revision decision_id]
+  }
+  [ *decision_events(decision_id), *decision_slot_events(slot_id), *decision_partition_events ].each do |event|
+    assert_acceptance_equal(
+      expected_payloads.fetch(event.type).sort, event.data.keys.sort, "#{event.type} narrow native payload"
+    )
+    assert_acceptance_equal(
+      event.type == "DecisionAddedToPartition" ? 1 : 2, event.metadata.fetch("schema_version"),
+      "#{event.type} current schema"
+    )
+    assert_acceptance(event.created_at, "#{event.type} is missing its native creation timestamp")
+  end
   assert_acceptance_equal(
     %w[CommandRegistered CommandSucceeded],
     command_events(@decision_activation.fetch(:activation_command_id)).map(&:type),
@@ -405,6 +422,15 @@ Then(
   assert_acceptance_equal("active", decision.fetch("policy_status"), "Corrected policy status")
   assert_acceptance_equal(interpretation_id, decision.fetch("interpretation_id"), "Correction interpretation")
   assert_acceptance_equal(1, decision.fetch("correction_count"), "Correction count")
+  correction = decision_events(decision_id).find { _1.type == "DecisionDefinitionCorrected" }
+  assert_acceptance_equal(2, correction.metadata.fetch("schema_version"), "Current correction schema")
+  assert_acceptance_equal(
+    %w[decision_id interpretation_id source_message_id definition rationale].sort,
+    correction.data.keys.sort, "Narrow correction fact"
+  )
+  assert_acceptance_equal(
+    correction.created_at.utc.iso8601(6), corrected.fetch("occurred_at"), "Native correction timestamp"
+  )
   assert_acceptance_equal(
     "DecisionDefinitionCorrected",
     corrected.dig("event", "type"),

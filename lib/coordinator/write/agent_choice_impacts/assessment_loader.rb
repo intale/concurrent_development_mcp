@@ -7,14 +7,12 @@ module Coordinator::Write
         event_store:,
         schema_registry: EventSchemaRegistry.new,
         marker_builder: AssessmentMarkerBuilder.new,
-        stream_factory: StreamFactory.new,
-        assessment_contract: Contracts::AgentChoiceImpactAssessment.new
+        stream_factory: StreamFactory.new
       )
         @event_store = event_store
         @schema_registry = schema_registry
         @marker_builder = marker_builder
         @stream_factory = stream_factory
-        @assessment_contract = assessment_contract
       end
 
       def call(command)
@@ -26,7 +24,7 @@ module Coordinator::Write
           GlobalMarkedEventReadCriteria.new(
             stream_context: "AgentGovernance",
             stream_name: "AgentChoiceImpact",
-            event_types: [ "AgentChoiceImpactAssessed", "AgentChoiceImpactAssessmentRecorded" ],
+            event_types: [ "AgentChoiceImpactAssessmentRecorded" ],
             markers: [ marker ],
             maximum_count: 2,
             direction: :asc
@@ -37,31 +35,13 @@ module Coordinator::Write
         return unless event
 
         payload = load(event)
-        valid =
-          case payload
-          when Events::AgentChoiceImpactAssessedV1
-            valid_legacy?(event, payload, command)
-          when Events::AgentChoiceImpactAssessmentRecordedV1
-            valid_current?(event, payload, command)
-          else
-            false
-          end
+        valid = payload.is_a?(Events::AgentChoiceImpactAssessmentRecordedV1) &&
+                valid_current?(event, payload, command)
         replay_invalid!(event) unless valid
         event
       end
 
       private
-
-      def valid_legacy?(event, payload, command)
-        validation = @assessment_contract.call(assessment: payload.assessment)
-        event.stream_revision == 0 &&
-          payload.assessment_id == event.stream.stream_id &&
-          payload.choice_id == command.choice_id &&
-          payload.accepted_choice == command.accepted_choice &&
-          payload.decision_change == command.decision_change &&
-          payload.assessment.policy_version == command.policy_version &&
-          validation.success?
-      end
 
       def valid_current?(event, payload, command)
         events = @event_store.read(

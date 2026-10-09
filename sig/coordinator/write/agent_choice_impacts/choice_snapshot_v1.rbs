@@ -3,11 +3,11 @@ module Coordinator
     module AgentChoiceImpacts
       class ChoiceSnapshotV1 < Shared::Value
         def choice_id: () -> String
-        def recorded: () -> (Events::AgentChoiceRecordedV1 | Events::AgentChoiceRecordedV2)
+        def recorded: () -> Events::AgentChoiceRecordedV2
         def recorded_event: () -> EventReference
-        def accepted: () -> (Events::AgentChoiceAcceptedV1 | Events::AgentChoiceAcceptedV2)
+        def accepted: () -> Events::AgentChoiceAcceptedV2
         def accepted_event: () -> EventReference
-        def invalidation: () -> (Events::AgentChoiceInvalidatedByDecisionV1 | Events::AgentChoiceInvalidatedByDecisionV2)?
+        def invalidation: () -> Events::AgentChoiceInvalidatedByDecisionV2?
         def invalidation_event: () -> EventReference?
       end
     end

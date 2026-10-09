@@ -4,11 +4,9 @@ module Coordinator
       class SourceV1 < Shared::Value
         def event: () -> PgEventstore::Event
         def reference: () -> Write::EventReference
-        def payload: () -> (Write::Events::DecisionActivatedV1 |
-                            Write::Events::DecisionActivatedV2 |
-                            Write::Events::DecisionDefinitionCorrectedV1 |
+        def payload: () -> (Write::Events::DecisionActivatedV2 |
                             Write::Events::DecisionDefinitionCorrectedV2 |
-                            Write::Events::AgentChoiceAcceptedV1 |
+                            Write::Events::AgentChoiceAcceptedV2 |
                             Write::Events::AgentChoiceAcceptedV2 |
                             Write::Events::AgentChoiceImpactScanStartedV2 |
                             Write::Events::AgentChoiceImpactScanProgressedV2)

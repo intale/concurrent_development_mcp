@@ -4,7 +4,6 @@ module Coordinator::Processes
   module Contracts
     class CandidateObligationProcessSource < Dry::Validation::Contract
       ALLOWED = {
-        "DecisionPartitionAdvanced" => [ "HumanGuidance", "DecisionPartition" ],
         "DecisionAddedToPartition" => [ "HumanGuidance", "DecisionPartition" ],
         "DecisionRemovedFromPartition" => [ "HumanGuidance", "DecisionPartition" ],
         "CandidateImpactSurfaceAssigned" => [ "DevelopmentIntegration", "Candidate" ],

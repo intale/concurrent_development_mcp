@@ -28,10 +28,6 @@ module Coordinator::Write
 
         payload = load(event)
         case payload
-        when Events::DecisionActivatedV1
-          activated_state(head, payload)
-        when Events::DecisionDefinitionCorrectedV1
-          corrected_state(head, payload)
         when Events::DecisionActivatedV2
           cohesive_activated_state(head, payload)
         when Events::DecisionDefinitionCorrectedV2
@@ -42,42 +38,6 @@ module Coordinator::Write
       end
 
       private
-
-      def activated_state(head, activation)
-        recorded_event = read_reference(activation.recorded_event)
-        unless recorded_event
-          invalid!("historical_decision_definition_missing", decision_head: head.to_h)
-        end
-        recorded = load(recorded_event)
-        valid = recorded.is_a?(Events::DecisionRecordedV1) &&
-                recorded.decision_id == head.decision_id &&
-                activation.decision_id == head.decision_id &&
-                activation.definition_digest == recorded.definition.digest
-        invalid!("historical_decision_activation_invalid", decision_head: head.to_h) unless valid
-
-        Decisions::DecisionCurrentStateV1.new(
-          decision_id: head.decision_id,
-          definition: recorded.definition,
-          head:,
-          slot: activation.slot,
-          partitions: activation.partitions
-        )
-      end
-
-      def corrected_state(head, correction)
-        valid = correction.decision_id == head.decision_id &&
-                correction.previous_head.decision_id == head.decision_id &&
-                correction.previous_head.decision_revision < head.decision_revision
-        invalid!("historical_decision_correction_invalid", decision_head: head.to_h) unless valid
-
-        Decisions::DecisionCurrentStateV1.new(
-          decision_id: head.decision_id,
-          definition: correction.definition,
-          head:,
-          slot: correction.slot,
-          partitions: correction.partitions
-        )
-      end
 
       def cohesive_activated_state(head, activation)
         recorded_event = @event_store.read_at(@stream_factory.decision(head.decision_id), 0)
@@ -112,18 +72,6 @@ module Coordinator::Write
           slot: nil,
           partitions: @partition_builder.call(definition)
         )
-      end
-
-      def read_reference(reference)
-        event = @event_store.read_at(
-          StreamReference.new(
-            context: reference.stream_context,
-            stream_name: reference.stream_name,
-            stream_id: reference.stream_id
-          ),
-          reference.stream_revision
-        )
-        event if event && self.reference(event) == reference
       end
 
       def load(event)

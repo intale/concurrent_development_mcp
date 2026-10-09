@@ -154,8 +154,6 @@ module Coordinator::Write
       def decision_slot_identity_from(event, proposed)
         opening = load_event(event)
         case opening
-        when Events::DecisionSlotOpenedV1
-          opening.slot.slot_id if opening.slot.document == proposed.document
         when Events::DecisionSlotOpenedV2
           opening.slot_id if opening.slot == proposed.document
         end
@@ -187,22 +185,15 @@ module Coordinator::Write
 
         correction_event = events.find { _1.type == "DecisionDefinitionCorrected" }
         recorded = load_event(recorded_event)
-        activation = load_event(activated_event)
         correction = correction_event && load_event(correction_event)
         head_event = correction_event || activated_event
         definition_payload = correction ? correction.definition : recorded.definition
         definition = normalize_definition(definition_payload)
-        if correction.is_a?(Events::DecisionDefinitionCorrectedV1) ||
-           (!correction && activation.is_a?(Events::DecisionActivatedV1))
-          slot = correction ? correction.slot : activation.slot
-          partitions = correction ? correction.partitions : activation.partitions
-        else
-          slot_result = resolve_current_slot(@decision_slot_builder.call(definition))
-          return slot_result if slot_result.failure?
+        slot_result = resolve_current_slot(@decision_slot_builder.call(definition))
+        return slot_result if slot_result.failure?
 
-          slot = slot_result.value!
-          partitions = @decision_partition_builder.call(definition)
-        end
+        slot = slot_result.value!
+        partitions = @decision_partition_builder.call(definition)
 
         Success(
           Decisions::DecisionCurrentStateV1.new(
@@ -220,8 +211,6 @@ module Coordinator::Write
       end
 
       def normalize_definition(value)
-        return value if value.is_a?(Decisions::DecisionDefinitionV1)
-
         Decisions::DecisionDefinitionV1.new(
           document: value,
           digest: @canonical_json.sha256(value.to_h)
@@ -309,7 +298,7 @@ module Coordinator::Write
         Decisions::DecisionSlotStateV1.new(
           slot:,
           opened: !opening.nil?,
-          head: change ? change.head : (opening.is_a?(Events::DecisionSlotOpenedV1) ? opening.opened_by : nil)
+          head: change&.head
         )
       end
 
@@ -322,8 +311,6 @@ module Coordinator::Write
         events.each do |event|
           payload = load_event(event)
           case payload
-          when Events::DecisionPartitionAdvancedV1
-            active = payload.active_decisions.to_h { [ _1.decision_id, _1 ] }
           when Events::DecisionAddedToPartitionV1
             head = load_decision_head(payload.decision_id)
             active[payload.decision_id] = head if head
@@ -339,11 +326,10 @@ module Coordinator::Write
       end
 
       def load_decision_head(decision_id)
-        event = @event_store.read_grouped(
+        event = @event_store.read_latest(
           @stream_factory.decision(decision_id),
-          EventQueries::DECISION_CORRECTION_STATE
-        ).select { %w[DecisionDefinitionCorrected DecisionActivated].include?(_1.type) }
-          .max_by(&:stream_revision)
+          LatestEventReadCriteria.new(event_types: %w[DecisionDefinitionCorrected DecisionActivated])
+        )
         return unless event
 
         Decisions::DecisionHeadV1.new(

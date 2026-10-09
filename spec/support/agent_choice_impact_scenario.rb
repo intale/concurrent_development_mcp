@@ -175,8 +175,6 @@ module AgentChoiceImpactScenario
       events.each do |event|
         payload = load(event)
         case payload
-        when Coordinator::Write::Events::DecisionPartitionAdvancedV1
-          active = payload.active_decisions.to_h { [ _1.decision_id, _1 ] }
         when Coordinator::Write::Events::DecisionAddedToPartitionV1
           active[payload.decision_id] = current_decision(payload.decision_id).head
         when Coordinator::Write::Events::DecisionRemovedFromPartitionV1
@@ -214,7 +212,6 @@ module AgentChoiceImpactScenario
     activated_event = events.find { _1.type == "DecisionActivated" }
     correction_event = events.find { _1.type == "DecisionDefinitionCorrected" }
     recorded = load(recorded_event)
-    activation = load(activated_event)
     correction = correction_event && load(correction_event)
     head_event = correction_event || activated_event
     definition = normalize_definition(correction ? correction.definition : recorded.definition)
@@ -226,33 +223,16 @@ module AgentChoiceImpactScenario
         decision_revision: head_event.stream_revision,
         event: reference(head_event)
       ),
-      slot: legacy_slot(correction:, activation:),
-      partitions: legacy_partitions(correction:, activation:) ||
-        Coordinator::Write::Decisions::DecisionPartitionBuilder.new.call(definition)
+      slot: nil,
+      partitions: Coordinator::Write::Decisions::DecisionPartitionBuilder.new.call(definition)
     )
   end
 
   def normalize_definition(value)
-    return value if value.is_a?(Coordinator::Write::Decisions::DecisionDefinitionV1)
-
     Coordinator::Write::Decisions::DecisionDefinitionV1.new(
       document: value,
       digest: Coordinator::Write::CanonicalJson.new.sha256(value.to_h)
     )
-  end
-
-  def legacy_slot(correction:, activation:)
-    return correction.slot if correction.is_a?(Coordinator::Write::Events::DecisionDefinitionCorrectedV1)
-    return activation.slot if !correction && activation.is_a?(Coordinator::Write::Events::DecisionActivatedV1)
-
-    nil
-  end
-
-  def legacy_partitions(correction:, activation:)
-    return correction.partitions if correction.is_a?(Coordinator::Write::Events::DecisionDefinitionCorrectedV1)
-    return activation.partitions if !correction && activation.is_a?(Coordinator::Write::Events::DecisionActivatedV1)
-
-    nil
   end
 
   def accepted_interpretation(suffix:, decision_id:, option_id:, scope:, enforcement:, relations:)

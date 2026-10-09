@@ -24,7 +24,7 @@ module Coordinator::Processes
         valid_stream = expected_stream && stream &&
                        [ stream.context, stream.stream_name ] == expected_stream &&
                        Types::IDENTIFIER_PATTERN.match?(stream.stream_id.to_s)
-        valid_schema = allowed_schema_versions(event.type).include?(event.metadata["schema_version"]) &&
+        valid_schema = event.metadata["schema_version"] == 2 &&
                        Types::IDENTIFIER_PATTERN.match?(event.metadata["command_id"].to_s)
         valid_trace = Types::UUID_V7_PATTERN.match?(event.id.to_s) &&
                       Types::UUID_V7_PATTERN.match?(event.correlation_id.to_s)
@@ -32,14 +32,6 @@ module Coordinator::Processes
         key.failure("must be a persisted AgentChoice impact process source") unless persisted && valid_stream
         key.failure("must carry a supported command schema version") unless valid_schema
         key.failure("must carry UUIDv7 event and correlation identities") unless valid_trace
-      end
-
-      private
-
-      def allowed_schema_versions(type)
-        return [ 1, 2 ] if %w[DecisionActivated DecisionDefinitionCorrected AgentChoiceAccepted].include?(type)
-
-        [ 2 ]
       end
     end
   end

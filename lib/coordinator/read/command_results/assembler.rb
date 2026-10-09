@@ -882,10 +882,6 @@ module Coordinator::Read
         payload && event_for_payload(source, payload)
       end
 
-      def partition_payload?(payload)
-        payload.is_a?(Coordinator::Write::Events::DecisionPartitionAdvancedV1)
-      end
-
       def event_reference(event)
         Coordinator::Write::EventReference.new(
           event_id: event.id,
