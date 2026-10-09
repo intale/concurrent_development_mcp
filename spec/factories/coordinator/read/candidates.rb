@@ -14,16 +14,19 @@ FactoryBot.define do
     base_commit_oid { "a" * 40 }
     head_commit_oid { "b" * 40 }
     checkpoint_kind { "final" }
-    lease_set_id { SecureRandom.uuid_v7 }
-    lease_policy_version { "coordinator-resource-lease/v2" }
-    lease_references do
+    intention_set_id { SecureRandom.uuid_v7 }
+    intention_policy_version { "coordinator-work-intention/v1" }
+    intentions do
       [
         {
-          "lease_id" => SecureRandom.uuid_v7,
+          "intention_id" => SecureRandom.uuid_v7,
           "resource_id" => SecureRandom.uuid_v7,
           "resource_kind" => "file",
           "resource_path" => "lib/factory.rb",
           "base_blob_oid" => "c" * 40,
+          "mode" => "shared",
+          "purpose" => "Implement the assigned Candidate checkpoint",
+          "context" => nil,
           "fencing_token" => 1
         }
       ]
@@ -43,9 +46,9 @@ FactoryBot.define do
     end
     submitted_actor { { "kind" => "agent", "id" => agent_id, "authenticated" => false } }
     submitted_markers { [ "candidate:#{candidate_id}" ] }
-    submitted_metadata { { "schema_version" => 1 } }
+    submitted_metadata { { "schema_version" => 3 } }
     submitted_at_domain { Time.utc(2026, 8, 30, 12) }
-    submitted_at_store { Time.utc(2026, 8, 30, 12, 0, 1) }
+    submitted_at_store { submitted_at_domain }
 
     trait :manifest_observed do
       manifest do

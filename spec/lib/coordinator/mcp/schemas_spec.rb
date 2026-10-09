@@ -8,7 +8,7 @@ RSpec.describe Coordinator::Mcp::Schemas do
     candidate_maximum = described_class.candidate_submit
       .dig(:properties, :change_manifest, :properties, :files, :maxItems)
 
-    expect(intention_set_maximum).to eq(Coordinator::Shared::Types::WRITE_SET_RESOURCE_MAXIMUM_COUNT)
+    expect(intention_set_maximum).to eq(Coordinator::Shared::Types::WORK_INTENTION_SET_MAXIMUM_RESOURCE_COUNT)
     expect(candidate_maximum).to eq(Coordinator::Shared::Types::CANDIDATE_MANIFEST_MAXIMUM_FILE_COUNT)
     expect(candidate_maximum).to be > intention_set_maximum
     expect(intention_set.dig(:properties, :resources, :items, :properties, :mode)).to include(

@@ -13,7 +13,7 @@ module Coordinator::Write
       attribute :repository_id, Types::UuidV7
       attribute :base_commit_oid, Types::GitOid
       attribute :resources, Types::Array.of(Resource).constrained(min_size: 1, max_size: 32)
-      attribute :ttl_seconds, Types::LeaseDurationSeconds
+      attribute :ttl_seconds, Types::WorkIntentionTtlSeconds
     end
   end
 end

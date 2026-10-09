@@ -203,16 +203,16 @@ RSpec.describe Coordinator::Read::Web::Queries::ProjectResources, :read_model do
       agent_id:,
       status: "started",
       base_snapshots: snapshots(repository_id),
-      write_set_repository_id: repository_id,
+      work_intention_set_repository_id: repository_id,
       work_intention_resource_id: resource_id,
       work_intention_resource_path: Coordinator::Read::Resource.find(resource_id).normalized_path,
       work_intention_id: intention_id,
       work_intention_mode: mode,
       work_intention_purpose: "Implement #{attempt_id}",
       work_intention_context: context,
-      write_set_lease_set_id: SecureRandom.uuid_v7,
-      write_set_expires_at_domain: expires_at || Time.utc(2026, 8, 30, 12, 20),
-      write_set_released_at_domain: withdrawn ? Time.utc(2026, 8, 30, 12, 4) : nil
+      work_intention_set_id: SecureRandom.uuid_v7,
+      work_intention_set_expires_at_domain: expires_at || Time.utc(2026, 8, 30, 12, 20),
+      work_intention_set_withdrawn_at_domain: withdrawn ? Time.utc(2026, 8, 30, 12, 4) : nil
     )
   end
 

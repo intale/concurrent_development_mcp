@@ -11,7 +11,7 @@ RSpec.describe Coordinator::Read::AttemptHistory, :read_model do
       "commit_oid" => "a" * 40
     )
     expect(attempt.authorization_event).to include(
-      "type" => "AttemptAuthorized",
+      "type" => "AttemptStarted",
       "stream_id" => attempt.attempt_id
     )
   end

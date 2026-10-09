@@ -2,8 +2,6 @@ module Coordinator
   module Read
     module Projections
       class CoordContextStateLoader
-        TERMINAL_ATTEMPT_STATUSES: Array[String]
-
         def call: (Hash[String | Symbol, untyped] document) -> CoordContextStateV1
       end
     end

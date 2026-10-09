@@ -172,7 +172,7 @@ module Coordinator::Write
       attribute :repository_id, Types::RepositoryId
       attribute :base_commit_oid, Types::GitOid
       attribute :resources, Types::Array.of(Resource).constrained(min_size: 1, max_size: 32)
-      attribute :ttl_seconds, Types::LeaseDurationSeconds
+      attribute :ttl_seconds, Types::WorkIntentionTtlSeconds
     end
 
     class DeclareWorkIntentionSetV1 < BaseV1
@@ -213,7 +213,7 @@ module Coordinator::Write
       attribute :attempt_id, Types::Identifier
       attribute :intention_set_id, Types::UuidV7
       attribute :intentions, Types::Array.of(Reference).constrained(min_size: 1, max_size: 32)
-      attribute :ttl_seconds, Types::LeaseDurationSeconds
+      attribute :ttl_seconds, Types::WorkIntentionTtlSeconds
     end
 
     class RenewWorkIntentionSetV1 < BaseV1
@@ -455,7 +455,7 @@ module Coordinator::Write
     class ClaimVerificationObligationInputV1 < Value
       attribute :actor, ActorV1
       attribute :obligation_id, Types::Identifier
-      attribute :claim_duration_seconds, Types::LeaseDurationSeconds
+      attribute :claim_duration_seconds, Types::WorkIntentionTtlSeconds
     end
 
     class ClaimVerificationObligationV1 < BaseV1

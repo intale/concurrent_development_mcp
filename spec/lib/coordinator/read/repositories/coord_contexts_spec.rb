@@ -13,7 +13,7 @@ RSpec.describe Coordinator::Read::Repositories::CoordContexts, :read_model do
     resource_id = SecureRandom.uuid_v7
     create(
       :coordinator_read_attempt_history,
-      :with_write_set,
+      :with_work_intention_set,
       attempt_id:,
       change_set_id:,
       work_item_id:,
@@ -42,7 +42,7 @@ RSpec.describe Coordinator::Read::Repositories::CoordContexts, :read_model do
       stream: Coordinator::Write::StreamFactory.new.resource_work_intention(intention_id),
       stream_revision: 0,
       global_position: 1_000,
-      policy_version: Coordinator::Write::LeaseResourceV2::POLICY_VERSION,
+      policy_version: Coordinator::Write::WorkIntentionPolicyV1::VERSION,
       created_at: Time.utc(2026, 9, 11, 12)
     )
     view = Coordinator::Read::WorkIntentionSetViewV1.new(
@@ -52,7 +52,7 @@ RSpec.describe Coordinator::Read::Repositories::CoordContexts, :read_model do
       attempt_id:,
       repository_id:,
       agent_id: "agent-rebuild",
-      policy_version: Coordinator::Write::LeaseResourceV2::POLICY_VERSION,
+      policy_version: Coordinator::Write::WorkIntentionPolicyV1::VERSION,
       intentions: [
         Coordinator::Read::WorkIntentionViewV1.new(
           intention_id:,
@@ -69,7 +69,7 @@ RSpec.describe Coordinator::Read::Repositories::CoordContexts, :read_model do
       created_event: event,
       last_expanded_event: nil,
       last_renewed_event: nil,
-      release_event: nil,
+      withdrawal_event: nil,
       declared_at: "2026-09-11T12:00:00.000000Z",
       last_expanded_at: nil,
       last_renewed_at: nil,
@@ -86,12 +86,12 @@ RSpec.describe Coordinator::Read::Repositories::CoordContexts, :read_model do
 
     history = Coordinator::Read::AttemptHistory.find(attempt_id)
     expect(history).to have_attributes(
-      write_set_lease_set_id: set_id,
-      write_set_repository_id: repository_id,
-      write_set_reserved_at_domain: Time.utc(2026, 9, 11, 12),
-      write_set_expires_at_domain: Time.utc(2026, 9, 11, 13)
+      work_intention_set_id: set_id,
+      work_intention_set_repository_id: repository_id,
+      work_intention_set_declared_at_domain: Time.utc(2026, 9, 11, 12),
+      work_intention_set_expires_at_domain: Time.utc(2026, 9, 11, 13)
     )
-    expect(history.write_set_resources.sole).to include(
+    expect(history.work_intention_set_intentions.sole).to include(
       "intention_id" => intention_id,
       "resource_id" => resource_id,
       "resource_path" => "app/models/example.rb",

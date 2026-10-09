@@ -134,17 +134,6 @@ RSpec.describe Coordinator::Write::Domain::Candidates::SubmitImpactSurface do
     )
   end
 
-  def lease_reference
-    Coordinator::Write::LeaseReferenceV2.new(
-      resource_id: "01919191-9191-7191-8191-919191919190",
-      resource_kind: "file",
-      resource_path: "Gemfile",
-      base_blob_oid: "c" * 40,
-      lease_id: "01919191-9191-7191-8191-919191919192",
-      fencing_token: 1
-    )
-  end
-
   def event_reference
     Coordinator::Write::EventReference.new(
       event_id: "01919191-9191-7191-8191-919191919193",

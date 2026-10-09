@@ -12,9 +12,9 @@ module Coordinator
       attr_reader base_commit_oid: String
       attr_reader head_commit_oid: String
       attr_reader checkpoint_kind: String
-      attr_reader lease_set_id: String
-      attr_reader lease_policy_version: String
-      attr_reader lease_references: Array[Write::LeaseReferenceV2]
+      attr_reader intention_set_id: String
+      attr_reader intention_policy_version: String
+      attr_reader intentions: Array[WorkIntentionViewV1]
       attr_reader manifest_digest: String
       attr_reader build_context_digest: String?
       attr_reader evidence_status: String

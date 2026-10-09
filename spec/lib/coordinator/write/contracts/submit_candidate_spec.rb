@@ -60,7 +60,7 @@ RSpec.describe Coordinator::Write::Contracts::SubmitCandidate do
 
   it "bounds Candidate file evidence independently of the write-set resource count" do
     maximum = Coordinator::Shared::Types::CANDIDATE_MANIFEST_MAXIMUM_FILE_COUNT
-    expect(maximum).to be > Coordinator::Shared::Types::WRITE_SET_RESOURCE_MAXIMUM_COUNT
+    expect(maximum).to be > Coordinator::Shared::Types::WORK_INTENTION_SET_MAXIMUM_RESOURCE_COUNT
 
     files = Array.new(maximum + 1) do |index|
       file(old_path: "lib/example_#{index}.rb")

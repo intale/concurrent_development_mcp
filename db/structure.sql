@@ -122,20 +122,20 @@ CREATE TABLE public.attempt_histories (
     terminal_event jsonb,
     updated_at timestamp(6) without time zone NOT NULL,
     work_item_id character varying NOT NULL,
-    write_set_lease_set_id character varying,
-    write_set_repository_id character varying,
-    write_set_policy_version character varying,
-    write_set_resources jsonb DEFAULT '[]'::jsonb NOT NULL,
-    write_set_reserved_event jsonb,
-    write_set_reserved_at_domain timestamp(6) without time zone,
-    write_set_last_expanded_event jsonb,
-    write_set_last_expanded_at_domain timestamp(6) without time zone,
-    write_set_last_renewed_event jsonb,
-    write_set_last_renewed_at_domain timestamp(6) without time zone,
-    write_set_previous_expires_at_domain timestamp(6) without time zone,
-    write_set_expires_at_domain timestamp(6) without time zone,
-    write_set_release_event jsonb,
-    write_set_released_at_domain timestamp(6) without time zone,
+    work_intention_set_id character varying,
+    work_intention_set_repository_id character varying,
+    work_intention_set_policy_version character varying,
+    work_intention_set_intentions jsonb DEFAULT '[]'::jsonb CONSTRAINT attempt_histories_write_set_resources_not_null NOT NULL,
+    work_intention_set_declared_event jsonb,
+    work_intention_set_declared_at_domain timestamp(6) without time zone,
+    work_intention_set_last_expanded_event jsonb,
+    work_intention_set_last_expanded_at_domain timestamp(6) without time zone,
+    work_intention_set_last_renewed_event jsonb,
+    work_intention_set_last_renewed_at_domain timestamp(6) without time zone,
+    work_intention_set_previous_expires_at_domain timestamp(6) without time zone,
+    work_intention_set_expires_at_domain timestamp(6) without time zone,
+    work_intention_set_withdrawal_event jsonb,
+    work_intention_set_withdrawn_at_domain timestamp(6) without time zone,
     projection_version integer DEFAULT 4 NOT NULL
 );
 
@@ -217,9 +217,9 @@ CREATE TABLE public.candidates (
     impact_markers jsonb,
     impact_metadata jsonb,
     impact_surface jsonb,
-    lease_policy_version character varying NOT NULL,
-    lease_references jsonb DEFAULT '[]'::jsonb NOT NULL,
-    lease_set_id character varying NOT NULL,
+    intention_policy_version character varying CONSTRAINT candidates_lease_policy_version_not_null NOT NULL,
+    intentions jsonb DEFAULT '[]'::jsonb CONSTRAINT candidates_lease_references_not_null NOT NULL,
+    intention_set_id character varying CONSTRAINT candidates_lease_set_id_not_null NOT NULL,
     manifest jsonb,
     manifest_actor jsonb,
     manifest_at_domain timestamp(6) without time zone,
@@ -1113,43 +1113,43 @@ CREATE TABLE public.resources (
 --
 
 CREATE VIEW public.resource_work_intention_browser_rows AS
- SELECT COALESCE((membership.value ->> 'intention_id'::text), (membership.value ->> 'lease_id'::text)) AS intention_id,
+ SELECT (membership.value ->> 'intention_id'::text) AS intention_id,
     (membership.value ->> 'resource_id'::text) AS resource_id,
-    attempt.write_set_lease_set_id AS intention_set_id,
-    attempt.write_set_repository_id AS repository_id,
+    attempt.work_intention_set_id AS intention_set_id,
+    attempt.work_intention_set_repository_id AS repository_id,
     repository.scope AS project_scope,
     repository.display_name AS project_name,
     COALESCE(resource.kind, ((membership.value ->> 'resource_kind'::text))::character varying) AS resource_kind,
     COALESCE(resource.normalized_path, (membership.value ->> 'resource_path'::text)) AS resource_path,
     resource.lifecycle_status AS resource_lifecycle_status,
     (membership.value ->> 'base_blob_oid'::text) AS base_blob_oid,
-    COALESCE((membership.value ->> 'mode'::text), 'exclusive'::text) AS mode,
-    COALESCE((membership.value ->> 'purpose'::text), 'Legacy Resource reservation'::text) AS purpose,
+    (membership.value ->> 'mode'::text) AS mode,
+    (membership.value ->> 'purpose'::text) AS purpose,
     (membership.value ->> 'context'::text) AS context,
     ((membership.value ->> 'fencing_token'::text))::bigint AS fencing_token,
-    attempt.write_set_policy_version AS policy_version,
+    attempt.work_intention_set_policy_version AS policy_version,
     attempt.change_set_id,
     attempt.work_item_id,
     attempt.attempt_id,
     attempt.agent_id,
-    attempt.write_set_reserved_event AS declared_event,
-    attempt.write_set_reserved_at_domain AS declared_at_domain,
-    attempt.write_set_last_expanded_event AS last_expanded_event,
-    attempt.write_set_last_expanded_at_domain AS last_expanded_at_domain,
-    attempt.write_set_last_renewed_event AS last_renewed_event,
-    attempt.write_set_last_renewed_at_domain AS last_renewed_at_domain,
-    attempt.write_set_previous_expires_at_domain AS previous_expires_at_domain,
-    attempt.write_set_expires_at_domain AS expires_at_domain,
-    attempt.write_set_release_event AS withdrawal_event,
-    attempt.write_set_released_at_domain AS withdrawn_at_domain,
+    attempt.work_intention_set_declared_event AS declared_event,
+    attempt.work_intention_set_declared_at_domain AS declared_at_domain,
+    attempt.work_intention_set_last_expanded_event AS last_expanded_event,
+    attempt.work_intention_set_last_expanded_at_domain AS last_expanded_at_domain,
+    attempt.work_intention_set_last_renewed_event AS last_renewed_event,
+    attempt.work_intention_set_last_renewed_at_domain AS last_renewed_at_domain,
+    attempt.work_intention_set_previous_expires_at_domain AS previous_expires_at_domain,
+    attempt.work_intention_set_expires_at_domain AS expires_at_domain,
+    attempt.work_intention_set_withdrawal_event AS withdrawal_event,
+    attempt.work_intention_set_withdrawn_at_domain AS withdrawn_at_domain,
     attempt.terminal_event AS attempt_terminal_event,
     attempt.terminal_at_domain AS attempt_terminal_at_domain,
     attempt.updated_at
    FROM (((public.attempt_histories attempt
-     JOIN public.repositories repository ON (((repository.repository_id)::text = (attempt.write_set_repository_id)::text)))
-     CROSS JOIN LATERAL jsonb_array_elements(attempt.write_set_resources) membership(value))
-     LEFT JOIN public.resources resource ON ((((resource.resource_id)::text = (membership.value ->> 'resource_id'::text)) AND ((resource.repository_id)::text = (attempt.write_set_repository_id)::text))))
-  WHERE (attempt.write_set_lease_set_id IS NOT NULL);
+     JOIN public.repositories repository ON (((repository.repository_id)::text = (attempt.work_intention_set_repository_id)::text)))
+     CROSS JOIN LATERAL jsonb_array_elements(attempt.work_intention_set_intentions) membership(value))
+     LEFT JOIN public.resources resource ON ((((resource.resource_id)::text = (membership.value ->> 'resource_id'::text)) AND ((resource.repository_id)::text = (attempt.work_intention_set_repository_id)::text))))
+  WHERE (attempt.work_intention_set_id IS NOT NULL);
 
 
 --
@@ -1709,10 +1709,10 @@ CREATE INDEX idx_artifact_observations_exact_locator ON public.development_artif
 
 
 --
--- Name: idx_attempt_histories_current_write_sets; Type: INDEX; Schema: public; Owner: -
+-- Name: idx_attempt_histories_current_work_intention_sets; Type: INDEX; Schema: public; Owner: -
 --
 
-CREATE INDEX idx_attempt_histories_current_write_sets ON public.attempt_histories USING btree (write_set_repository_id, write_set_expires_at_domain, attempt_id) WHERE ((write_set_lease_set_id IS NOT NULL) AND (write_set_released_at_domain IS NULL) AND (terminal_at_domain IS NULL));
+CREATE INDEX idx_attempt_histories_current_work_intention_sets ON public.attempt_histories USING btree (work_intention_set_repository_id, work_intention_set_expires_at_domain, attempt_id) WHERE ((work_intention_set_id IS NOT NULL) AND (work_intention_set_withdrawn_at_domain IS NULL) AND (terminal_at_domain IS NULL));
 
 
 --
@@ -1726,7 +1726,14 @@ CREATE INDEX idx_attempt_histories_event_time ON public.attempt_histories USING 
 -- Name: idx_attempt_histories_work_intention_browser; Type: INDEX; Schema: public; Owner: -
 --
 
-CREATE INDEX idx_attempt_histories_work_intention_browser ON public.attempt_histories USING btree (write_set_repository_id, updated_at DESC, attempt_id DESC) WHERE (write_set_lease_set_id IS NOT NULL);
+CREATE INDEX idx_attempt_histories_work_intention_browser ON public.attempt_histories USING btree (work_intention_set_repository_id, updated_at DESC, attempt_id DESC) WHERE (work_intention_set_id IS NOT NULL);
+
+
+--
+-- Name: idx_attempt_histories_work_intention_set_identity; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE UNIQUE INDEX idx_attempt_histories_work_intention_set_identity ON public.attempt_histories USING btree (work_intention_set_id, attempt_id) WHERE (work_intention_set_id IS NOT NULL);
 
 
 --
@@ -1734,13 +1741,6 @@ CREATE INDEX idx_attempt_histories_work_intention_browser ON public.attempt_hist
 --
 
 CREATE UNIQUE INDEX idx_attempt_histories_work_item_cursor ON public.attempt_histories USING btree (work_item_id, authorized_global_position, attempt_id);
-
-
---
--- Name: idx_attempt_histories_write_set_identity; Type: INDEX; Schema: public; Owner: -
---
-
-CREATE UNIQUE INDEX idx_attempt_histories_write_set_identity ON public.attempt_histories USING btree (write_set_lease_set_id, attempt_id) WHERE (write_set_lease_set_id IS NOT NULL);
 
 
 --
@@ -2657,6 +2657,7 @@ ALTER TABLE ONLY public.operation_batch_outcomes
 SET search_path TO "$user", public;
 
 INSERT INTO "schema_migrations" (version) VALUES
+('20261009101000'),
 ('20260914125000'),
 ('20260914070000'),
 ('20260911103000'),

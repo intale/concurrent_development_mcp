@@ -6,7 +6,7 @@ module Coordinator::Write
       attribute :command_id, Types::Identifier
       attribute :actor, Actor
       attribute :obligation_id, Types::Identifier
-      attribute :claim_duration_seconds, Types::LeaseDurationSeconds
+      attribute :claim_duration_seconds, Types::WorkIntentionTtlSeconds
     end
   end
 end

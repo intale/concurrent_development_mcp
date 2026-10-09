@@ -1,0 +1,12 @@
+module Coordinator::Read::CommandResults
+  class InstructionLoader
+    def initialize: (event_store: Coordinator::Write::_EventStore, ?schema_registry: Coordinator::Write::EventSchemaRegistry, ?stream_factory: Coordinator::Write::StreamFactory, ?target_command_builder: Coordinator::Write::Tasks::TargetCommandBuilder, ?batch_item_builder: Coordinator::Write::OperationBatches::ItemBuilder) -> void
+    def for_registration: (PgEventstore::Event registration) -> Coordinator::Write::CommandInputDocuments::BaseV1?
+    def call: (CommandState command_state, registration: PgEventstore::Event) -> Coordinator::Write::CommandInputDocuments::BaseV1?
+    private
+    def find_task_submission: (String command_id) -> PgEventstore::Event?
+    def find_batch_item: (String command_id, registration: PgEventstore::Event) -> Coordinator::Write::OperationBatches::ItemV2?
+    def validated_command_input: (Coordinator::Write::CommandInputDocuments::BaseV1 command_input, command_state: CommandState, registration: PgEventstore::Event) -> Coordinator::Write::CommandInputDocuments::BaseV1
+    def load_payload: (PgEventstore::Event event) -> Coordinator::Write::Events::Base
+  end
+end

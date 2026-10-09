@@ -87,22 +87,22 @@ module Coordinator::Read
       def update_work_intention_set(event:, payload:)
         record = attempt_history!(payload)
         update_record(record, event,
-          write_set_lease_set_id: payload.set_id,
-          write_set_repository_id: payload.repository_id,
-          write_set_policy_version: payload.policy_version,
-          write_set_resources: sorted_resources(payload.intentions),
-          write_set_reserved_event: event_reference(payload.created_event).to_h,
-          write_set_reserved_at_domain: payload.declared_at,
-          write_set_last_expanded_event: payload.last_expanded_event &&
+          work_intention_set_id: payload.set_id,
+          work_intention_set_repository_id: payload.repository_id,
+          work_intention_set_policy_version: payload.policy_version,
+          work_intention_set_intentions: sorted_resources(payload.intentions),
+          work_intention_set_declared_event: event_reference(payload.created_event).to_h,
+          work_intention_set_declared_at_domain: payload.declared_at,
+          work_intention_set_last_expanded_event: payload.last_expanded_event &&
             event_reference(payload.last_expanded_event).to_h,
-          write_set_last_expanded_at_domain: payload.last_expanded_at,
-          write_set_last_renewed_event: payload.last_renewed_event &&
+          work_intention_set_last_expanded_at_domain: payload.last_expanded_at,
+          work_intention_set_last_renewed_event: payload.last_renewed_event &&
             event_reference(payload.last_renewed_event).to_h,
-          write_set_last_renewed_at_domain: payload.last_renewed_at,
-          write_set_previous_expires_at_domain: payload.previous_expires_at,
-          write_set_expires_at_domain: payload.expires_at,
-          write_set_release_event: payload.release_event && event_reference(payload.release_event).to_h,
-          write_set_released_at_domain: payload.withdrawn_at
+          work_intention_set_last_renewed_at_domain: payload.last_renewed_at,
+          work_intention_set_previous_expires_at_domain: payload.previous_expires_at,
+          work_intention_set_expires_at_domain: payload.expires_at,
+          work_intention_set_withdrawal_event: payload.withdrawal_event && event_reference(payload.withdrawal_event).to_h,
+          work_intention_set_withdrawn_at_domain: payload.withdrawn_at
         )
       end
 

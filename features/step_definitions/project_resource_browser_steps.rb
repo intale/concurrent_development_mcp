@@ -34,7 +34,7 @@ Given("projected resource rows contain two running agents but only one active wo
     "A-ui-owner",
     "luna-owner",
     resource: leased,
-    trait: :with_write_set
+    trait: :with_work_intention_set
   )
   FactoryBot.create(
     :coordinator_read_attempt_history,
@@ -60,21 +60,21 @@ Given("projected resource rows represent expanded renewed withdrawn and expired 
     "luna-active",
     resource: first,
     expanded_resource: second,
-    trait: :expanded_and_renewed_write_set
+    trait: :expanded_and_renewed_work_intention_set
   )
   create_resource_browser_attempt(
     "A-ui-lifecycle-released",
     "luna-released",
     resource: released_first,
     expanded_resource: released_second,
-    trait: :completed_write_set_lifecycle
+    trait: :withdrawn_expanded_work_intention_set
   )
   @expired_resource_browser_intention_id = SecureRandom.uuid_v7
   create_resource_browser_attempt(
     "A-ui-lifecycle-expired",
     "luna-expired",
     resource: expired,
-    trait: :with_write_set,
+    trait: :with_work_intention_set,
     intention_id: @expired_resource_browser_intention_id,
     expires_at: Time.utc(2020, 8, 31, 12)
   )
@@ -87,7 +87,7 @@ Given("projected resource rows retain an old active work intention and one hundr
     "A-ui-old-active",
     "luna-old-active",
     resource:,
-    trait: :with_write_set
+    trait: :with_work_intention_set
   )
   101.times do |index|
     FactoryBot.create(
@@ -213,17 +213,17 @@ def create_resource_browser_attempt(
     agent_id:,
     status: "started",
     base_snapshots: resource_browser_snapshots,
-    write_set_repository_id: @resource_browser_repository_id,
-    write_set_resource_id: resource.resource_id,
-    write_set_resource_path: resource.normalized_path,
-    write_set_lease_id: intention_id,
-    write_set_lease_set_id: SecureRandom.uuid_v7,
-    write_set_expires_at_domain: expires_at
+    work_intention_set_repository_id: @resource_browser_repository_id,
+    work_intention_resource_id: resource.resource_id,
+    work_intention_resource_path: resource.normalized_path,
+    work_intention_id: intention_id,
+    work_intention_set_id: SecureRandom.uuid_v7,
+    work_intention_set_expires_at_domain: expires_at
   }
   if expanded_resource
     attributes[:expanded_resource_id] = expanded_resource.resource_id
     attributes[:expanded_resource_path] = expanded_resource.normalized_path
-    attributes[:expanded_lease_id] = SecureRandom.uuid_v7
+    attributes[:expanded_intention_id] = SecureRandom.uuid_v7
   end
 
   FactoryBot.create(:coordinator_read_attempt_history, trait, **attributes)

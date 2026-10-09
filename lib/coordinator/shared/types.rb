@@ -131,11 +131,10 @@ module Coordinator::Shared
       (OPERATION_BATCH_MAXIMUM_ITEMS * 2) + # outcome and terminal-command link per item
       OPERATION_BATCH_MAXIMUM_CONTINUATIONS +
       2 # cancellation request plus either cancellation or completion
-    WRITE_SET_RESOURCE_MAXIMUM_COUNT = 32
+    WORK_INTENTION_SET_MAXIMUM_RESOURCE_COUNT = 32
     CANDIDATE_MANIFEST_MAXIMUM_FILE_COUNT = 1_000
     CANDIDATE_ACTUAL_RESOURCE_MAXIMUM_COUNT = CANDIDATE_MANIFEST_MAXIMUM_FILE_COUNT * 2
-    RESOURCE_LEASE_POLICY_VERSIONS = %w[
-      coordinator-resource-lease/v2
+    WORK_INTENTION_POLICY_VERSIONS = %w[
       coordinator-work-intention/v1
     ].freeze
 
@@ -541,12 +540,12 @@ module Coordinator::Shared
     ResourcePath = String.constrained(format: RESOURCE_PATH_PATTERN)
     ResourceKind = String.enum("file", "directory")
     ResourceMarker = String.constrained(min_size: 1, max_size: RESOURCE_MARKER_MAXIMUM_BYTES)
-    ResourceLeasePolicyVersion = String.enum(*RESOURCE_LEASE_POLICY_VERSIONS)
+    WorkIntentionPolicyVersion = String.enum(*WORK_INTENTION_POLICY_VERSIONS)
     LeaseMode = String.enum("shared", "exclusive")
     WorkIntentionMode = LeaseMode
     WorkIntentionPurpose = String.constrained(min_size: 1, max_size: 1_000)
     WorkIntentionContext = String.constrained(min_size: 1, max_size: 4_000)
-    LeaseDurationSeconds = Integer.constrained(gteq: 30, lteq: 3_600)
+    WorkIntentionTtlSeconds = Integer.constrained(gteq: 30, lteq: 3_600)
     WriteSetSize = Integer.constrained(gteq: 1, lteq: 32)
     ExpandedWriteSetSize = Integer.constrained(gteq: 2, lteq: 32)
     FencingToken = Integer.constrained(gteq: 1)

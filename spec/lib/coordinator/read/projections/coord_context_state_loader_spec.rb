@@ -21,6 +21,7 @@ RSpec.describe Coordinator::Read::Projections::CoordContextStateLoader do
           status: "started",
           authorized_at: "2026-09-14T06:59:04.639069Z",
           started_at: "2026-09-14T06:59:04.639069Z",
+          work_intention_set: nil,
           selected_candidate_id: nil,
           selected_candidate_event: nil,
           completed_at: nil,
@@ -38,7 +39,7 @@ RSpec.describe Coordinator::Read::Projections::CoordContextStateLoader do
     )
   end
 
-  it "compacts terminal work-intention details before enforcing the current projection schema" do
+  it "keeps the current terminal Attempt readable without active work intentions" do
     document = Coordinator::Read::Projections::CoordContextStateV1.initial.to_h.merge(
       attempts: [
         {
@@ -56,7 +57,7 @@ RSpec.describe Coordinator::Read::Projections::CoordContextStateLoader do
           status: "abandoned",
           authorized_at: "2026-08-29T10:00:00.000000Z",
           started_at: "2026-08-29T10:00:01.000000Z",
-          work_intention_set: { removed_projection_shape: true },
+          work_intention_set: nil,
           selected_candidate_id: nil,
           selected_candidate_event: nil,
           completed_at: nil,

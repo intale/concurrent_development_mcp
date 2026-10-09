@@ -12,9 +12,9 @@ module Coordinator
       def base_commit_oid: () -> String
       def head_commit_oid: () -> String
       def checkpoint_kind: () -> String
-      def lease_set_id: () -> String
-      def lease_policy_version: () -> String
-      def lease_references: () -> Array[Hash[String, untyped]]
+      def intention_set_id: () -> String
+      def intention_policy_version: () -> String
+      def intentions: () -> Array[Hash[String, untyped]]
       def manifest_digest: () -> String
       def build_context_digest: () -> String?
       def evidence_status: () -> String

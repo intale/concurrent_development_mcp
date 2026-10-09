@@ -1,5 +1,26 @@
 module Coordinator::Read
   class CandidateSubmissionViewV2 < Coordinator::Shared::Value
-    Lease: untyped
+    Intention: singleton(Coordinator::Read::WorkIntentionViewV1)
+    attr_reader candidate_id: String
+    attr_reader change_set_id: String
+    attr_reader work_item_id: String
+    attr_reader attempt_id: String
+    attr_reader agent_id: String
+    attr_reader repository_id: String
+    attr_reader target_branch: String
+    attr_reader object_format: String
+    attr_reader base_commit_oid: String
+    attr_reader head_commit_oid: String
+    attr_reader checkpoint_kind: String
+    attr_reader intention_set_id: String
+    attr_reader intentions: Array[Coordinator::Read::WorkIntentionViewV1]
+    attr_reader manifest_digest: String
+    attr_reader build_context_digest: String?
+    attr_reader evidence_status: String
+    attr_reader manifest: Coordinator::Write::Events::CandidateChangeManifestCapturedV2
+    attr_reader build_context: Coordinator::Write::Events::CandidateBuildContextCapturedV2?
+    attr_reader submitted_event: PgEventstore::Event
+    attr_reader manifest_event: PgEventstore::Event
+    attr_reader build_context_event: PgEventstore::Event?
   end
 end

@@ -55,6 +55,15 @@ Feature: Attributed Candidate checkpoints
 
   Rule: Available history may lag while the write side protects head ownership
 
+    Scenario: Later intention expansion does not alter a delayed checkpoint projection
+      Given Candidate coordination "EXPANDED" gives agent "agent-a" an active work intention on "lib/original.rb"
+      When the agent submits Candidate "CAN-CUC-EXPANDED" with command "cmd-cuc-can-expanded" at head "b" without build context
+      Then the Candidate Task completes with an attributed unverified checkpoint
+      And Candidate "CAN-CUC-EXPANDED" is honestly not observed before projection
+      When the agent adds a work intention on "lib/later.rb" before the checkpoint is projected
+      And the Candidate "CAN-CUC-EXPANDED" evidence and Attempt context reach the read side
+      Then Candidate "CAN-CUC-EXPANDED" retains its original intention while current Attempt context includes both intentions
+
     Scenario: An older checkpoint remains available while a newer Candidate is still projecting
       Given Candidate coordination "LAG" gives agent "agent-a" an active work intention on "lib/lag.rb"
       When Candidate "CAN-CUC-LAG-OLD" at head "b" is submitted and fully projected

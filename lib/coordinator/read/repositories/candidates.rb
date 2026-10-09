@@ -26,9 +26,9 @@ module Coordinator::Read
           base_commit_oid: candidate.base_commit_oid,
           head_commit_oid: candidate.head_commit_oid,
           checkpoint_kind: candidate.checkpoint_kind,
-          lease_set_id: candidate.intention_set_id,
-          lease_policy_version: Coordinator::Write::LeaseResourceV2::POLICY_VERSION,
-          lease_references: candidate.lease_references.map(&:to_h),
+          intention_set_id: candidate.intention_set_id,
+          intention_policy_version: Coordinator::Write::WorkIntentionPolicyV1::VERSION,
+          intentions: candidate.intentions.map(&:to_h),
           manifest_digest: candidate.manifest_digest,
           build_context_digest: candidate.build_context_digest,
           evidence_status: candidate.evidence_status,
@@ -119,10 +119,10 @@ module Coordinator::Read
           base_commit_oid: record.base_commit_oid,
           head_commit_oid: record.head_commit_oid,
           checkpoint_kind: record.checkpoint_kind,
-          lease_set_id: record.lease_set_id,
-          lease_policy_version: record.lease_policy_version,
-          lease_references: record.lease_references.map do |reference|
-            Coordinator::Write::LeaseReferenceV2.new(symbolize(reference))
+          intention_set_id: record.intention_set_id,
+          intention_policy_version: record.intention_policy_version,
+          intentions: record.intentions.map do |reference|
+            WorkIntentionViewV1.new(symbolize(reference))
           end,
           manifest_digest: record.manifest_digest,
           build_context_digest: record.build_context_digest,

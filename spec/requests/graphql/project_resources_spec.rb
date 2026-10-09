@@ -278,15 +278,15 @@ RSpec.describe "Project resource GraphQL", :read_model do
       base_snapshots: [
         { "repository_id" => resource.repository_id, "object_format" => "sha1", "commit_oid" => "a" * 40 }
       ],
-      write_set_repository_id: resource.repository_id,
+      work_intention_set_repository_id: resource.repository_id,
       work_intention_resource_id: resource_id,
       work_intention_resource_path: resource.normalized_path,
       work_intention_id: intention_id,
       work_intention_mode: "shared",
       work_intention_purpose: "Implement #{attempt_id}",
       work_intention_context: "Keep the intent visible to peers",
-      write_set_lease_set_id: SecureRandom.uuid_v7,
-      write_set_expires_at_domain: expires_at
+      work_intention_set_id: SecureRandom.uuid_v7,
+      work_intention_set_expires_at_domain: expires_at
     )
   end
 

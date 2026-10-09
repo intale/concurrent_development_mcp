@@ -9,7 +9,7 @@ module Coordinator::Read
       attribute :repository_id, Types::RepositoryId
       attribute :resources,
                 Types::Array.of(Reference)
-                  .constrained(min_size: 1, max_size: Coordinator::Shared::Types::WRITE_SET_RESOURCE_MAXIMUM_COUNT)
+                  .constrained(min_size: 1, max_size: Coordinator::Shared::Types::WORK_INTENTION_SET_MAXIMUM_RESOURCE_COUNT)
       attribute :created_at, Types::Timestamp
       attribute :current_expires_at, Types::Timestamp
       attribute :before_command_expires_at, Types::Timestamp.optional

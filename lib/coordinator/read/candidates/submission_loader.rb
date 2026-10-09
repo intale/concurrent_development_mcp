@@ -19,11 +19,15 @@ module Coordinator::Read
       def initialize(
         event_store:,
         stream_factory: Coordinator::Write::StreamFactory.new,
-        schema_registry: Coordinator::Write::EventSchemaRegistry.new
+        schema_registry: Coordinator::Write::EventSchemaRegistry.new,
+        instruction_loader: CommandResults::InstructionLoader.new(event_store:),
+        target_command_builder: Coordinator::Write::Tasks::TargetCommandBuilder.new
       )
         @event_store = event_store
         @stream_factory = stream_factory
         @schema_registry = schema_registry
+        @instruction_loader = instruction_loader
+        @target_command_builder = target_command_builder
       end
 
       def call(candidate_id)
@@ -55,6 +59,18 @@ module Coordinator::Read
           raise InvalidProjectionSource, "Candidate facts disagree on candidate_id"
         end
 
+        command = load_command(created_event)
+        consistent = command.candidate_id == candidate_id &&
+          command.change_set_id == attempt.change_set_id && command.work_item_id == attempt.work_item_id &&
+          command.attempt_id == attempt.attempt_id && command.repository_id == repository.repository_id &&
+          command.intention_set_id == intention_set.intention_set_id && command.target_branch == branch.target_branch &&
+          command.object_format == commit_range.object_format && command.base_commit_oid == commit_range.base_commit_oid &&
+          command.head_commit_oid == commit_range.head_commit_oid && command.checkpoint_kind == checkpoint.checkpoint_kind &&
+          command.actor.id == created_event.metadata.fetch("actor_id") &&
+          command.actor.kind == created_event.metadata.fetch("actor_kind") &&
+          events.all? { _1.metadata.fetch("command_id") == command.command_id }
+        raise InvalidProjectionSource, "Candidate facts do not match their submitting instruction" unless consistent
+
         CandidateSubmissionViewV2.new(
           candidate_id:,
           change_set_id: attempt.change_set_id,
@@ -68,7 +84,7 @@ module Coordinator::Read
           head_commit_oid: commit_range.head_commit_oid,
           checkpoint_kind: checkpoint.checkpoint_kind,
           intention_set_id: intention_set.intention_set_id,
-          lease_references: load_lease_references(intention_set.intention_set_id),
+          intentions: load_intention_references(command),
           manifest_digest: manifest_event.metadata.fetch("manifest_digest"),
           build_context_digest: build_context_event&.metadata&.fetch("build_context_digest"),
           evidence_status: "attributed_unverified",
@@ -88,44 +104,57 @@ module Coordinator::Read
         facts.fetch(type) { raise InvalidProjectionSource, "Candidate is missing #{type}" }
       end
 
-      def load_lease_references(set_id)
-        memberships = @event_store.read(
-          @stream_factory.work_intention_set(set_id),
+      def load_command(created_event)
+        command_id = created_event.metadata.fetch("command_id")
+        registration = @event_store.read(
+          @stream_factory.command(command_id),
           Coordinator::Write::EventReadCriteria.new(
-            event_types: [ "WorkIntentionAddedToSet" ],
-            maximum_count: Coordinator::Shared::Types::WRITE_SET_RESOURCE_MAXIMUM_COUNT,
+            event_types: [ "CommandRegistered" ],
+            maximum_count: 1,
             direction: :asc
           )
-        ).map { load_event(_1) }
-        if memberships.empty? || memberships.any? { _1.set_id != set_id }
-          raise InvalidProjectionSource, "Candidate work-intention set is incomplete"
+        ).first
+        raise InvalidProjectionSource, "Candidate submitting command is not registered" unless registration
+
+        instruction = @instruction_loader.for_registration(registration)
+        unless instruction&.tool_name == "candidate_submit"
+          raise InvalidProjectionSource, "Candidate command has no matching submission instruction"
         end
 
-        memberships.map do |membership|
+        @target_command_builder.call(instruction)
+      end
+
+      def load_intention_references(command)
+        command.intentions.map do |reference|
           declaration = load_first(
-            @stream_factory.resource_work_intention(membership.intention_id),
+            @stream_factory.resource_work_intention(reference.intention_id),
             "ResourceWorkIntentionDeclared"
           )
           registration = load_first(
-            @stream_factory.resource(membership.resource_id),
+            @stream_factory.resource(reference.resource_id),
             "ResourceRegistered"
           )
-          unless declaration.intention_id == membership.intention_id &&
-                 declaration.resource_id == membership.resource_id &&
-                 declaration.set_id == set_id &&
-                 registration.resource_id == membership.resource_id
-            raise InvalidProjectionSource, "Candidate work-intention membership is inconsistent"
+          unless declaration.intention_id == reference.intention_id && declaration.resource_id == reference.resource_id &&
+                 declaration.set_id == command.intention_set_id && declaration.fencing_token == reference.fencing_token &&
+                 declaration.repository_id == command.repository_id && registration.repository_id == command.repository_id &&
+                 declaration.change_set_id == command.change_set_id && declaration.work_item_id == command.work_item_id &&
+                 declaration.attempt_id == command.attempt_id && declaration.agent_id == command.actor.id &&
+                 registration.resource_id == reference.resource_id
+            raise InvalidProjectionSource, "Candidate command-time work-intention reference is inconsistent"
           end
 
-          Coordinator::Write::LeaseReferenceV2.new(
-            lease_id: declaration.intention_id,
+          WorkIntentionViewV1.new(
+            intention_id: declaration.intention_id,
             resource_id: declaration.resource_id,
             resource_kind: registration.kind,
             resource_path: registration.normalized_path,
             base_blob_oid: declaration.base_blob_oid,
+            mode: declaration.mode,
+            purpose: declaration.purpose,
+            context: declaration.context,
             fencing_token: declaration.fencing_token
           )
-        end
+        end.sort_by { _1.resource_id.b }
       end
 
       def load_first(stream, event_type)

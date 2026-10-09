@@ -8,11 +8,19 @@ module Coordinator::Read
       FACT_TYPES: Array[String]
 
       def initialize: (
-        event_store: Coordinator::Write::EventStore,
+        event_store: Coordinator::Write::_EventStore,
         ?stream_factory: Coordinator::Write::StreamFactory,
-        ?schema_registry: Coordinator::Write::EventSchemaRegistry
+        ?schema_registry: Coordinator::Write::EventSchemaRegistry,
+        ?instruction_loader: Coordinator::Read::CommandResults::InstructionLoader,
+        ?target_command_builder: Coordinator::Write::Tasks::TargetCommandBuilder
       ) -> void
       def call: (String candidate_id) -> Coordinator::Read::CandidateSubmissionViewV2
+      private
+      def fetch_fact: (Hash[String, [Coordinator::Write::Events::Base, PgEventstore::Event]] facts, String type) -> [Coordinator::Write::Events::Base, PgEventstore::Event]
+      def load_command: (PgEventstore::Event created_event) -> Coordinator::Write::Commands::SubmitCandidate
+      def load_intention_references: (Coordinator::Write::Commands::SubmitCandidate command) -> Array[Coordinator::Read::WorkIntentionViewV1]
+      def load_first: (Coordinator::Write::StreamReference stream, String event_type) -> Coordinator::Write::Events::Base
+      def load_event: (PgEventstore::Event event) -> Coordinator::Write::Events::Base
     end
   end
 end

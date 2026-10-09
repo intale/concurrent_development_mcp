@@ -111,7 +111,7 @@ module Coordinator::Read
           .max_by(&:created_at)
         renewed_event = lifecycle_events(members, "ResourceWorkIntentionRenewed").max_by(&:created_at)
         withdrawal_events = lifecycle_events(members, "ResourceWorkIntentionWithdrawn")
-        release_event = withdrawal_events.max_by(&:created_at) if withdrawal_events.length == members.length
+        withdrawal_event = withdrawal_events.max_by(&:created_at) if withdrawal_events.length == members.length
         expiration_histories = members.map do |member|
           member.history.filter_map do |_physical, logical|
             logical.expires_at if logical.respond_to?(:expires_at)
@@ -127,18 +127,18 @@ module Coordinator::Read
           attempt_id: created.attempt_id,
           repository_id: created.repository_id,
           agent_id: members.first.state.agent_id,
-          policy_version: members.first.declaration_event.metadata.fetch("policy_version"),
+          policy_version: Coordinator::Write::WorkIntentionPolicyV1::VERSION,
           intentions: members.map { reference(_1) }.sort_by { _1.resource_id.b },
           created_event:,
           last_expanded_event: expanded_event,
           last_renewed_event: renewed_event,
-          release_event:,
+          withdrawal_event:,
           declared_at: timestamp(created_event),
           last_expanded_at: expanded_event && timestamp(expanded_event),
           last_renewed_at: renewed_event && timestamp(renewed_event),
           previous_expires_at: previous_expirations.min,
           expires_at: current_expirations.min,
-          withdrawn_at: release_event && timestamp(release_event)
+          withdrawn_at: withdrawal_event && timestamp(withdrawal_event)
         )
       end
 

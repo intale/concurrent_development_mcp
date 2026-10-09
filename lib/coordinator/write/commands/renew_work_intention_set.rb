@@ -12,7 +12,7 @@ module Coordinator::Write
       attribute :attempt_id, Types::Identifier
       attribute :intention_set_id, Types::UuidV7
       attribute :intentions, Types::Array.of(Reference).constrained(min_size: 1, max_size: 32)
-      attribute :ttl_seconds, Types::LeaseDurationSeconds
+      attribute :ttl_seconds, Types::WorkIntentionTtlSeconds
     end
   end
 end

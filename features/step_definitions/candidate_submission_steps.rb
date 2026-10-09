@@ -6,6 +6,53 @@ Given(
   @candidate_coordination = prepare_candidate_coordination(prefix:, agent_id:, path:)
 end
 
+When("the agent adds a work intention on {string} before the checkpoint is projected") do |path|
+  coordination = @candidate_coordination
+  stop_read_model_subscriptions
+  complete_candidate_setup_task(
+    "work_intention_set_expand",
+    command_id: "cmd-cuc-can-#{coordination.fetch(:prefix)}-expand",
+    actor: { kind: "agent", id: coordination.fetch(:agent_id) },
+    **coordination.fetch(:ids),
+    intention_set_id: coordination.fetch(:reservation).fetch("intention_set_id"),
+    repository_id: coordination.fetch(:repository_id),
+    base_commit_oid: CandidateAcceptanceWorld::BASE_COMMIT_OID,
+    resources: [
+      resource_target(
+        kind: "file", path:, repository_id: coordination.fetch(:repository_id),
+        base_blob_oid: CandidateAcceptanceWorld::BASE_BLOB_OID,
+        actor_id: coordination.fetch(:agent_id)
+      )
+    ]
+  )
+  @candidate_expanded_path = path
+end
+
+Then(
+  "Candidate {string} retains its original intention while current Attempt context includes both intentions"
+) do |candidate_id|
+  candidate = candidate_view(candidate_id).dig("data", "candidate")
+  original = @candidate_arguments.fetch(:intentions).map { _1.transform_keys(&:to_s) }
+  assert_acceptance_equal(
+    original,
+    candidate.fetch("intentions").map { _1.slice("resource_id", "intention_id", "fencing_token") },
+    "Immutable checkpoint intentions"
+  )
+  assert_acceptance_equal(
+    [ @candidate_coordination.fetch(:path) ],
+    candidate.fetch("intentions").map { _1.fetch("resource_path") },
+    "Immutable checkpoint Resource paths"
+  )
+  await_read_model("expanded Attempt intentions to become available") do
+    context = candidate_context(@candidate_coordination.dig(:ids, :attempt_id))
+    attempt = context.dig("data", "context", "attempts")&.find do
+      _1.fetch("attempt_id") == @candidate_coordination.dig(:ids, :attempt_id)
+    end
+    paths = attempt&.dig("work_intention_set", "intentions")&.map { _1.fetch("resource_path") }
+    [ paths&.sort == [ @candidate_coordination.fetch(:path), @candidate_expanded_path ].sort, context ]
+  end
+end
+
 When(
   "the agent submits Candidate {string} with command {string} at head {string} and build context"
 ) do |candidate_id, command_id, head_character|
@@ -135,7 +182,7 @@ Then(
   assert_acceptance(attempt, "Candidate must reference its available Attempt")
   assert_acceptance_equal(
     attempt.fetch("work_intention_set").fetch("intention_set_id"),
-    candidate.fetch("lease_set_id"),
+    candidate.fetch("intention_set_id"),
     "Candidate and Attempt work-intention set identity"
   )
 

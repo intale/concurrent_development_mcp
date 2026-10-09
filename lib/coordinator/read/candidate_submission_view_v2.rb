@@ -2,7 +2,7 @@
 
 module Coordinator::Read
   class CandidateSubmissionViewV2 < Value
-    Lease = Coordinator::Write::LeaseReferenceV2
+    Intention = WorkIntentionViewV1
 
     attribute :candidate_id, Types::Identifier
     attribute :change_set_id, Types::Identifier
@@ -16,7 +16,7 @@ module Coordinator::Read
     attribute :head_commit_oid, Types::GitOid
     attribute :checkpoint_kind, Types::CandidateCheckpointKind
     attribute :intention_set_id, Types::UuidV7
-    attribute :lease_references, Types::Array.of(Lease).constrained(min_size: 1, max_size: 32)
+    attribute :intentions, Types::Array.of(Intention).constrained(min_size: 1, max_size: 32)
     attribute :manifest_digest, Types::Sha256Digest
     attribute :build_context_digest, Types::Sha256Digest.optional
     attribute :evidence_status, Types::CandidateEvidenceStatus

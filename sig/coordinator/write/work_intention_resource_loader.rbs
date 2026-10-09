@@ -1,8 +1,22 @@
 module Coordinator
   module Write
     class WorkIntentionResourceLoader
-      def initialize: (event_store: _EventStore, ?lease_resource_loader: LeaseResourceLoader) -> void
+      def initialize: (
+        event_store: _EventStore,
+        ?normalizer: ResourceIdentityNormalizer,
+        ?schema_registry: EventSchemaRegistry,
+        ?stream_factory: StreamFactory
+      ) -> void
+
       def call: (WorkIntentionTargetV1 target, repository_id: String) -> Dry::Monads::Result
+      private
+      def load_registration: (String resource_id) -> Dry::Monads::Result
+      def load_current_binding: (ResourceIdentityV1 identity, resource_id: String) -> Dry::Monads::Result
+      def deserialize: (PgEventstore::Event event) -> Events::Base
+      def resource_not_found: (String resource_id) -> Dry::Monads::Result
+      def repository_mismatch: (String resource_id, Events::ResourceIdentityV2::Registered registration, String repository_id) -> Dry::Monads::Result
+      def inactive: (String resource_id, Events::ResourceIdentityV2::Bound | Events::ResourceIdentityV2::Unbound binding) -> Dry::Monads::Result
+      def corrupt: (String resource_id, String reason) -> Dry::Monads::Result
     end
   end
 end

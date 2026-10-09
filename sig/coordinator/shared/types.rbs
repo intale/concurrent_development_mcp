@@ -63,7 +63,7 @@ module Coordinator
       OPERATION_BATCH_MAXIMUM_ENCODED_BYTES: Integer
       OPERATION_BATCH_MAXIMUM_CONTINUATIONS: Integer
       OPERATION_BATCH_MAXIMUM_HISTORY_EVENTS: Integer
-      WRITE_SET_RESOURCE_MAXIMUM_COUNT: Integer
+      WORK_INTENTION_SET_MAXIMUM_RESOURCE_COUNT: Integer
       CANDIDATE_MANIFEST_MAXIMUM_FILE_COUNT: Integer
       CANDIDATE_ACTUAL_RESOURCE_MAXIMUM_COUNT: Integer
 
@@ -201,7 +201,9 @@ module Coordinator
       ResourceKind: untyped
       ResourceMarker: untyped
       LeaseMode: untyped
-      LeaseDurationSeconds: untyped
+      WORK_INTENTION_POLICY_VERSIONS: Array[String]
+      WorkIntentionPolicyVersion: untyped
+      WorkIntentionTtlSeconds: untyped
       WriteSetSize: untyped
       ExpandedWriteSetSize: untyped
       FencingToken: untyped

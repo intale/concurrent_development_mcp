@@ -132,13 +132,13 @@ RSpec.describe Coordinator::Read::Projectors::CoordContextV1, :read_model, :even
     expect(set.to_h.keys & %i[active fresh pending]).to be_empty
 
     history = Coordinator::Read::AttemptHistory.find(attempt_id)
-    expect(history.write_set_last_renewed_event.fetch("event_id")).to eq(renewed.id)
-    expect(history.write_set_release_event.fetch("event_id")).to eq(withdrawn.id)
+    expect(history.work_intention_set_last_renewed_event.fetch("event_id")).to eq(renewed.id)
+    expect(history.work_intention_set_withdrawal_event.fetch("event_id")).to eq(withdrawn.id)
     expect(history.updated_at).to eq(withdrawn.created_at)
   end
 
   it "rebuilds projection-owned Attempt history when its projection version advances" do
-    create(:coordinator_read_attempt_history, :with_write_set,
+    create(:coordinator_read_attempt_history, :with_work_intention_set,
       attempt_id:, change_set_id:, work_item_id:,
       projection_version: described_class::PROJECTION.version - 1)
 
@@ -147,7 +147,7 @@ RSpec.describe Coordinator::Read::Projectors::CoordContextV1, :read_model, :even
     history = Coordinator::Read::AttemptHistory.find(attempt_id)
     expect(history).to have_attributes(
       projection_version: described_class::PROJECTION.version, agent_id:, status: "started",
-      write_set_lease_set_id: nil, write_set_resources: []
+      work_intention_set_id: nil, work_intention_set_intentions: []
     )
   end
 
@@ -310,6 +310,26 @@ RSpec.describe Coordinator::Read::Projectors::CoordContextV1, :read_model, :even
 
   def candidate_events(checkpoint_kind:, head_character:)
     candidate_id = SecureRandom.uuid_v7
+    command_id = SecureRandom.uuid_v7
+    command = candidate_submission_command(candidate_id:, command_id:, checkpoint_kind:, head_character:)
+    input_digest = Coordinator::Write::CommandInputDigest.new.call(command)
+    append(streams.command(command_id),
+      Coordinator::Write::Events::CommandRegisteredV1.new(
+        command_id:, request_id: 1, tool_name: "candidate_submit"
+      ),
+      command_id:,
+      metadata_class: Coordinator::Write::Metadata::CanonicalCommandV1,
+      metadata_attributes: {
+        policy_version: "coordination-task/v3", canonical_input_digest: input_digest
+      },
+      markers: [ "command:#{command_id}" ])
+    task_id = SecureRandom.uuid_v7
+    append(streams.coordination_task(task_id),
+      Coordinator::Write::Events::CoordinationTaskSubmittedV3.new(
+        task_id:, command_id:, tool_name: "candidate_submit",
+        command_input: Coordinator::Write::CommandInputDigest.new.document(command),
+        poll_interval_ms: 500, ttl_ms: nil
+      ), command_id:, markers: [ "command:#{command_id}", "task:#{task_id}" ])
     manifest = Coordinator::Write::Events::CandidateChangeManifestCapturedV2.new(
       candidate_id:, evidence_revision: 1,
       files: [ Coordinator::Write::Candidates::ManifestFileV1.new(
@@ -326,21 +346,57 @@ RSpec.describe Coordinator::Read::Projectors::CoordContextV1, :read_model, :even
         candidate_id:, object_format: "sha1", base_commit_oid: "a" * 40, head_commit_oid: head_character * 40
       ),
       Coordinator::Write::Events::CandidateCheckpointKindSelectedV1.new(candidate_id:, checkpoint_kind:),
-      Coordinator::Write::Events::CandidateWorkIntentionSetAssignedV1.new(candidate_id:, intention_set_id: set_id))
+      Coordinator::Write::Events::CandidateWorkIntentionSetAssignedV1.new(candidate_id:, intention_set_id: set_id),
+      command_id:)
     captured = append(streams.candidate(candidate_id), manifest,
-      extra_metadata: { "manifest_digest" => "sha256:#{head_character * 64}" })
+      command_id:,
+      extra_metadata: {
+        "manifest_digest" => "sha256:#{head_character * 64}",
+        "policy_version" => "candidate-change-manifest/v1",
+        "collector" => { "kind" => "agent", "id" => agent_id, "collector_version" => "git-evidence-v1" }
+      })
     submitted = append(streams.candidate(candidate_id),
-      Coordinator::Write::Events::CandidateSubmittedV3.new(candidate_id:))
+      Coordinator::Write::Events::CandidateSubmittedV3.new(candidate_id:), command_id:)
     definition + captured + submitted
   end
 
-  def append(stream, *facts, extra_metadata: {})
+  def candidate_submission_command(candidate_id:, command_id:, checkpoint_kind:, head_character:)
+    files = [ Coordinator::Write::Candidates::ManifestFileV1.new(
+      status: "modified", old_path: "app/models/invoice.rb", new_path: "app/models/invoice.rb",
+      old_blob_oid: "b" * 40, new_blob_oid: head_character * 40, old_mode: "100644", new_mode: "100644"
+    ) ]
+    Coordinator::Write::Commands::SubmitCandidate.new(
+      command_id:,
+      actor: Coordinator::Write::Commands::Actor.new(kind: "agent", id: agent_id),
+      candidate_id:, change_set_id:, work_item_id:, attempt_id:, repository_id:, target_branch: "main",
+      object_format: "sha1", base_commit_oid: "a" * 40, head_commit_oid: head_character * 40,
+      checkpoint_kind:, intention_set_id: set_id,
+      intentions: [ Coordinator::Write::WorkIntentionFencedReferenceV1.new(
+        intention_id:, resource_id:, fencing_token: 1
+      ) ],
+      manifest: Coordinator::Write::Candidates::ChangeManifestV1.new(
+        policy_version: Coordinator::Write::Candidates::ChangeManifestDocumentV1::SCHEMA,
+        digest: "sha256:#{head_character * 64}", files:,
+        collector: Coordinator::Write::Candidates::EvidenceCollectorV1.new(
+          kind: "agent", id: agent_id, collector_version: "git-evidence-v1"
+        )
+      ),
+      build_context: nil,
+      actual_resources: [ Coordinator::Write::Candidates::ActualResourceV2.new(
+        kind: "file", path: "app/models/invoice.rb", base_blob_oid: "b" * 40
+      ) ]
+    )
+  end
+
+  def append(stream, *facts, extra_metadata: {}, command_id: "cmd-coord-context-projection",
+             metadata_class: Coordinator::Write::EventMetadata, metadata_attributes: {}, markers: [])
     metadata = Coordinator::Write::EventMetadata.new(
-      command_id: "cmd-coord-context-projection", actor_kind: "agent", actor_id: agent_id,
+      command_id:, actor_kind: "agent", actor_id: agent_id,
       recorded_by: "coordinator", policy_version: "coordinator-work-intention/v1"
     )
+    metadata = metadata_class.new(**metadata.to_h.merge(metadata_attributes))
     events = facts.map do |fact|
-      event = factory.build!(event: fact, event_id: SecureRandom.uuid_v7, metadata:, markers: [], correlation_id:)
+      event = factory.build!(event: fact, event_id: SecureRandom.uuid_v7, metadata:, markers:, correlation_id:)
       event.metadata.merge!(extra_metadata)
       event
     end
