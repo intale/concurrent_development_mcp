@@ -1,27 +1,39 @@
 module Coordinator::Read
   module CommandResults
     class WorkIntentionSetEvidenceLoader
-      @event_store: untyped
+      @event_store: Coordinator::Write::_EventStore
 
-      @stream_factory: untyped
+      @stream_factory: Coordinator::Write::StreamFactory
 
-      @schema_registry: untyped
+      @schema_registry: Coordinator::Write::EventSchemaRegistry
 
-      def initialize: (event_store: untyped, ?stream_factory: untyped, ?schema_registry: untyped) -> void
+      def initialize: (event_store: Coordinator::Write::_EventStore, ?stream_factory: Coordinator::Write::StreamFactory, ?schema_registry: Coordinator::Write::EventSchemaRegistry) -> void
 
-      def call: (untyped set_id, ?excluding_event_ids: untyped) -> untyped
+      def call: (String set_id, through_position: Integer, before_position: Integer) -> WorkIntentionSetEvidenceV1
 
-      def member_count_for_attempt: (untyped attempt_id) -> untyped
+      def member_count_for_attempt: (String attempt_id, through_position: Integer) -> Integer
 
       private
 
-      def load_member: (untyped membership, set_id: untyped, excluding_event_ids: untyped) -> untyped
+      def memberships_at: (Array[PgEventstore::Event] set_events, through_position: Integer) -> Array[Coordinator::Write::Events::WorkIntentionAddedToSetV1]
 
-      def lease_reference: (untyped declaration) -> untyped
+      def successful_command_position: (String command_id) -> Integer
 
-      def before_command_expiration: (untyped members) -> untyped
+      def set_history: (String set_id, through_position: Integer) -> Array[PgEventstore::Event]
 
-      def load_event: (untyped event) -> untyped
+      def load_member: (Coordinator::Write::Events::WorkIntentionAddedToSetV1 membership, set_id: String, repository_id: String, through_position: Integer, before_position: Integer) -> WorkIntentionMemberEvidenceV1
+
+      def expiration_event: (String intention_id, through_position: Integer) -> PgEventstore::Event?
+
+      def latest_fact: (stream_name: String, event_types: Array[String], marker: String, through_position: Integer) -> PgEventstore::Event?
+
+      def expiration: (PgEventstore::Event event, declaration: Coordinator::Write::Events::ResourceWorkIntentionDeclaredV1) -> String
+
+      def intention_reference: (Coordinator::Write::Events::ResourceWorkIntentionDeclaredV1 declaration) -> Coordinator::Write::WorkIntentionReceiptReferenceV1
+
+      def before_command_expiration: (Array[WorkIntentionMemberEvidenceV1] members) -> String?
+
+      def load_event: (PgEventstore::Event event) -> Coordinator::Write::Events::Base
     end
   end
 end

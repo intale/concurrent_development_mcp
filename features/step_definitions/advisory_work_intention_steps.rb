@@ -195,6 +195,8 @@ When("agent A renews that intention twice and withdraws it while read projection
   stop_read_model_subscriptions
   agent = @advisory_existing.fetch(:agent)
   data = @advisory_existing.dig(:outcome, "data")
+  @advisory_renewal_receipts = []
+  previous_expiry = data.fetch("expires_at")
   [ 600, 900 ].each_with_index do |ttl_seconds, index|
     task_id = submit_and_execute(
       "work_intention_set_renew",
@@ -210,9 +212,25 @@ When("agent A renews that intention twice and withdraws it while read projection
     )
     state = task_request("tasks/get", task_id, client_id: agent.fetch(:client_id))
     assert_acceptance_equal(false, state.dig("result", "result", "isError"), "Renewal Task result")
-    @advisory_latest_expiry = state.dig("result", "result", "structuredContent", "data", "expires_at")
+    receipt = state.dig("result", "result", "structuredContent", "data")
+    assert_acceptance_equal(previous_expiry, receipt.fetch("previous_expires_at"), "Immediately previous renewal deadline")
+    @advisory_renewal_receipts << [ "cuc-advisory-replay-renew-#{index}", receipt ]
+    @advisory_latest_expiry = receipt.fetch("expires_at")
+    previous_expiry = @advisory_latest_expiry
   end
   withdraw_advisory_intention(@advisory_existing, command_id: "cuc-advisory-replay-withdraw")
+end
+
+Then("each renewal receipt retains its own previous and extended deadlines") do
+  @advisory_renewal_receipts.each do |command_id, expected|
+    receipt = await_read_model("The exact earlier renewal receipt to become available") do
+      outcome = call_tool("operation_get", { command_id: }).dig("result", "structuredContent")
+      [ outcome["status"] == "ok", outcome ]
+    end
+    assert_acceptance_equal(expected.fetch("previous_expires_at"), receipt.dig("data", "result", "previous_expires_at"), "Earlier renewal previous deadline")
+    assert_acceptance_equal(expected.fetch("expires_at"), receipt.dig("data", "result", "expires_at"), "Earlier renewal extended deadline")
+    assert_acceptance_equal(expected.fetch("intentions"), receipt.dig("data", "result", "intentions"), "Earlier renewal membership")
+  end
 end
 
 Then("available Attempt context reflects the latest renewal and withdrawal") do

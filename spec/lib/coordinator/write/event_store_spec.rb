@@ -154,6 +154,23 @@ RSpec.describe Coordinator::Write::EventStore, :event_store do
     expect(event_store.read_global_marked(criteria).map(&:id)).to eq([ target.id ])
   end
 
+  it "limits the latest globally marked match to the requested inclusive position window" do
+    marker = "work-intention:#{SecureRandom.uuid_v7}"
+    reference = Coordinator::Write::StreamFactory.new.resource_work_intention(SecureRandom.uuid_v7)
+    first, previous, current, later = event_store.append(
+      reference, Array.new(4) { build_event(type: "ResourceWorkIntentionRenewed", markers: [ marker ]) }
+    )
+    criteria = Coordinator::Write::GlobalMarkedEventReadCriteria.new(
+      stream_context: reference.context, stream_name: reference.stream_name,
+      event_types: [ "ResourceWorkIntentionRenewed" ], markers: [ marker ],
+      maximum_count: 1, direction: :desc,
+      from_position: current.global_position, to_position: previous.global_position
+    )
+
+    expect(event_store.read_latest_global_marked(criteria)).to have_attributes(id: current.id)
+    expect([ first.id, later.id ]).not_to include(event_store.read_latest_global_marked(criteria).id)
+  end
+
   it "reads one bounded global page using an intentional OR union of markers" do
     choice_streams = Coordinator::Write::StreamFactory.new
     first = event_store.append(

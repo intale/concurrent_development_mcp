@@ -304,36 +304,19 @@ module Coordinator::Read
 
       def write_set_expansion(source, args:)
         command = source.command
-        memberships = @event_store.read(
-          @stream_factory.work_intention_set(command.lease_set_id),
-          Coordinator::Write::EventReadCriteria.new(
-            event_types: [ "WorkIntentionAddedToSet" ],
-            maximum_count: Coordinator::Shared::Types::WRITE_SET_RESOURCE_MAXIMUM_COUNT,
-            direction: :asc
-          )
-        ).map { load_payload(_1) }
-        declarations = memberships.map do |membership|
-          event = @event_store.read_grouped(
-            @stream_factory.resource_work_intention(membership.intention_id),
-            Coordinator::Write::EventQueries::WORK_INTENTION_STATE
-          )
-          declared = event.find { _1.type == "ResourceWorkIntentionDeclared" }
-          latest = event.find { _1.type == "ResourceWorkIntentionRenewed" } || declared
-          [ load_payload(declared), load_payload(latest) ]
-        end
+        evidence = work_intention_set_evidence(source, command.lease_set_id)
         emitted_declarations = payloads(source).grep(
           Coordinator::Write::Events::ResourceWorkIntentionDeclaredV1
         )
         added_intentions = emitted_declarations.map { work_intention_reference_for(_1) }
-        expiration = declarations.map { |declared, latest| latest.expires_at || declared.expires_at }.min
         expansion = Coordinator::Write::WorkIntentionSetExpansionReceiptV1.new(
           intention_set_id: command.lease_set_id,
           repository_id: command.repository_id,
           policy_version: Coordinator::Write::WorkIntentionPolicyV1::VERSION,
           expanded_at: source.persisted_events.first&.created_at&.utc&.iso8601(6) || source.completed_at,
-          expires_at: expiration,
+          expires_at: evidence.current_expires_at,
           added_intentions:,
-          intention_count: memberships.length
+          intention_count: evidence.resources.length
         )
         @completion_builder.write_set_expand(**args, expansion:)
       end
@@ -354,6 +337,9 @@ module Coordinator::Read
 
       def work_intention_set_renewal(source, args:)
         evidence = work_intention_set_evidence(source, source.command.lease_set_id)
+        unless evidence.before_command_expires_at
+          raise InvalidProjectionSource, "Work-intention renewal is missing its preceding deadline"
+        end
         renewal = Coordinator::Write::WorkIntentionSetRenewalReceiptV1.new(
           intention_set_id: evidence.set_id,
           repository_id: evidence.repository_id,
@@ -361,7 +347,7 @@ module Coordinator::Read
           intentions: evidence.resources,
           intention_count: evidence.resources.length,
           renewed_at: source.completed_at,
-          previous_expires_at: evidence.before_command_expires_at || evidence.current_expires_at,
+          previous_expires_at: evidence.before_command_expires_at,
           expires_at: evidence.current_expires_at
         )
         @completion_builder.lease_renew(**args, renewal:)
@@ -384,7 +370,8 @@ module Coordinator::Read
       def work_intention_set_evidence(source, set_id)
         @work_intention_set_evidence_loader.call(
           set_id,
-          excluding_event_ids: source.persisted_events.map(&:id)
+          through_position: source.terminal_event.global_position,
+          before_position: (source.persisted_events.map(&:global_position).min || source.terminal_event.global_position + 1) - 1
         )
       end
 
@@ -829,7 +816,9 @@ module Coordinator::Read
         withdrawn_count = payloads(source).count do |payload|
           payload.is_a?(Coordinator::Write::Events::ResourceWorkIntentionWithdrawnV1)
         end
-        member_count = @work_intention_set_evidence_loader.member_count_for_attempt(abandonment.attempt_id)
+        member_count = @work_intention_set_evidence_loader.member_count_for_attempt(
+          abandonment.attempt_id, through_position: source.terminal_event.global_position
+        )
         untouched_count = member_count - withdrawn_count
         if untouched_count.negative?
           raise InvalidProjectionSource, "Attempt abandonment withdrew more intentions than its set contains"

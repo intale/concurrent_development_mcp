@@ -177,18 +177,21 @@ module Coordinator::Write
     end
 
     def read_latest_global_marked(criteria)
+      options = {
+        direction: :desc,
+        max_count: 1,
+        filter: {
+          streams: [ { context: criteria.stream_context, stream_name: criteria.stream_name } ],
+          event_types: criteria.event_types.map do |event_type|
+            { type: event_type, markers: criteria.markers }
+          end
+        }
+      }
+      options[:from_position] = criteria.from_position unless criteria.from_position.nil?
+      options[:to_position] = criteria.to_position unless criteria.to_position.nil?
       @client.read(
         PgEventstore::Stream.all_stream,
-        options: {
-          direction: :desc,
-          max_count: 1,
-          filter: {
-            streams: [ { context: criteria.stream_context, stream_name: criteria.stream_name } ],
-            event_types: criteria.event_types.map do |event_type|
-              { type: event_type, markers: criteria.markers }
-            end
-          }
-        }
+        options:
       ).first
     end
 

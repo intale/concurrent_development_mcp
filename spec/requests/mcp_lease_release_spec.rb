@@ -213,8 +213,9 @@ RSpec.describe "MCP work_intention_set_withdraw Task boundary", :event_store do
 
   def reserve_initial_set
     resource_ids = %w[app/a.rb app/b.rb].map { resolve_resource(_1) }
-    Coordinator::Write::Operations::ExecuteReserveWriteSet.new(event_store:).call(
-      command_id: "seed-reserve-#{RELEASE_ATTEMPT_ID}",
+    command_id = SecureRandom.uuid_v7
+    result = Coordinator::Write::Operations::ExecuteReserveWriteSet.new(event_store:).call(
+      command_id:,
       actor: { kind: "agent", id: "agent-a" },
       change_set_id: RELEASE_CHANGE_SET_ID,
       work_item_id: RELEASE_WORK_ITEM_ID,
@@ -224,6 +225,8 @@ RSpec.describe "MCP work_intention_set_withdraw Task boundary", :event_store do
       resources: resource_ids.map { { resource_id: _1 } },
       ttl_seconds: 600
     )
+    CommandTraceFixture.record_success(command_id:, event_store:, tool_name: "work_intention_set_declare")
+    result
   end
 
   def seed_active_attempt

@@ -512,7 +512,252 @@ RSpec.describe Coordinator::Read::CommandResults::Assembler, :event_store do
     end
   end
 
+  context "when intention receipts are assembled from exact command-time facts" do
+    let(:set_id) { SecureRandom.uuid_v7 }
+    let(:intention_id) { SecureRandom.uuid_v7 }
+    let(:resource_id) { SecureRandom.uuid_v7 }
+    let(:initial_expiry) { "2026-10-09T10:00:00.000000Z" }
+    let(:first_expiry) { "2026-10-09T11:00:00.000000Z" }
+    let(:second_expiry) { "2026-10-09T12:00:00.000000Z" }
+    let(:command) do
+      Coordinator::Write::Commands::RenewLeaseSet.new(
+        command_id:,
+        actor: Coordinator::Write::Commands::Actor.new(kind: "agent", id: "assembly-spec"),
+        change_set_id: "CS-command-result", work_item_id: "W-command-result",
+        attempt_id: "A-command-result", lease_set_id: set_id,
+        leases: [ Coordinator::Write::LeaseRenewalReferenceV2.new(resource_id:, lease_id: intention_id, fencing_token: 1) ],
+        lease_duration_seconds: 600
+      )
+    end
+
+    it "reports the immediately preceding renewal rather than the original declaration deadline" do
+      append_initial_intention
+      append_renewal(first_expiry, owner: "previous-renewal")
+      register_command
+      append_task_submission
+      append_renewal(second_expiry, owner: command_id)
+      terminal = append_terminal(Coordinator::Write::Events::CommandSucceededV1.new(command_id:))
+
+      expect(assemble.call(terminal).data).to have_attributes(
+        previous_expires_at: first_expiry, expires_at: second_expiry, intention_count: 1
+      )
+    end
+
+    it "does not borrow later renewal deadlines or expanded membership during delayed assembly" do
+      append_initial_intention
+      register_command
+      append_task_submission
+      append_renewal(first_expiry, owner: command_id)
+      terminal = append_terminal(Coordinator::Write::Events::CommandSucceededV1.new(command_id:))
+      append_renewal(second_expiry, owner: "later-renewal")
+      append_later_member
+      append_withdrawal(owner: "later-withdrawal")
+
+      result = assemble.call(terminal)
+
+      expect(result.data).to have_attributes(
+        previous_expires_at: initial_expiry, expires_at: first_expiry, intention_count: 1
+      )
+      expect(result.data.intentions.map(&:intention_id)).to eq([ intention_id ])
+    end
+
+    it "excludes future-command membership even when its fact was delivered before this terminal" do
+      append_initial_intention
+      register_command
+      append_task_submission
+      append_renewal(first_expiry, owner: command_id)
+      append_later_member(complete: false)
+      terminal = append_terminal(Coordinator::Write::Events::CommandSucceededV1.new(command_id:))
+      append_successful_source_command("later-expansion")
+
+      result = assemble.call(terminal)
+
+      expect(result.data).to have_attributes(
+        previous_expires_at: initial_expiry, expires_at: first_expiry, intention_count: 1
+      )
+      expect(result.data.intentions.map(&:intention_id)).to eq([ intention_id ])
+    end
+
+    context "for a declaration followed by later renewal and expansion" do
+      let(:command) do
+        Coordinator::Write::Commands::ReserveWriteSet.new(
+          command_id:,
+          actor: Coordinator::Write::Commands::Actor.new(kind: "agent", id: "assembly-spec"),
+          change_set_id: "CS-command-result", work_item_id: "W-command-result",
+          attempt_id: "A-command-result", repository_id: RepositoryScenario::DEFAULT_REPOSITORY_ID,
+          base_commit_oid: "a" * 40, lease_duration_seconds: 600,
+          resources: [ Coordinator::Write::ResourceLeaseTargetV1.new(resource_id:, base_blob_oid: nil, purpose: "Current edit") ]
+        )
+      end
+
+      it "keeps the original declaration membership and deadline" do
+        register_command
+        append_task_submission
+        append_initial_intention(owner: command_id)
+        terminal = append_terminal(Coordinator::Write::Events::CommandSucceededV1.new(command_id:))
+        append_renewal(first_expiry, owner: "later-renewal")
+        append_later_member
+
+        result = assemble.call(terminal)
+
+        expect(result.data).to have_attributes(expires_at: initial_expiry)
+        expect(result.data.intentions.map(&:intention_id)).to eq([ intention_id ])
+      end
+    end
+
+    context "for an expansion followed by another expansion" do
+      let(:expansion_resource_id) { resource_id }
+      let(:command) do
+        Coordinator::Write::Commands::ExpandWriteSet.new(
+          command_id:,
+          actor: Coordinator::Write::Commands::Actor.new(kind: "agent", id: "assembly-spec"),
+          change_set_id: "CS-command-result", work_item_id: "W-command-result",
+          attempt_id: "A-command-result", lease_set_id: set_id,
+          repository_id: RepositoryScenario::DEFAULT_REPOSITORY_ID, base_commit_oid: "a" * 40,
+          resources: [ Coordinator::Write::ResourceLeaseTargetV1.new(resource_id: expansion_resource_id, base_blob_oid: nil, purpose: "Current edit") ]
+        )
+      end
+
+      it "keeps its command-time count and expires_at even when the no-op is assembled late" do
+        append_initial_intention
+        register_command
+        append_task_submission
+        terminal = append_terminal(Coordinator::Write::Events::CommandSucceededV1.new(command_id:))
+        append_renewal(first_expiry, owner: "later-renewal")
+        append_later_member
+
+        result = assemble.call(terminal)
+
+        expect(result.data).to have_attributes(expires_at: initial_expiry, intention_count: 1, added_intentions: [])
+      end
+
+      context "when this command adds a resource" do
+        let(:expansion_resource_id) { SecureRandom.uuid_v7 }
+
+        it "reports only the members added by this command and its exact resulting count" do
+          append_initial_intention
+          register_command
+          append_task_submission
+          added_intention_id = SecureRandom.uuid_v7
+          append_intention_member(
+            intention_id: added_intention_id, resource_id: expansion_resource_id,
+            path: "docs/expanded.md", owner: command_id
+          )
+          terminal = append_terminal(Coordinator::Write::Events::CommandSucceededV1.new(command_id:))
+          append_later_member
+          append_renewal(first_expiry, owner: "later-renewal")
+
+          result = assemble.call(terminal)
+
+          expect(result.data).to have_attributes(expires_at: initial_expiry, intention_count: 2)
+          expect(result.data.added_intentions.map(&:intention_id)).to eq([ added_intention_id ])
+        end
+      end
+    end
+
+    def append_initial_intention(owner: "initial-declaration")
+      owner = source_owner_id(owner)
+      append(
+        streams.work_intention_set(set_id),
+        Coordinator::Write::Events::WorkIntentionSetCreatedV1.new(
+          set_id:, attempt_id: "A-command-result", work_item_id: "W-command-result",
+          change_set_id: "CS-command-result", repository_id: RepositoryScenario::DEFAULT_REPOSITORY_ID
+        ),
+        metadata: command_metadata(command_id: owner),
+        markers: [ "work-intention-set:#{set_id}", "attempt:A-command-result", "command:#{owner}" ]
+      )
+      append_intention_member(intention_id:, resource_id:, path: "README.md", owner:)
+    end
+
+    def append_later_member(complete: true)
+      append_intention_member(
+        intention_id: SecureRandom.uuid_v7, resource_id: SecureRandom.uuid_v7,
+        path: "docs/later.md", owner: "later-expansion", complete:
+      )
+    end
+
+    def append_intention_member(intention_id:, resource_id:, path:, owner:, complete: true)
+      owner = source_owner_id(owner)
+      append(
+        streams.resource(resource_id),
+        Coordinator::Write::Events::ResourceIdentityV2::Registered.new(
+          resource_id:, repository_id: RepositoryScenario::DEFAULT_REPOSITORY_ID,
+          kind: "file", normalized_path: path
+        ),
+        metadata: command_metadata(command_id: "resource-registration"), markers: [ "resource:#{resource_id}" ]
+      )
+      append(
+        streams.resource_work_intention(intention_id),
+        Coordinator::Write::Events::ResourceWorkIntentionDeclaredV1.new(
+          intention_id:, set_id:, resource_id:, repository_id: RepositoryScenario::DEFAULT_REPOSITORY_ID,
+          change_set_id: "CS-command-result", work_item_id: "W-command-result", attempt_id: "A-command-result",
+          agent_id: "assembly-spec", mode: "shared", purpose: "Current edit", context: nil,
+          object_format: "sha1", base_commit_oid: "a" * 40, base_blob_oid: nil,
+          fencing_token: 1, expires_at: initial_expiry
+        ),
+        metadata: command_metadata(command_id: owner),
+        markers: [ "work-intention:#{intention_id}", "command:#{owner}" ]
+      )
+      append(
+        streams.work_intention_set(set_id),
+        Coordinator::Write::Events::WorkIntentionAddedToSetV1.new(set_id:, intention_id:, resource_id:),
+        metadata: command_metadata(command_id: owner),
+        markers: [ "work-intention-set:#{set_id}", "command:#{owner}" ]
+      )
+      append_successful_source_command(owner) if complete && owner != command_id
+    end
+
+    def append_renewal(expires_at, owner:)
+      owner = source_owner_id(owner)
+      append(
+        streams.resource_work_intention(intention_id),
+        Coordinator::Write::Events::ResourceWorkIntentionRenewedV1.new(
+          intention_id:, resource_id:, fencing_token: 1, expires_at:
+        ),
+        metadata: command_metadata(command_id: owner),
+        markers: [ "work-intention:#{intention_id}", "command:#{owner}" ]
+      )
+    end
+
+    def append_withdrawal(owner:)
+      owner = source_owner_id(owner)
+      append(
+        streams.resource_work_intention(intention_id),
+        Coordinator::Write::Events::ResourceWorkIntentionWithdrawnV1.new(
+          intention_id:, resource_id:, fencing_token: 1, reason: "Finished the edit"
+        ),
+        metadata: command_metadata(command_id: owner),
+        markers: [ "work-intention:#{intention_id}", "command:#{owner}" ]
+      )
+    end
+
+    def append_successful_source_command(owner)
+      owner = source_owner_id(owner)
+      [
+        Coordinator::Write::Events::CommandRegisteredV1.new(
+          command_id: owner, request_id: "source-#{owner}", tool_name: "work_intention_set_declare"
+        ),
+        Coordinator::Write::Events::CommandSucceededV1.new(command_id: owner)
+      ].each do |fact|
+        append(
+          streams.command(owner), fact, metadata: command_metadata(command_id: owner),
+          markers: [ "command:#{owner}" ]
+        )
+      end
+    end
+
+    def source_owner_id(label)
+      @intention_source_command_ids ||= { command_id => command_id }
+      @intention_source_command_ids.fetch(label) do
+        generated = SecureRandom.uuid_v7
+        @intention_source_command_ids[generated] = generated
+        @intention_source_command_ids[label] = generated
+      end
+    end
+  end
+
   context "when an Attempt is abandoned through granular lifecycle facts" do
+    let(:prior_intention_command_id) { SecureRandom.uuid_v7 }
     let(:intention_id) { SecureRandom.uuid_v7 }
     let(:resource_id) { SecureRandom.uuid_v7 }
     let(:set_id) { SecureRandom.uuid_v7 }
@@ -572,10 +817,16 @@ RSpec.describe Coordinator::Read::CommandResults::Assembler, :event_store do
         append(
           streams.work_intention_set(set_id),
           fact,
-          metadata: command_metadata,
+          metadata: command_metadata(command_id: prior_intention_command_id),
           markers: [ "attempt:#{command.attempt_id}", "work-intention-set:#{set_id}" ]
         )
       end
+      append(
+        streams.command(prior_intention_command_id),
+        Coordinator::Write::Events::CommandSucceededV1.new(command_id: prior_intention_command_id),
+        metadata: command_metadata(command_id: prior_intention_command_id),
+        markers: [ "command:#{prior_intention_command_id}" ]
+      )
     end
 
     def append_abandonment_facts

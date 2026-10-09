@@ -185,8 +185,9 @@ RSpec.describe "MCP work_intention_set_expand Task boundary", :event_store do
 
   def reserve_initial_set
     resource_id = resolve_resource("app/a.rb")
-    Coordinator::Write::Operations::ExecuteReserveWriteSet.new(event_store:).call(
-      command_id: "seed-reserve-#{EXPAND_ATTEMPT_ID}",
+    command_id = SecureRandom.uuid_v7
+    result = Coordinator::Write::Operations::ExecuteReserveWriteSet.new(event_store:).call(
+      command_id:,
       actor: { kind: "agent", id: "agent-a" },
       change_set_id: EXPAND_CHANGE_SET_ID,
       work_item_id: EXPAND_WORK_ITEM_ID,
@@ -196,6 +197,8 @@ RSpec.describe "MCP work_intention_set_expand Task boundary", :event_store do
       resources: [ { resource_id: } ],
       ttl_seconds: 300
     )
+    CommandTraceFixture.record_success(command_id:, event_store:, tool_name: "work_intention_set_declare")
+    result
   end
 
   def seed_active_attempt
@@ -271,5 +274,4 @@ RSpec.describe "MCP work_intention_set_expand Task boundary", :event_store do
       path:
     )
   end
-
 end

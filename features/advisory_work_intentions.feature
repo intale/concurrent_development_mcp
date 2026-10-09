@@ -43,6 +43,7 @@ Feature: Advisory resource work intentions
       Given agent A has an active shared intention for file README.md
       When agent A renews that intention twice and withdraws it while read projections are stopped
       Then available Attempt context reflects the latest renewal and withdrawal
+      And each renewal receipt retains its own previous and extended deadlines
 
     Scenario: A blocked exclusive request can be reconsidered after withdrawal
       Given another agent has a shared intention with context explaining its current edit
