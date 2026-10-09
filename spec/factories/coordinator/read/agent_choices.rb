@@ -57,7 +57,7 @@ FactoryBot.define do
       {
         "event_id" => SecureRandom.uuid_v7,
         "type" => "AgentChoiceRecorded",
-        "stream_context" => "DevelopmentGovernance",
+        "stream_context" => "AgentGovernance",
         "stream_name" => "AgentChoice",
         "stream_id" => choice_id,
         "stream_revision" => 0
@@ -65,7 +65,7 @@ FactoryBot.define do
     end
     recorded_actor { { "kind" => "agent", "id" => "factory-agent", "authenticated" => false } }
     recorded_markers { [ "choice:#{choice_id}" ] }
-    recorded_metadata { { "schema_version" => 1 } }
+    recorded_metadata { { "schema_version" => 2 } }
     recorded_at_domain { Time.utc(2026, 8, 30, 12) }
     recorded_at_store { Time.utc(2026, 8, 30, 12, 0, 1) }
 
@@ -76,7 +76,7 @@ FactoryBot.define do
         {
           "event_id" => SecureRandom.uuid_v7,
           "type" => "AgentChoiceAccepted",
-          "stream_context" => "DevelopmentGovernance",
+          "stream_context" => "AgentGovernance",
           "stream_name" => "AgentChoice",
           "stream_id" => choice_id,
           "stream_revision" => 1
@@ -84,7 +84,7 @@ FactoryBot.define do
       end
       accepted_actor { { "kind" => "agent", "id" => "factory-agent", "authenticated" => false } }
       accepted_markers { [ "choice:#{choice_id}" ] }
-      accepted_metadata { { "schema_version" => 1 } }
+      accepted_metadata { { "schema_version" => 2 } }
       accepted_at_domain { Time.utc(2026, 8, 30, 12, 1) }
       accepted_at_store { Time.utc(2026, 8, 30, 12, 1, 1) }
     end

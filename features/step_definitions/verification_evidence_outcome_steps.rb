@@ -41,6 +41,12 @@ Then("one attributed evidence fact and no terminal fact are durable") do
   evidence = compatibility_evidence_events.sole
   assessment = evidence.data.fetch("assessment")
   assert_acceptance_equal("VerificationEvidenceSubmitted", evidence.type, "Evidence fact")
+  assert_acceptance_equal(2, evidence.metadata.fetch("schema_version"), "Native evidence schema")
+  assert_acceptance_equal(
+    %w[assessment claim evidence_id evidence_kind obligation_id], evidence.data.keys.sort,
+    "Native evidence fact payload"
+  )
+  assert_acceptance(evidence.metadata.fetch("assessment_input_digest"), "Evidence integrity metadata")
   assert_acceptance_equal(@evidence_actor_id, evidence.metadata.fetch("actor_id"), "Evidence actor")
   assert_acceptance_equal(
     "cucumber-external-verifier",
@@ -63,6 +69,8 @@ Then("two attributed evidence facts and one satisfied fact are durable") do
     [ events.one?, events ]
   end.sole
   assert_acceptance_equal(2, evidence.length, "Satisfied evidence facts")
+  assert_acceptance_equal(2, terminal.metadata.fetch("schema_version"), "Native satisfaction schema")
+  assert_acceptance_equal([ "obligation_id" ], terminal.data.keys, "Native completion fact")
   assert_acceptance_equal(
     %w[combined_tests contract_compatibility_review],
     evidence.map { _1.data.fetch("evidence_kind") },
@@ -93,6 +101,8 @@ Then("one attributed evidence fact and one failed fact are durable") do
   end.sole
   assert_acceptance_equal("failed", evidence.data.dig("assessment", "conclusion"), "Failed conclusion")
   assert_acceptance_equal("VerificationObligationFailed", terminal.type, "Failed terminal fact")
+  assert_acceptance_equal(2, terminal.metadata.fetch("schema_version"), "Native failed schema")
+  assert_acceptance_equal(%w[obligation_id reason], terminal.data.keys.sort, "Native failure fact")
   assert_acceptance_equal(
     evidence.data.fetch("evidence_id"),
     verification_selection_events.sole.data.fetch("evidence_id"),
@@ -354,6 +364,10 @@ Then("the available view reports satisfied with complete attributed evidence") d
     "Converged evidence attribution"
   )
   assert_acceptance(item.fetch("outcome"), "Converged outcome")
+  terminal = verification_terminal_events.sole
+  assert_acceptance_equal(
+    terminal.created_at.utc.iso8601(6), item.dig("outcome", "satisfied_at"), "Native projected outcome time"
+  )
   assert_acceptance_equal(
     [],
     candidate_obligation_page(obligation_id: @obligation_id).dig("data", "page", "items"),

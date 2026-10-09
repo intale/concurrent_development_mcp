@@ -26,6 +26,9 @@ Then("the waiver Task completes with an attributed coordination override") do
   assert_acceptance_equal("completed", @waiver_attempt.dig(:state, "result", "status"), "Waiver Task")
   assert_acceptance_equal(false, @waiver_attempt.dig(:result, "isError"), "Waiver error")
   assert_acceptance_equal("waived", data.fetch("status"), "Waiver status")
+  fact = verification_obligation_lifecycle_events.find { _1.type == "VerificationObligationWaived" }
+  assert_acceptance_equal(2, fact.metadata.fetch("schema_version"), "Native waiver schema")
+  assert_acceptance_equal(%w[obligation_id reason], fact.data.keys.sort, "Native waiver fact")
   assert_acceptance_equal("accepted_risk", data.dig("reason", "code"), "Waiver reason")
   forbidden = %w[authenticated verified satisfied succeeded merge_safe]
   assert_acceptance_equal([], data.keys & forbidden, "Unsupported waiver semantics")
@@ -49,6 +52,8 @@ Then("the available obligation reports waived with the exact attributed reason")
   assert_acceptance_equal("waived", item.fetch("status"), "Projected waiver status")
   assert_acceptance_equal("accepted_risk", item.dig("outcome", "reason", "code"), "Projected waiver reason")
   assert_acceptance_equal("user", item.dig("outcome", "evidence", "actor", "kind"), "Projected waiver actor")
+  fact = verification_obligation_lifecycle_events.find { _1.type == "VerificationObligationWaived" }
+  assert_acceptance_equal(fact.created_at.utc.iso8601(6), item.dig("outcome", "waived_at"), "Native waiver time")
 end
 
 When("the user corrects the Candidate impact policy through guidance Tasks") do
@@ -64,6 +69,11 @@ Then("one policy invalidation is durable with exact Saga tracing") do
     _1.type == "VerificationObligationInvalidated"
   end
   invalidation = invalidations.sole
+  assert_acceptance_equal(2, invalidation.metadata.fetch("schema_version"), "Native invalidation schema")
+  assert_acceptance_equal(
+    %w[obligation_id reason superseding_partition_event], invalidation.data.keys.sort,
+    "Native invalidation fact"
+  )
   started = verification_obligation_validity_scan_events.find do
     _1.type == "VerificationObligationValidityScanStarted"
   end

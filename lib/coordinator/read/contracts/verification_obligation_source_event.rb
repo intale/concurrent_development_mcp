@@ -18,17 +18,17 @@ module Coordinator::Read
       ].freeze
 
       SCHEMA_VERSIONS = {
-        "VerificationObligationCreated" => [ 1, 2 ],
+        "VerificationObligationCreated" => [ 2 ],
         "VerificationObligationAddedToChangeSet" => [ 1 ],
         "VerificationObligationSourceCandidateAssigned" => [ 1 ],
         "VerificationObligationTargetCandidateAssigned" => [ 1 ],
-        "VerificationObligationClaimed" => [ 1, 2 ],
-        "VerificationEvidenceSubmitted" => [ 1, 2 ],
+        "VerificationObligationClaimed" => [ 2 ],
+        "VerificationEvidenceSubmitted" => [ 2 ],
         "VerificationObligationEvidenceSelected" => [ 1 ],
-        "VerificationObligationSatisfied" => [ 1, 2 ],
-        "VerificationObligationFailed" => [ 1, 2 ],
-        "VerificationObligationWaived" => [ 1, 2 ],
-        "VerificationObligationInvalidated" => [ 1, 2 ]
+        "VerificationObligationSatisfied" => [ 2 ],
+        "VerificationObligationFailed" => [ 2 ],
+        "VerificationObligationWaived" => [ 2 ],
+        "VerificationObligationInvalidated" => [ 2 ]
       }.freeze
 
       config.validate_keys = true
@@ -92,7 +92,7 @@ module Coordinator::Read
             values[:policy_version] == "verification-obligation-outcome/v2"
         when "VerificationObligationSatisfied", "VerificationObligationFailed"
           values[:stream_revision] >= 3 &&
-            outcome_source?(values, version)
+            outcome_source?(values)
         when "VerificationObligationWaived"
           values[:stream_revision].positive? &&
             values[:actor_kind] == "user" &&
@@ -116,15 +116,10 @@ module Coordinator::Read
           values[:policy_version] == "candidate-compatibility-obligation/v1"
       end
 
-      def outcome_source?(values, version)
-        if version == 1
-          values[:actor_kind] == "agent" &&
-            values[:policy_version] == "compatibility-assessment/v1"
-        else
-          values[:actor_kind] == "system" &&
-            values[:actor_id] == "verification-evidence-outcome" &&
-            values[:policy_version] == "verification-obligation-outcome/v2"
-        end
+      def outcome_source?(values)
+        values[:actor_kind] == "system" &&
+          values[:actor_id] == "verification-evidence-outcome" &&
+          values[:policy_version] == "verification-obligation-outcome/v2"
       end
     end
   end

@@ -2,10 +2,12 @@ module Coordinator::Read::Repositories
     class MergeSnapshots
     def initialize: (?authorizations: MergeAuthorizations) -> void
     def fetch: (String merge_snapshot_id) -> Coordinator::Read::MergeSnapshotViewV1?
-    def store: (event: PgEventstore::Event, snapshot: Coordinator::Write::Events::MergeSnapshotRegisteredV1) -> Coordinator::Read::MergeSnapshot
-    def record_submission: (event: PgEventstore::Event, submission: Coordinator::Write::Events::MergeSnapshotVerificationSubmittedV1) -> bool
-    def record_verified: (event: PgEventstore::Event, verified: Coordinator::Write::Events::MergeSnapshotVerifiedV1) -> bool
-    def record_observation: (event: PgEventstore::Event, observation: Coordinator::Write::Events::MergeObservedV1) -> bool
+    def store: (event: PgEventstore::Event, snapshot: Coordinator::Read::MergeSnapshotRegistrationViewV2) -> Coordinator::Read::MergeSnapshot
+    def record_submission: (event: PgEventstore::Event, submission: Coordinator::Write::Events::MergeSnapshotVerificationSubmittedV2) -> Coordinator::Read::MergeSnapshot
+    def record_selection: (event: PgEventstore::Event, selection: Coordinator::Write::Events::MergeSnapshotVerificationSelectedV1) -> Coordinator::Read::MergeSnapshot
+    def record_verified: (event: PgEventstore::Event, verified: Coordinator::Write::Events::MergeSnapshotVerifiedV2) -> Coordinator::Read::MergeSnapshot
+    def record_observation: (event: PgEventstore::Event, observation: Coordinator::Write::Events::MergeObservedV2) -> Coordinator::Read::MergeSnapshot
+    def link_observation_authorization: (event: PgEventstore::Event, link: Coordinator::Write::Events::MergeObservationAuthorizationLinkedV1) -> Coordinator::Read::MergeSnapshot
 
     private
 
@@ -14,7 +16,7 @@ module Coordinator::Read::Repositories
     def verification_view: (Coordinator::Read::MergeSnapshot record) -> Coordinator::Read::MergeSnapshotVerificationViewV1
     def verified_view: (untyped value) -> Coordinator::Read::MergeSnapshotVerifiedViewV1?
     def observation_view: (untyped value) -> Coordinator::Read::MergeObservationViewV1?
-    def event_source: (PgEventstore::Event event, occurred_at: String) -> Coordinator::Read::MergeSnapshotSourceEvidenceV1
+    def event_source: (PgEventstore::Event event) -> Coordinator::Read::MergeSnapshotSourceEvidenceV1
     def source_from_hash: (untyped value) -> Coordinator::Read::MergeSnapshotSourceEvidenceV1
     def actor: (PgEventstore::Event event) -> Coordinator::Read::AttributedActorV1
     def event_reference: (PgEventstore::Event event) -> Coordinator::Write::EventReference

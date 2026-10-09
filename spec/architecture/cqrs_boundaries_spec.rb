@@ -98,6 +98,23 @@ RSpec.describe "CQRS source boundaries" do
     expect(declared_signatures).to eq(implementation_signatures)
   end
 
+  it "keeps every concrete event definition registered under its exact current contract" do
+    definitions = Coordinator::Write::EventSchemaRegistry::DEFAULT_DEFINITIONS
+    unregistered = SIDE_ROOT.glob("write/events/*.rb").flat_map do |path|
+      next [] if path.basename.to_s == "base.rb"
+
+      namespace = path.relative_path_from(Rails.root.join("lib")).sub_ext("").to_s.camelize.constantize
+      classes = namespace.is_a?(Class) ? [ namespace ] : namespace.constants(false).map { namespace.const_get(_1, false) }
+      classes.select { _1.is_a?(Class) && _1 < Coordinator::Write::Events::Base }.filter_map do |event_class|
+        contract = [ event_class.event_type, event_class.schema_version ]
+        event_class.name unless definitions[contract] == event_class
+      end
+    end
+
+    expect(unregistered).to be_empty,
+      "unregistered event definitions: #{unregistered.join(', ')}"
+  end
+
   def side_files(side)
     SIDE_ROOT.glob("#{side}/**/*.rb")
   end

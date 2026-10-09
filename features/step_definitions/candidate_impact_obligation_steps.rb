@@ -66,8 +66,14 @@ Then("one exact open Rails obligation is durable under {string}") do |level|
   events = candidate_obligation_events
   assert_acceptance_equal(1, events.length, "Durable Candidate compatibility obligations")
   event = events.sole
+  assert_acceptance_equal(2, event.metadata.fetch("schema_version"), "Native obligation schema")
+  assert_acceptance_equal(
+    %w[enforcement kind obligation_id reasons required_evidence], event.data.keys.sort,
+    "Native obligation creation fact"
+  )
   state = candidate_obligation_state
   definition = state.definition
+  assert_acceptance_equal(event.created_at.utc.iso8601(6), definition.created_at, "Native obligation time")
   source = @obligation_candidates.fetch("source")
   target = @obligation_candidates.fetch("target")
   assert_acceptance_equal(nil, state.terminal_status, "Obligation terminal status")

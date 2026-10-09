@@ -1,6 +1,0 @@
-module Coordinator::Write::ReleaseSets
-  class CompensationRequestFactV1 < Coordinator::Shared::Value
-    def payload: () -> Coordinator::Write::Events::ReleaseSetCompensationRequestedV1
-    def event: () -> Coordinator::Write::EventReference
-  end
-end

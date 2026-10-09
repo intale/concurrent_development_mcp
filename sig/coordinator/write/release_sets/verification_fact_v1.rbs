@@ -1,6 +1,0 @@
-module Coordinator::Write::ReleaseSets
-  class VerificationFactV1 < Coordinator::Shared::Value
-    def payload: () -> Coordinator::Write::Events::ReleaseSetVerificationRecordedV1
-    def event: () -> Coordinator::Write::EventReference
-  end
-end

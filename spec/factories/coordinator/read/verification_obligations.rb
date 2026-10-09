@@ -30,6 +30,7 @@ FactoryBot.define do
         }
       end
       subject = ->(candidate_id, work_item_id, repository_id, suffix) do
+        surface_id = SecureRandom.uuid_v7
         {
           "candidate_id" => candidate_id,
           "change_set_id" => change_set_id,
@@ -43,11 +44,11 @@ FactoryBot.define do
           "manifest_digest" => "sha256:#{suffix == 'source' ? 'd' * 64 : 'e' * 64}",
           "build_context_digest" => nil,
           "surface_digest" => "sha256:#{suffix == 'source' ? 'f' * 64 : '1' * 64}",
-          "candidate_event" => reference.call("CandidateSubmitted", "Candidate", candidate_id, 0),
-          "manifest_event" => reference.call("CandidateChangeManifestCaptured", "Candidate", candidate_id, 1),
+          "candidate_event" => reference.call("CandidateSubmitted", "Candidate", candidate_id, 8),
+          "manifest_event" => reference.call("CandidateChangeManifestCaptured", "Candidate", candidate_id, 7),
           "build_context_event" => nil,
-          "surface_event" => reference.call("CandidateImpactSurfaceDerived", "Candidate", candidate_id, 2),
-          "registration_event" => reference.call("CandidateRegisteredForImpact", "CandidateImpactRegistry", candidate_id, 0)
+          "surface_event" => reference.call("CandidateImpactSurfaceDerived", "CandidateImpactSurface", surface_id, 0),
+          "registration_event" => reference.call("CandidateImpactSurfaceAssigned", "Candidate", candidate_id, 9)
         }
       end
       partition = {
@@ -72,7 +73,6 @@ FactoryBot.define do
       {
         "obligation_id" => obligation_id,
         "kind" => kind,
-        "status" => "open",
         "change_set_id" => change_set_id,
         "source_candidate" => source,
         "target_candidate" => target,
@@ -105,15 +105,15 @@ FactoryBot.define do
       {
         "event_id" => SecureRandom.uuid_v7,
         "type" => "VerificationObligationCreated",
-        "stream_context" => "DevelopmentVerification",
+        "stream_context" => "DevelopmentIntegration",
         "stream_name" => "VerificationObligation",
         "stream_id" => obligation_id,
         "stream_revision" => 0
       }
     end
-    actor { { "kind" => "system", "id" => "candidate-obligations", "authenticated" => false } }
+    actor { { "kind" => "system", "id" => "candidate-impact-obligation-policy", "authenticated" => false } }
     markers { [ "verification-obligation:#{obligation_id}" ] }
-    metadata { { "schema_version" => 1 } }
+    metadata { { "schema_version" => 2 } }
     sequence(:event_global_position, 1_200)
     created_at_domain { Time.utc(2026, 8, 30, 12) }
     created_at_store { Time.utc(2026, 8, 30, 12, 0, 1) }
@@ -130,11 +130,9 @@ FactoryBot.define do
       claim do
         {
           "obligation_id" => obligation_id,
-          "obligation_event" => event,
           "claim_id" => claim_id,
           "claimant_id" => claimant_id,
           "fencing_token" => claim_fencing_token,
-          "claimed_at" => claim_claimed_at_domain.iso8601(6),
           "expires_at" => claim_expires_at_domain.iso8601(6)
         }
       end
@@ -142,7 +140,7 @@ FactoryBot.define do
         {
           "event_id" => SecureRandom.uuid_v7,
           "type" => "VerificationObligationClaimed",
-          "stream_context" => "DevelopmentVerification",
+          "stream_context" => "DevelopmentIntegration",
           "stream_name" => "VerificationObligation",
           "stream_id" => obligation_id,
           "stream_revision" => 1
@@ -150,7 +148,7 @@ FactoryBot.define do
       end
       claim_actor { { "kind" => "agent", "id" => claimant_id, "authenticated" => false } }
       claim_markers { markers }
-      claim_metadata { { "schema_version" => 1 } }
+      claim_metadata { { "schema_version" => 2 } }
       claim_event_global_position { event_global_position + 1 }
       claim_stream_revision { 1 }
       claim_created_at_store { Time.utc(2026, 8, 30, 12, 1, 1) }
@@ -166,7 +164,7 @@ FactoryBot.define do
         evidence_event = {
           "event_id" => SecureRandom.uuid_v7,
           "type" => "VerificationEvidenceSubmitted",
-          "stream_context" => "DevelopmentVerification",
+          "stream_context" => "DevelopmentIntegration",
           "stream_name" => "VerificationObligation",
           "stream_id" => obligation_id,
           "stream_revision" => 2
@@ -193,7 +191,7 @@ FactoryBot.define do
         {
           "event_id" => SecureRandom.uuid_v7,
           "type" => "VerificationObligationSatisfied",
-          "stream_context" => "DevelopmentVerification",
+          "stream_context" => "DevelopmentIntegration",
           "stream_name" => "VerificationObligation",
           "stream_id" => obligation_id,
           "stream_revision" => 3
@@ -201,7 +199,7 @@ FactoryBot.define do
       end
       terminal_actor { { "kind" => "system", "id" => "verification-outcomes", "authenticated" => false } }
       terminal_markers { markers }
-      terminal_metadata { { "schema_version" => 1 } }
+      terminal_metadata { { "schema_version" => 2 } }
       terminal_event_global_position { event_global_position + 3 }
       terminal_stream_revision { 3 }
       terminal_at_domain { Time.utc(2026, 8, 30, 12, 3) }
@@ -212,16 +210,7 @@ FactoryBot.define do
   factory :coordinator_read_verification_obligation_evidence_item,
           class: "Coordinator::Read::VerificationObligationEvidenceItem" do
     transient do
-      obligation_event do
-        {
-          "event_id" => SecureRandom.uuid_v7,
-          "type" => "VerificationObligationCreated",
-          "stream_context" => "DevelopmentVerification",
-          "stream_name" => "VerificationObligation",
-          "stream_id" => obligation_id,
-          "stream_revision" => 0
-        }
-      end
+      source_obligation { nil }
     end
 
     evidence_id { SecureRandom.uuid_v7 }
@@ -233,26 +222,26 @@ FactoryBot.define do
     submission do
       {
         "obligation_id" => obligation_id,
-        "obligation_event" => obligation_event,
         "evidence_id" => evidence_id,
         "evidence_kind" => evidence_kind,
-        "claim" => {
+        "claim" => source_obligation ? {
+          "claim_id" => source_obligation.claim_id,
+          "claimant_id" => source_obligation.claimant_id,
+          "fencing_token" => source_obligation.claim_fencing_token,
+          "claim_event" => source_obligation.claim_event
+        } : {
           "claim_id" => SecureRandom.uuid_v7,
           "claimant_id" => "factory-agent",
           "fencing_token" => 1,
           "claim_event" => {
             "event_id" => SecureRandom.uuid_v7,
             "type" => "VerificationObligationClaimed",
-            "stream_context" => "DevelopmentVerification",
+            "stream_context" => "DevelopmentIntegration",
             "stream_name" => "VerificationObligation",
             "stream_id" => obligation_id,
             "stream_revision" => 1
           }
         },
-        "source_candidate" => {},
-        "target_candidate" => {},
-        "policy" => {},
-        "obligation_validity_input_digest" => "sha256:#{'3' * 64}",
         "assessment" => {
           "evidence_kind" => evidence_kind,
           "producer" => { "name" => "factory-suite", "version" => "1.0" },
@@ -264,9 +253,7 @@ FactoryBot.define do
           "conclusion" => conclusion,
           "findings" => [],
           "produced_at" => "2026-08-30T12:02:00.000000Z"
-        },
-        "assessment_input_digest" => assessment_input_digest,
-        "submitted_at" => "2026-08-30T12:02:00.000000Z"
+        }
       }
     end
     event_id { SecureRandom.uuid_v7 }
@@ -274,7 +261,7 @@ FactoryBot.define do
       {
         "event_id" => event_id,
         "type" => "VerificationEvidenceSubmitted",
-        "stream_context" => "DevelopmentVerification",
+        "stream_context" => "DevelopmentIntegration",
         "stream_name" => "VerificationObligation",
         "stream_id" => obligation_id,
         "stream_revision" => 2
@@ -282,7 +269,14 @@ FactoryBot.define do
     end
     actor { { "kind" => "agent", "id" => "factory-agent", "authenticated" => false } }
     markers { [ "verification-obligation:#{obligation_id}" ] }
-    metadata { { "schema_version" => 1 } }
+    metadata do
+      {
+        "schema_version" => 2,
+        "policy_version" => "compatibility-assessment/v2",
+        "obligation_validity_input_digest" => "sha256:#{'3' * 64}",
+        "assessment_input_digest" => assessment_input_digest
+      }
+    end
     sequence(:event_global_position, 1_300)
     stream_revision { 2 }
     produced_at_domain { Time.utc(2026, 8, 30, 12, 2) }

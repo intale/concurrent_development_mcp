@@ -174,7 +174,7 @@ FactoryBot.define do
     end
     recorded_actor { { "kind" => "orchestrator", "id" => "guidance-host", "authenticated" => false } }
     recorded_markers { [ "decision:#{decision_id}" ] }
-    recorded_metadata { { "schema_version" => 1 } }
+    recorded_metadata { { "schema_version" => 2 } }
     recorded_at_domain { Time.utc(2026, 8, 30, 12) }
     recorded_at_store { Time.utc(2026, 8, 30, 12, 0, 1) }
 
@@ -227,7 +227,7 @@ FactoryBot.define do
       end
       activated_actor { recorded_actor }
       activated_markers { recorded_markers }
-      activated_metadata { { "schema_version" => 1 } }
+      activated_metadata { { "schema_version" => 2 } }
       activated_at_domain { Time.utc(2026, 8, 30, 12, 1) }
       activated_at_store { Time.utc(2026, 8, 30, 12, 1, 1) }
     end

@@ -2,32 +2,15 @@ module Coordinator
   module Read
     module Repositories
       class VerificationObligations
-        def initialize: (
-          ?evidence_contract: Contracts::VerificationEvidenceProjection,
-          ?outcome_contract: Contracts::VerificationOutcomeProjection,
-          ?lifecycle_contract: Contracts::VerificationLifecycleProjection
-        ) -> void
-        def store_creation: (
-          event: PgEventstore::Event,
-          obligation: Write::Events::VerificationObligationCreatedV1
-        ) -> VerificationObligation
-        def store_definition_v2: (
+        def store_definition: (
           event: PgEventstore::Event,
           loaded: Write::VerificationObligations::LoadedDefinitionV2
         ) -> VerificationObligation
         def store_claim: (
           event: PgEventstore::Event,
-          claim: Write::Events::VerificationObligationClaimedV1
-        ) -> VerificationObligation
-        def store_claim_v2: (
-          event: PgEventstore::Event,
           claim: Write::Events::VerificationObligationClaimedV2
         ) -> VerificationObligation
         def store_evidence: (
-          event: PgEventstore::Event,
-          submission: Write::Events::VerificationEvidenceSubmittedV1
-        ) -> VerificationObligation
-        def store_evidence_v2: (
           event: PgEventstore::Event,
           submission: Write::Events::VerificationEvidenceSubmittedV2
         ) -> VerificationObligation
@@ -37,18 +20,10 @@ module Coordinator
         ) -> VerificationObligation
         def store_outcome: (
           event: PgEventstore::Event,
-          outcome: Write::Events::VerificationObligationSatisfiedV1 | Write::Events::VerificationObligationFailedV1
-        ) -> VerificationObligation
-        def store_outcome_v2: (
-          event: PgEventstore::Event,
           outcome: Write::Events::VerificationObligationSatisfiedV2 | Write::Events::VerificationObligationFailedV2,
           state: Write::VerificationObligations::OutcomeStateV2
         ) -> VerificationObligation
         def store_lifecycle: (
-          event: PgEventstore::Event,
-          transition: Write::Events::VerificationObligationWaivedV1 | Write::Events::VerificationObligationInvalidatedV1
-        ) -> VerificationObligation
-        def store_lifecycle_v2: (
           event: PgEventstore::Event,
           transition: Write::Events::VerificationObligationWaivedV2 | Write::Events::VerificationObligationInvalidatedV2
         ) -> VerificationObligation

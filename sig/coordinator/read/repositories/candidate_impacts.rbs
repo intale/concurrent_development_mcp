@@ -12,9 +12,9 @@ module Coordinator
           ?candidates: Candidates,
           ?policies: CandidateImpactPolicies
         ) -> void
-        def store_manifest: (manifest: Write::Events::CandidateChangeManifestCapturedV1) -> void
-        def store_build_context: (build_context: Write::Events::CandidateBuildContextCapturedV1) -> void
-        def store_surface: (event: PgEventstore::Event, surface: Write::Events::CandidateImpactSurfaceDerivedV1) -> Candidate
+        def store_manifest: (event: PgEventstore::Event, manifest: Write::Events::CandidateChangeManifestCapturedV2) -> void
+        def store_build_context: (event: PgEventstore::Event, build_context: Write::Events::CandidateBuildContextCapturedV2) -> void
+        def store_surface: (event: PgEventstore::Event, ?projection_event: PgEventstore::Event, surface: Write::Events::CandidateImpactSurfaceDerivedV2) -> Candidate
         def page: (CandidateImpactGetQueryV1 query) -> CandidateImpactPageV1?
       end
     end

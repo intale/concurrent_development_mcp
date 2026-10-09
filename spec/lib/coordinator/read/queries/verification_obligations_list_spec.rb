@@ -100,8 +100,7 @@ RSpec.describe Coordinator::Read::Queries::VerificationObligationsList, :read_mo
       :coordinator_read_verification_obligation_evidence_item,
       evidence_id:,
       obligation_id: obligation.obligation_id,
-      obligation_event: obligation.event,
-      submission: evidence_submission(obligation, evidence_id:)
+      source_obligation: obligation
     )
 
     open_page = query.call(obligation_id: obligation.obligation_id).value!.data.page
@@ -124,38 +123,5 @@ RSpec.describe Coordinator::Read::Queries::VerificationObligationsList, :read_mo
       evidence_kind: "combined_tests",
       assessment: have_attributes(conclusion: "passed")
     )
-  end
-
-  def evidence_submission(obligation, evidence_id:)
-    {
-      "obligation_id" => obligation.obligation_id,
-      "obligation_event" => obligation.event,
-      "evidence_id" => evidence_id,
-      "evidence_kind" => "combined_tests",
-      "claim" => {
-        "claim_id" => obligation.claim_id,
-        "claimant_id" => obligation.claimant_id,
-        "fencing_token" => obligation.claim_fencing_token,
-        "claim_event" => obligation.claim_event
-      },
-      "source_candidate" => obligation.obligation.fetch("source_candidate"),
-      "target_candidate" => obligation.obligation.fetch("target_candidate"),
-      "policy" => obligation.obligation.fetch("policy"),
-      "obligation_validity_input_digest" => obligation.obligation.fetch("validity_input_digest"),
-      "assessment" => {
-        "evidence_kind" => "combined_tests",
-        "producer" => { "name" => "factory-suite", "version" => "1.0" },
-        "run_id" => "run-factory",
-        "test_suite_digest" => "sha256:#{'7' * 64}",
-        "environment_digest" => "sha256:#{'8' * 64}",
-        "dependency_graph_digest" => "sha256:#{'9' * 64}",
-        "result_digest" => "sha256:#{'4' * 64}",
-        "conclusion" => "passed",
-        "findings" => [],
-        "produced_at" => "2026-08-30T12:02:00.000000Z"
-      },
-      "assessment_input_digest" => "sha256:#{'5' * 64}",
-      "submitted_at" => "2026-08-30T12:02:00.000000Z"
-    }
   end
 end

@@ -1,8 +1,0 @@
-module Coordinator
-  module Read
-    module Contracts
-      class VerificationLifecycleProjection < Dry::Validation::Contract
-      end
-    end
-  end
-end

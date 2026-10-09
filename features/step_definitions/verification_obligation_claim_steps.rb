@@ -73,6 +73,12 @@ Then("the durable claim carries exact Task tracing") do
   attempt = @last_successful_claim
   submitted, started, task_completed = task_events(attempt.fetch(:task_id))
   claim = verification_obligation_claim_events.sole
+  assert_acceptance_equal(2, claim.metadata.fetch("schema_version"), "Native claim schema")
+  assert_acceptance_equal(
+    %w[claim_id claimant_id expires_at fencing_token obligation_id],
+    claim.data.keys.sort,
+    "Native claim fact payload"
+  )
   command_terminal = command_terminal_event(attempt.fetch(:command_id))
   assert_acceptance_equal("CommandSucceeded", command_terminal&.type, "Claim command terminal")
   assert_acceptance_equal(started.id, claim.causation_id, "Claim immediate parent")

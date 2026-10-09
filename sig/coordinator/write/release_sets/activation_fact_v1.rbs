@@ -1,6 +1,0 @@
-module Coordinator::Write::ReleaseSets
-  class ActivationFactV1 < Coordinator::Shared::Value
-    def payload: () -> Coordinator::Write::Events::ReleaseSetActivatedV1
-    def event: () -> Coordinator::Write::EventReference
-  end
-end

@@ -1,9 +1,0 @@
-module Coordinator
-  module Write
-    class SkillPublicationPreparationV1 < Shared::Value
-      def published_at: () -> String
-      def input_digest: () -> String
-      def domain_event_id: () -> String
-    end
-  end
-end

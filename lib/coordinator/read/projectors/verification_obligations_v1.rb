@@ -6,8 +6,8 @@ module Coordinator::Read
       PROJECTION = ProjectionDefinition.new(name: "verification_obligations", version: 1)
 
       def initialize(
-        definition_loader: nil,
-        outcome_state_loader: nil,
+        definition_loader:,
+        outcome_state_loader:,
         contract: Contracts::VerificationObligationSourceEvent.new,
         schema_registry: Coordinator::Write::EventSchemaRegistry.new,
         obligations: Repositories::VerificationObligations.new,
@@ -43,44 +43,32 @@ module Coordinator::Read
 
       def project(event, payload)
         case payload
-        when Coordinator::Write::Events::VerificationObligationCreatedV1
-          @obligations.store_creation(event:, obligation: payload)
         when Coordinator::Write::Events::VerificationObligationCreatedV2,
              Coordinator::Write::Events::VerificationObligationAddedToChangeSetV1,
              Coordinator::Write::Events::VerificationObligationSourceCandidateAssignedV1,
              Coordinator::Write::Events::VerificationObligationTargetCandidateAssignedV1
-          loaded = @definition_loader&.call(payload.obligation_id)
+          loaded = @definition_loader.call(payload.obligation_id)
           raise InvalidProjectionSource, "Verification obligation definition is unavailable" unless loaded
 
-          @obligations.store_definition_v2(event:, loaded:)
-        when Coordinator::Write::Events::VerificationObligationClaimedV1
-          @obligations.store_claim(event:, claim: payload)
+          @obligations.store_definition(event:, loaded:)
         when Coordinator::Write::Events::VerificationObligationClaimedV2
-          @obligations.store_claim_v2(event:, claim: payload)
-        when Coordinator::Write::Events::VerificationEvidenceSubmittedV1
-          @obligations.store_evidence(event:, submission: payload)
+          @obligations.store_claim(event:, claim: payload)
         when Coordinator::Write::Events::VerificationEvidenceSubmittedV2
-          @obligations.store_evidence_v2(event:, submission: payload)
+          @obligations.store_evidence(event:, submission: payload)
         when Coordinator::Write::Events::VerificationObligationEvidenceSelectedV1
           @obligations.touch_from_event(event:, obligation_id: payload.obligation_id)
-        when Coordinator::Write::Events::VerificationObligationSatisfiedV1,
-             Coordinator::Write::Events::VerificationObligationFailedV1
-          @obligations.store_outcome(event:, outcome: payload)
         when Coordinator::Write::Events::VerificationObligationSatisfiedV2,
              Coordinator::Write::Events::VerificationObligationFailedV2
-          state = @outcome_state_loader&.call(
+          state = @outcome_state_loader.call(
             payload.obligation_id,
             through_revision: event.stream_revision
           )
           raise InvalidProjectionSource, "Verification obligation outcome state is unavailable" unless state
 
-          @obligations.store_outcome_v2(event:, outcome: payload, state:)
-        when Coordinator::Write::Events::VerificationObligationWaivedV1,
-             Coordinator::Write::Events::VerificationObligationInvalidatedV1
-          @obligations.store_lifecycle(event:, transition: payload)
+          @obligations.store_outcome(event:, outcome: payload, state:)
         when Coordinator::Write::Events::VerificationObligationWaivedV2,
              Coordinator::Write::Events::VerificationObligationInvalidatedV2
-          @obligations.store_lifecycle_v2(event:, transition: payload)
+          @obligations.store_lifecycle(event:, transition: payload)
         end
       end
 
