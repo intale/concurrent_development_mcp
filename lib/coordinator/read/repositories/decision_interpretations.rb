@@ -23,37 +23,7 @@ module Coordinator::Read
         )
       end
 
-      def store_proposal(event:, proposal:)
-        create_from_event(Coordinator::Read::DecisionInterpretation, event:, attributes: {
-          interpretation_id: proposal.interpretation_id,
-          message_id: proposal.source_message_id,
-          source_event: proposal.source_event.to_h,
-          source_span: proposal.source_span&.to_h,
-          classifier: proposal.classifier.to_h,
-          proposed_decision: proposal.proposed_decision.to_h,
-          scope_provenance: proposal.scope_provenance.to_h,
-          ambiguities: proposal.ambiguities.map(&:to_h),
-          assessment: proposal.assessment.to_h,
-          proposal_status: proposal.assessment.status,
-          lifecycle_status: "proposed",
-          policy_status: "proposal_only",
-          adjudication: nil,
-          clarification_required: false,
-          actor_kind: event.metadata.fetch("actor_kind"),
-          actor_id: event.metadata.fetch("actor_id"),
-          event_id: event.id,
-          event_type: event.type,
-          stream_context: event.stream.context,
-          stream_name: event.stream.stream_name,
-          stream_id: event.stream.stream_id,
-          stream_revision: event.stream_revision,
-          causation_id: event.causation_id,
-          correlation_id: event.correlation_id,
-          proposed_at_domain: proposal.proposed_at
-        })
-      end
-
-      def store_proposal_v2(event:, source:)
+      def store_proposal(event:, source:)
         proposal = source.proposal
         create_from_event(Coordinator::Read::DecisionInterpretation, event:, attributes: {
           interpretation_id: proposal.interpretation_id,
@@ -90,14 +60,11 @@ module Coordinator::Read
           message_id: clarification.source_message_id
         )
         questions = clarification_questions(clarification)
-        status = if clarification.respond_to?(:status)
-                   clarification.status
-        elsif clarification.origin == "adjudication"
+        status = if clarification.origin == "adjudication"
                    "needs_classification"
         else
                    record.proposal_status
         end
-        occurred_at = clarification.respond_to?(:required_at) ? clarification.required_at : event.created_at
         attributes = {
           assessment: {
             status:,
@@ -109,7 +76,7 @@ module Coordinator::Read
           clarification_required: true,
           clarification_event_id: event.id,
           clarification_stream_revision: event.stream_revision,
-          clarification_required_at_domain: occurred_at
+          clarification_required_at_domain: event.created_at
         }
         if clarification.origin == "adjudication"
           attributes[:adjudication] = build_adjudication(
@@ -122,7 +89,7 @@ module Coordinator::Read
               questions:
             ),
             slot: nil,
-            adjudicated_at: timestamp(occurred_at)
+            adjudicated_at: event.created_at.utc.iso8601(6)
           ).to_h
         end
         save_from_event(record, event:, attributes:)
@@ -140,7 +107,7 @@ module Coordinator::Read
             rationale: normalize_adjudication_rationale("accepted", acceptance.rationale),
             clarification: nil,
             slot: acceptance.slot,
-            adjudicated_at: timestamp(acceptance.respond_to?(:accepted_at) ? acceptance.accepted_at : event.created_at)
+            adjudicated_at: event.created_at.utc.iso8601(6)
           ).to_h
         })
       end
@@ -157,7 +124,7 @@ module Coordinator::Read
             rationale: normalize_adjudication_rationale("rejected", rejection.rationale),
             clarification: nil,
             slot: nil,
-            adjudicated_at: timestamp(rejection.respond_to?(:rejected_at) ? rejection.rejected_at : event.created_at)
+            adjudicated_at: event.created_at.utc.iso8601(6)
           ).to_h
         })
       end
@@ -166,8 +133,6 @@ module Coordinator::Read
 
       def clarification_questions(clarification)
         clarification.questions.map.with_index do |question, index|
-          next question unless question.is_a?(String)
-
           Coordinator::Write::Interpretations::ClarificationQuestionV1.new(
             field: "clarification_#{index + 1}",
             prompt: question,
@@ -177,13 +142,7 @@ module Coordinator::Read
       end
 
       def normalize_adjudication_rationale(code, rationale)
-        return rationale unless rationale.is_a?(String)
-
         Coordinator::Write::Interpretations::AdjudicationRationaleV1.new(code:, summary: rationale)
-      end
-
-      def timestamp(value)
-        value.respond_to?(:utc) ? value.utc.iso8601(6) : value
       end
 
       def build(record)

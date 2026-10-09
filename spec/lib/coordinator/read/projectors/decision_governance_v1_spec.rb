@@ -340,17 +340,13 @@ RSpec.describe Coordinator::Read::Projectors::DecisionGovernanceV1, :read_model 
       scope:,
       relations:
     )
-    proposal = Coordinator::Write::Events::DecisionInterpretationProposedV1.new(
+    proposal = Coordinator::Write::Events::DecisionInterpretationProposedV2.new(
       interpretation_id:,
       source_message_id: message_id,
-      source_event: source_reference("UserUtteranceRecorded", "Conversation", "C-#{message_id}", 0),
-      source_span: input.fetch(:source_span),
-      classifier: input.fetch(:classifier),
+      source_span: input.fetch(:source_span).fetch(:text),
       proposed_decision: input.fetch(:proposed_decision),
-      scope_provenance: scope_provenance(message_id, scope[:work_item_id] ? "work_item" : "repository"),
       ambiguities: [],
-      assessment: { status: "accepted_for_activation", reasons: [], questions: [] },
-      proposed_at: "2026-08-30T12:00:00.000000Z"
+      assessment: "accepted_for_activation"
     )
     Coordinator::Write::Decisions::DecisionDefinitionBuilder.new.call(
       proposal:,

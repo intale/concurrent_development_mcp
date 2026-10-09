@@ -4,33 +4,16 @@ RSpec.describe Coordinator::Write::Interpretations::InterpretationSlotBuilder do
   subject(:builder) { described_class.new }
 
   let(:proposal) do
-    Coordinator::Write::Events::DecisionInterpretationProposedV1.new(
+    Coordinator::Write::Events::DecisionInterpretationProposedV2.new(
       interpretation_id: "I-1",
       source_message_id: "M-1",
-      source_event: event_reference("000001"),
-      source_span: nil,
-      classifier: Coordinator::Write::Interpretations::ClassifierAttributionV1.new(
-        id: "classifier-a",
-        version: "v1",
-        ontology_version: 1,
-        confidence_millionths: 900_000
-      ),
+      source_span: "RSpec",
       proposed_decision: proposed_decision([
         RepositoryScenario.repository_id("orders"),
         RepositoryScenario::DEFAULT_REPOSITORY_ID
       ]),
-      scope_provenance: Coordinator::Write::Interpretations::DecisionScopeProvenanceV1.new(
-        kind: "explicit",
-        anchor_level: "repository",
-        source_message_id: "M-1"
-      ),
       ambiguities: [],
-      assessment: Coordinator::Write::Interpretations::InterpretationAssessmentV1.new(
-        status: "accepted_for_activation",
-        reasons: [],
-        questions: []
-      ),
-      proposed_at: "2026-08-22T17:00:00.000000Z"
+      assessment: "accepted_for_activation"
     )
   end
 
@@ -81,19 +64,8 @@ RSpec.describe Coordinator::Write::Interpretations::InterpretationSlotBuilder do
     )
   end
 
-  def event_reference(suffix)
-    Coordinator::Write::EventReference.new(
-      event_id: "01900000-0000-7000-8000-000000#{suffix}",
-      type: "UserUtteranceRecorded",
-      stream_context: "HumanGuidance",
-      stream_name: "Conversation",
-      stream_id: "C-1",
-      stream_revision: 0
-    )
-  end
-
   it "normalizes semantically identical exact scopes into one compound slot" do
-    reordered = Coordinator::Write::Events::DecisionInterpretationProposedV1.new(
+    reordered = Coordinator::Write::Events::DecisionInterpretationProposedV2.new(
       proposal.to_h.merge(
         proposed_decision: proposed_decision([
           RepositoryScenario::DEFAULT_REPOSITORY_ID,
@@ -122,10 +94,10 @@ RSpec.describe Coordinator::Write::Interpretations::InterpretationSlotBuilder do
   end
 
   it "keeps different messages and scopes in distinct slots" do
-    another_message = Coordinator::Write::Events::DecisionInterpretationProposedV1.new(
+    another_message = Coordinator::Write::Events::DecisionInterpretationProposedV2.new(
       proposal.to_h.merge(source_message_id: "M-2")
     )
-    another_scope = Coordinator::Write::Events::DecisionInterpretationProposedV1.new(
+    another_scope = Coordinator::Write::Events::DecisionInterpretationProposedV2.new(
       proposal.to_h.merge(
         proposed_decision: proposed_decision([ RepositoryScenario.repository_id("catalog") ])
       )

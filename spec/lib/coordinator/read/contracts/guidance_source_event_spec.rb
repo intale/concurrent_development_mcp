@@ -50,4 +50,11 @@ RSpec.describe Coordinator::Read::Contracts::GuidanceSourceEvent do
     )
     expect(contract.call(valid_input.merge(schema_version: 3)).errors.to_h).to have_key(:schema_version)
   end
+
+  it "rejects superseded utterance versions while keeping current anchor facts" do
+    %w[UserUtteranceRecorded UserUtteranceForwardedByAgent].each do |event_type|
+      expect(contract.call(valid_input.merge(event_type:, schema_version: 1)).errors.to_h)
+        .to have_key(:schema_version)
+    end
+  end
 end

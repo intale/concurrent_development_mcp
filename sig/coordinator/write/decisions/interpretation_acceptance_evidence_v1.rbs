@@ -2,7 +2,7 @@ module Coordinator
   module Write
     module Decisions
       class InterpretationAcceptanceEvidenceV1 < Shared::Value
-        def acceptance: () -> (Events::DecisionInterpretationAcceptedV1 | Events::DecisionInterpretationAcceptedV2)
+        def acceptance: () -> Events::DecisionInterpretationAcceptedV2
         def event: () -> EventReference
       end
     end

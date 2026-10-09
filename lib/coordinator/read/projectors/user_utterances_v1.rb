@@ -65,9 +65,7 @@ module Coordinator::Read
 
       def project(event, fact)
         case fact
-        when Coordinator::Write::Events::UserUtteranceRecordedV1,
-             Coordinator::Write::Events::UserUtteranceForwardedByAgentV1,
-             Coordinator::Write::Events::UserUtteranceRecordedV2,
+        when Coordinator::Write::Events::UserUtteranceRecordedV2,
              Coordinator::Write::Events::UserUtteranceForwardedByAgentV2
           @utterances.store(event:, utterance: fact)
         when Coordinator::Write::Events::GuidanceMessageAnchoredV1

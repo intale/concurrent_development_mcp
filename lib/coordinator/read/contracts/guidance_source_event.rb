@@ -4,8 +4,8 @@ module Coordinator::Read
   module Contracts
     class GuidanceSourceEvent < Dry::Validation::Contract
       EVENT_SCHEMAS = {
-        "UserUtteranceRecorded" => [ 1, 2 ],
-        "UserUtteranceForwardedByAgent" => [ 1, 2 ],
+        "UserUtteranceRecorded" => [ 2 ],
+        "UserUtteranceForwardedByAgent" => [ 2 ],
         "GuidanceMessageAnchored" => [ 1 ]
       }.freeze
       EVENT_TYPES = EVENT_SCHEMAS.keys.freeze

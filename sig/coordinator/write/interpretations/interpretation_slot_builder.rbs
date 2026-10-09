@@ -9,7 +9,7 @@ module Coordinator
           ?compound_marker_builder: Shared::CompoundMarkerBuilder
         ) -> void
 
-        def call: ((Events::DecisionInterpretationProposedV1 | Events::DecisionInterpretationProposedV2) proposal) -> InterpretationSlotV1
+        def call: (Events::DecisionInterpretationProposedV2 proposal) -> InterpretationSlotV1
       end
     end
   end

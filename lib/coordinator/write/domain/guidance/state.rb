@@ -5,8 +5,6 @@ module Coordinator::Write
     module Guidance
       class State < Value
         EVENT_CLASSES = [
-          Events::UserUtteranceRecordedV1,
-          Events::UserUtteranceForwardedByAgentV1,
           Events::UserUtteranceRecordedV2,
           Events::UserUtteranceForwardedByAgentV2
         ].freeze

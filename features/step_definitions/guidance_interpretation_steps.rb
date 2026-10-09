@@ -32,6 +32,11 @@ Then("the guidance Task records one evidence-only fact") do
   assert_acceptance_equal("evidence_only", data.fetch("policy_status"), "Guidance policy status")
   assert_acceptance_equal([ "UserUtteranceRecorded" ], facts.map(&:type), "Guidance facts")
   assert_acceptance_equal(@guidance_text, facts.sole.data.fetch("text"), "Recorded guidance text")
+  assert_acceptance_equal(2, facts.sole.metadata.fetch("schema_version"), "Native guidance schema")
+  assert_acceptance_equal(
+    %w[conversation_id message_id source text], facts.sole.data.keys.sort,
+    "Guidance data contains only the recorded fact, not anchors, timestamps or transport results"
+  )
 end
 
 Then("the available guidance query honestly reports that message as not observed") do
@@ -292,6 +297,26 @@ Then("the hard proposal and its clarification are persisted atomically") do
 
   assert_acceptance(hard_proposal, "The hard proposal fact is missing")
   assert_acceptance(clarification, "The clarification fact is missing")
+  assert_acceptance_equal(2, hard_proposal.metadata.fetch("schema_version"), "Native proposal schema")
+  assert_acceptance_equal(2, clarification.metadata.fetch("schema_version"), "Native clarification schema")
+  assert_acceptance_equal(
+    %w[ambiguities assessment interpretation_id proposed_decision source_message_id source_span],
+    hard_proposal.data.keys.sort,
+    "Proposal data remains a concise fact rather than a serialized entity"
+  )
+  assert_acceptance_equal(
+    %w[interpretation_id origin questions rationale reasons source_message_id],
+    clarification.data.keys.sort,
+    "Clarification data contains no duplicated envelope timestamp or provenance"
+  )
+  assert_acceptance(hard_proposal.metadata.key?("classifier"), "Classifier provenance belongs to metadata")
+  assert_acceptance(hard_proposal.metadata.key?("scope_provenance"), "Scope provenance belongs to metadata")
+  assert_acceptance_equal(
+    hard_proposal.data.fetch("interpretation_id"), hard_proposal.stream.stream_id,
+    "Interpretation owns its stream independently of the source message"
+  )
+  assert_acceptance_equal(hard_proposal.stream.stream_id, clarification.stream.stream_id, "Atomic interpretation source stream")
+  assert_acceptance_equal(hard_proposal.correlation_id, clarification.correlation_id, "Atomic fact correlation")
   assert_acceptance_equal(
     hard_proposal.stream_revision + 1,
     clarification.stream_revision,
@@ -390,6 +415,12 @@ Then("one acceptance Task succeeds and the other reports a slot conflict") do
     1,
     interpretation_events(@interpretation_message_id).count { _1.type == "DecisionInterpretationAccepted" },
     "Accepted interpretation facts"
+  )
+  accepted = interpretation_events(@interpretation_message_id).find { _1.type == "DecisionInterpretationAccepted" }
+  assert_acceptance_equal(2, accepted.metadata.fetch("schema_version"), "Native acceptance schema")
+  assert_acceptance_equal(
+    %w[interpretation_id rationale slot source_message_id], accepted.data.keys.sort,
+    "Acceptance records its lifecycle fact rather than the complete proposal"
   )
 end
 

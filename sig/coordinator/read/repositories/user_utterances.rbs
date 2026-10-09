@@ -4,7 +4,7 @@ module Coordinator
       class UserUtterances
         def fetch: (String message_id) -> GuidanceUtteranceV1?
         def fetch_many: (Array[String] message_ids) -> Array[GuidanceUtteranceV1]
-        def store: (event: PgEventstore::Event, utterance: Write::Events::UserUtteranceRecordedV1 | Write::Events::UserUtteranceForwardedByAgentV1 | Write::Events::UserUtteranceRecordedV2 | Write::Events::UserUtteranceForwardedByAgentV2) -> UserUtterance
+        def store: (event: PgEventstore::Event, utterance: Write::Events::UserUtteranceRecordedV2 | Write::Events::UserUtteranceForwardedByAgentV2) -> UserUtterance
         def add_anchor: (event: PgEventstore::Event, anchor: Write::Events::GuidanceMessageAnchoredV1) -> UserUtterance
       end
     end

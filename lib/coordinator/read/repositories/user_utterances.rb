@@ -16,14 +16,12 @@ module Coordinator::Read
       end
 
       def store(event:, utterance:)
-        anchors = utterance.respond_to?(:anchors) ? utterance.anchors.to_h : empty_anchors
-        recorded_at = utterance.respond_to?(:recorded_at) ? utterance.recorded_at : event.created_at
         create_from_event(Coordinator::Read::UserUtterance, event:, attributes: {
           message_id: utterance.message_id,
           conversation_id: utterance.conversation_id,
           text: utterance.text,
           source: utterance.source == "user" ? "mcp_client" : utterance.source,
-          anchors:,
+          anchors: empty_anchors,
           actor_kind: event.metadata.fetch("actor_kind"),
           actor_id: event.metadata.fetch("actor_id"),
           policy_status: "evidence_only",
@@ -35,7 +33,7 @@ module Coordinator::Read
           stream_revision: event.stream_revision,
           causation_id: event.causation_id,
           correlation_id: event.correlation_id,
-          recorded_at_domain: recorded_at
+          recorded_at_domain: event.created_at
         })
       end
 

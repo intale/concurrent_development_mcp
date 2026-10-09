@@ -116,8 +116,7 @@ module Coordinator::Write
       def terminal_evidence(event)
         payload = load_event(event)
         Interpretations::InterpretationTerminalEvidenceV1.new(
-          status: payload.is_a?(Events::DecisionInterpretationAcceptedV1) ||
-            payload.is_a?(Events::DecisionInterpretationAcceptedV2) ? "accepted" : "rejected",
+          status: payload.is_a?(Events::DecisionInterpretationAcceptedV2) ? "accepted" : "rejected",
           interpretation_id: payload.interpretation_id,
           event: event_reference(event)
         )

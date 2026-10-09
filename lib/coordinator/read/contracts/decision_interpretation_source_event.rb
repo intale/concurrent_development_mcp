@@ -4,10 +4,10 @@ module Coordinator::Read
   module Contracts
     class DecisionInterpretationSourceEvent < Dry::Validation::Contract
       EVENT_SCHEMAS = {
-        "DecisionInterpretationProposed" => [ 1, 2 ],
-        "DecisionClarificationRequired" => [ 1, 2 ],
-        "DecisionInterpretationAccepted" => [ 1, 2 ],
-        "DecisionInterpretationRejected" => [ 1, 2 ]
+        "DecisionInterpretationProposed" => [ 2 ],
+        "DecisionClarificationRequired" => [ 2 ],
+        "DecisionInterpretationAccepted" => [ 2 ],
+        "DecisionInterpretationRejected" => [ 2 ]
       }.freeze
       EVENT_TYPES = EVENT_SCHEMAS.keys.freeze
 

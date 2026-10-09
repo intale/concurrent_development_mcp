@@ -6,7 +6,7 @@ RSpec.describe Coordinator::Read::Contracts::DecisionInterpretationSourceEvent d
   let(:valid_input) do
     {
       event_type: "DecisionInterpretationProposed",
-      schema_version: 1,
+      schema_version: 2,
       stream_context: "HumanGuidance",
       stream_name: "Interpretation",
       stream_id: "M-1",
@@ -47,5 +47,12 @@ RSpec.describe Coordinator::Read::Contracts::DecisionInterpretationSourceEvent d
       :actor_id
     )
     expect(contract.call(valid_input.merge(schema_version: 3)).errors.to_h).to have_key(:schema_version)
+  end
+
+  it "rejects superseded schema versions for every interpretation lifecycle fact" do
+    described_class::EVENT_TYPES.each do |event_type|
+      expect(contract.call(valid_input.merge(event_type:, schema_version: 1)).errors.to_h)
+        .to have_key(:schema_version)
+    end
   end
 end

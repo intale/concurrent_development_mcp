@@ -4,8 +4,6 @@ module Coordinator
       module Guidance
         class State < Shared::Value
           EVENT_CLASSES: Array[
-            singleton(Events::UserUtteranceRecordedV1) |
-            singleton(Events::UserUtteranceForwardedByAgentV1) |
             singleton(Events::UserUtteranceRecordedV2) |
             singleton(Events::UserUtteranceForwardedByAgentV2)
           ]

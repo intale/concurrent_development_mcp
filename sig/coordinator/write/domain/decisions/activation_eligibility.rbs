@@ -6,7 +6,7 @@ module Coordinator
           NON_NORMATIVE_KINDS: Array[String]
 
           def initialize: (?topic_registry: Write::Interpretations::TopicRegistry) -> void
-          def call: (proposal: Events::DecisionInterpretationProposedV1 | Events::DecisionInterpretationProposedV2, activated_at: String) -> Dry::Monads::Result
+          def call: (proposal: Events::DecisionInterpretationProposedV2, activated_at: String) -> Dry::Monads::Result
         end
       end
     end
