@@ -95,15 +95,6 @@ module Coordinator::Write
         event: nil
       ) unless event
 
-      unless event.metadata["schema_version"] == 3
-        return WorkIntentionBoundaryV1::EpochV1.new(
-          marker:,
-          epoch: 0,
-          through_global_position: nil,
-          event:
-        )
-      end
-
       payload = deserialize(event)
       unless payload.is_a?(Events::ResourceBoundaryEpochRolledV3) &&
              payload.repository_id == repository_id && payload.boundary_marker == marker

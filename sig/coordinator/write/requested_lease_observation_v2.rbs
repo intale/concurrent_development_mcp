@@ -1,9 +1,0 @@
-module Coordinator
-  module Write
-    class RequestedLeaseObservationV2 < Shared::Value
-      def prepared_target: () -> PreparedLeaseTargetV1
-      def resource: () -> LeaseResourceV2
-      def state: () -> Domain::ResourceLeases::State
-    end
-  end
-end

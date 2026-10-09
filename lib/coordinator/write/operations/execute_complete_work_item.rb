@@ -103,13 +103,10 @@ module Coordinator::Write
       end
 
       def load_attempt_state(attempt_id)
-        stream = @stream_factory.attempt(attempt_id)
-        membership = @event_store.read(stream, EventQueries::ATTEMPT_FOR_WORK_ITEM_COMPLETION)
-        lifecycle = @event_store.read_grouped(
-          stream,
-          EventQueries::ATTEMPT_LATEST_WRITE_SET_LIFECYCLE
+        events = @event_store.read(
+          @stream_factory.attempt(attempt_id),
+          EventQueries::ATTEMPT_FOR_WORK_ITEM_COMPLETION
         )
-        events = SpecificStreamEventSequence.merge(membership, lifecycle.reverse)
         Domain::Attempts::State.reduce(events.map { load_event(_1) })
       end
 

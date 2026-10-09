@@ -82,16 +82,6 @@ module Coordinator::Write
       )
     end
 
-    RESOURCE_LEASE_LIFECYCLE_EVENT_TYPES = %w[
-      ResourceLeaseAcquired
-      ResourceLeaseRenewed
-      ResourceLeaseReleased
-      ResourceLeaseExpired
-    ].freeze
-    RESOURCE_BOUNDARY_DECISION_DELTA_MAXIMUM_COUNT = 256
-    RESOURCE_BOUNDARY_ROLLOVER_SOFT_COUNT = 128
-    RESOURCE_BOUNDARY_ROLLOVER_DELTA_MAXIMUM_COUNT = 4_096
-    RESOURCE_BOUNDARY_ACTIVE_LEASE_MAXIMUM_COUNT = 1_024
     RESOURCE_BOUNDARY_MAXIMUM_GLOBAL_POSITION = (2**63) - 1
 
     WORK_INTENTION_LIFECYCLE_EVENT_TYPES = %w[
@@ -124,21 +114,6 @@ module Coordinator::Write
         maximum_count: 1,
         direction: :asc
       )
-    end
-
-    def self.resource_lease_boundary_pages(marker, from_position:, to_position:, maximum_count:)
-      RESOURCE_LEASE_LIFECYCLE_EVENT_TYPES.map do |event_type|
-        GlobalMarkedEventPageCriteria.new(
-          stream_context: "DevelopmentCoordination",
-          stream_name: "ResourceLease",
-          event_type:,
-          markers: [ marker ],
-          from_position:,
-          to_position:,
-          page_size: maximum_count,
-          direction: :asc
-        )
-      end
     end
 
     COMMAND_REGISTRATION = EventReadCriteria.new(
@@ -762,19 +737,11 @@ module Coordinator::Write
     )
 
     ATTEMPT_FOR_WORK_ITEM_COMPLETION = EventReadCriteria.new(
-      event_types: [
-        "AttemptAuthorized",
-        "AttemptAssignedToWorkItem",
-        "AttemptAssignedToAgent",
-        "AttemptBaseSnapshotRecorded",
-        "AttemptStarted",
-        "WorkIntentionSetCreated",
-        "WorkIntentionAddedToSet",
-        "WriteSetReserved",
-        "WriteSetExpanded",
-        "AttemptCompleted"
+      event_types: %w[
+        AttemptAuthorized AttemptAssignedToWorkItem AttemptAssignedToAgent
+        AttemptBaseSnapshotRecorded AttemptStarted AttemptAbandoned AttemptCompleted
       ],
-      maximum_count: 137,
+      maximum_count: 9,
       direction: :asc
     )
 
@@ -787,12 +754,6 @@ module Coordinator::Write
         "AttemptStarted"
       ],
       maximum_count: 104,
-      direction: :asc
-    )
-
-    ATTEMPT_FOR_WRITE_SET_RESERVATION = EventReadCriteria.new(
-      event_types: [ "AttemptAuthorized", "AttemptStarted", "WriteSetReserved" ],
-      maximum_count: 3,
       direction: :asc
     )
 
@@ -818,51 +779,6 @@ module Coordinator::Write
 
     WORK_INTENTION_STATE = GroupedEventReadCriteria.new(
       event_types: WORK_INTENTION_LIFECYCLE_EVENT_TYPES,
-      direction: :desc
-    )
-
-    ATTEMPT_FOR_WRITE_SET_EXPANSION = EventReadCriteria.new(
-      event_types: [ "AttemptAuthorized", "AttemptStarted", "WriteSetReserved", "WriteSetExpanded" ],
-      maximum_count: 34,
-      direction: :asc
-    )
-
-    ATTEMPT_FOR_CANDIDATE_SUBMISSION = EventReadCriteria.new(
-      event_types: [
-        "AttemptAuthorized",
-        "AttemptAssignedToWorkItem",
-        "AttemptAssignedToAgent",
-        "AttemptBaseSnapshotRecorded",
-        "AttemptStarted",
-        "WriteSetReserved",
-        "WriteSetExpanded"
-      ],
-      maximum_count: 37,
-      direction: :asc
-    )
-
-    ATTEMPT_LATEST_WRITE_SET_LIFECYCLE = GroupedEventReadCriteria.new(
-      event_types: [ "WriteSetRenewed", "WriteSetReleased" ],
-      direction: :desc
-    )
-
-    RESOURCE_LEASE_FOR_RESERVATION = GroupedEventReadCriteria.new(
-      event_types: [
-        "ResourceLeaseAcquired",
-        "ResourceLeaseRenewed",
-        "ResourceLeaseReleased",
-        "ResourceLeaseExpired"
-      ],
-      direction: :desc
-    )
-
-    RESOURCE_LEASE_FOR_CANDIDATE_SUBMISSION = GroupedEventReadCriteria.new(
-      event_types: [
-        "ResourceLeaseAcquired",
-        "ResourceLeaseRenewed",
-        "ResourceLeaseReleased",
-        "ResourceLeaseExpired"
-      ],
       direction: :desc
     )
   end

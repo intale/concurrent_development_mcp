@@ -20,10 +20,6 @@ module Coordinator::Read
            Coordinator::Write::Events::WorkItemMadeReadyV2,
            Coordinator::Write::Events::WorkItemAcquiredV2,
            Coordinator::Write::Events::WorkItemRequeuedV2,
-           Coordinator::Write::Events::WriteSetReservedV2,
-           Coordinator::Write::Events::WriteSetExpandedV2,
-           Coordinator::Write::Events::WriteSetRenewedV2,
-           Coordinator::Write::Events::WriteSetReleasedV2,
            Coordinator::Read::WorkIntentionSetViewV1,
            Coordinator::Read::CandidateSubmissionViewV2,
            Coordinator::Write::Events::WorkItemCandidateSelectedV2
@@ -38,10 +34,6 @@ module Coordinator::Read
       when Coordinator::Read::AttemptDefinitionViewV1,
            Coordinator::Read::AttemptAbandonmentViewV1,
            Coordinator::Read::AttemptCompletionViewV1,
-           Coordinator::Write::Events::WriteSetReservedV2,
-           Coordinator::Write::Events::WriteSetExpandedV2,
-           Coordinator::Write::Events::WriteSetRenewedV2,
-           Coordinator::Write::Events::WriteSetReleasedV2,
            Coordinator::Read::WorkIntentionSetViewV1,
            Coordinator::Read::CandidateSubmissionViewV2
         roots << ProjectionScopeRoot.new(

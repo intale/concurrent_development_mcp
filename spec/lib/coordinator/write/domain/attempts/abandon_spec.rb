@@ -3,20 +3,31 @@
 RSpec.describe Coordinator::Write::Domain::Attempts::Abandon do
   subject(:abandon) { described_class.new }
 
-  let(:resource) { ResourceLeaseExamples.resource }
-  let(:reference) { ResourceLeaseExamples.reference(resource:) }
+  let(:set_id) { "03919191-9191-7191-8191-919191919191" }
+  let(:expires_at) { "2026-08-22T10:15:00.000000Z" }
+  let(:reference) do
+    Coordinator::Write::WorkIntentionFencedReferenceV1.new(
+      intention_id: "04919191-9191-7191-8191-919191919191",
+      resource_id: "01919191-9191-7191-8191-919191919191",
+      fencing_token: 1
+    )
+  end
   let(:attempt_state) do
-    ResourceLeaseExamples.active_attempt_state(
-      lease_set_id: ResourceLeaseExamples::LEASE_SET_ID,
-      lease_resources: [ reference ],
-      lease_expires_at: ResourceLeaseExamples::EXPIRES_AT
+    Coordinator::Write::Domain::Attempts::State.new(
+      attempt_id: "A-LSE-A", change_set_id: "CS-LSE", work_item_id: "W-LSE-A",
+      agent_id: "agent-a", status: "active",
+      base_snapshots: [
+        Coordinator::Write::RepositorySnapshotV1.new(
+          repository_id: RepositoryScenario::DEFAULT_REPOSITORY_ID, object_format: "sha1", commit_oid: "a" * 40
+        )
+      ]
     )
   end
   let(:work_item_state) do
     Coordinator::Write::Domain::WorkItems::State.initial.new(
       work_item_id: "W-LSE-A",
       change_set_id: "CS-LSE",
-      repository_id: ResourceLeaseExamples::REPOSITORY_ID,
+      repository_id: RepositoryScenario::DEFAULT_REPOSITORY_ID,
       goal: "Coordinate the lease",
       acceptance_criteria: [ "The Attempt can be abandoned" ],
       status: "active",
@@ -27,7 +38,7 @@ RSpec.describe Coordinator::Write::Domain::Attempts::Abandon do
   let(:command) do
     Coordinator::Write::Commands::AbandonAttempt.new(
       command_id: "cmd-abandon",
-      actor: ResourceLeaseExamples.actor,
+      actor: Coordinator::Write::Commands::Actor.new(kind: "agent", id: "agent-a"),
       change_set_id: "CS-LSE",
       work_item_id: "W-LSE-A",
       attempt_id: "A-LSE-A",
@@ -50,7 +61,7 @@ RSpec.describe Coordinator::Write::Domain::Attempts::Abandon do
     withdrawal, abandonment, requeue = result.value!.events
     expect(withdrawal).to eq(
       Coordinator::Write::Events::ResourceWorkIntentionWithdrawnV1.new(
-        intention_id: reference.lease_id,
+        intention_id: reference.intention_id,
         resource_id: reference.resource_id,
         fencing_token: reference.fencing_token,
         reason: "Checkpoint and hand off"
@@ -82,14 +93,14 @@ RSpec.describe Coordinator::Write::Domain::Attempts::Abandon do
 
   def work_intention_set_state
     Coordinator::Write::Domain::WorkIntentions::SetState.new(
-      set_id: ResourceLeaseExamples::LEASE_SET_ID,
+      set_id: set_id,
       attempt_id: "A-LSE-A",
       work_item_id: "W-LSE-A",
       change_set_id: "CS-LSE",
-      repository_id: ResourceLeaseExamples::REPOSITORY_ID,
+      repository_id: RepositoryScenario::DEFAULT_REPOSITORY_ID,
       members: [
         Coordinator::Write::WorkIntentionReferenceV1.new(
-          intention_id: reference.lease_id,
+          intention_id: reference.intention_id,
           resource_id: reference.resource_id
         )
       ]
@@ -99,10 +110,10 @@ RSpec.describe Coordinator::Write::Domain::Attempts::Abandon do
   def work_intention_state(**overrides)
     Coordinator::Write::Domain::WorkIntentions::State.new(
       {
-        intention_id: reference.lease_id,
-        set_id: ResourceLeaseExamples::LEASE_SET_ID,
+        intention_id: reference.intention_id,
+        set_id: set_id,
         resource_id: reference.resource_id,
-        repository_id: ResourceLeaseExamples::REPOSITORY_ID,
+        repository_id: RepositoryScenario::DEFAULT_REPOSITORY_ID,
         change_set_id: "CS-LSE",
         work_item_id: "W-LSE-A",
         attempt_id: "A-LSE-A",
@@ -114,7 +125,7 @@ RSpec.describe Coordinator::Write::Domain::Attempts::Abandon do
         base_commit_oid: "a" * 40,
         base_blob_oid: nil,
         fencing_token: reference.fencing_token,
-        expires_at: ResourceLeaseExamples::EXPIRES_AT,
+        expires_at: expires_at,
         withdrawn: false,
         withdrawal_reason: nil,
         expired: false

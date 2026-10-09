@@ -228,7 +228,7 @@ RSpec.describe Coordinator::Write::Tasks::ToolResultMapper do
         {
           repository_id: RepositoryScenario::DEFAULT_REPOSITORY_ID,
           boundary_marker_count: 2,
-          maximum_delta_event_count: Coordinator::Write::EventQueries::RESOURCE_BOUNDARY_DECISION_DELTA_MAXIMUM_COUNT
+          maximum_delta_event_count: Coordinator::Write::EventQueries::WORK_INTENTION_BOUNDARY_MAXIMUM_COUNT
         },
         Coordinator::Write::Tasks::DomainErrorV1::ResourceBoundaryMaintenanceRequiredError,
         "limit_reached"

@@ -1,6 +1,0 @@
-module Coordinator
-  module Write
-    class InvalidWriteSetReservationEventPlan < StandardError
-    end
-  end
-end

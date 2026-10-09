@@ -297,7 +297,7 @@ module McpAcceptanceWorld
   def attempt_events(attempt_id)
     event_store.read(
       streams.attempt(attempt_id),
-      Coordinator::Write::EventQueries::ATTEMPT_FOR_WRITE_SET_EXPANSION
+      Coordinator::Write::EventQueries::ATTEMPT_FOR_WORK_INTENTIONS
     )
   end
 

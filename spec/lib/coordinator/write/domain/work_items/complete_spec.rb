@@ -28,7 +28,7 @@ RSpec.describe Coordinator::Write::Domain::WorkItems::Complete do
     )
   end
 
-  it "given exact active authority and a relinquished write set, emits one ordered terminal plan" do
+  it "given exact active authority and a current final Candidate, emits one ordered terminal plan" do
     result = decide
 
     expect(result).to be_success
@@ -119,23 +119,13 @@ RSpec.describe Coordinator::Write::Domain::WorkItems::Complete do
         work_item_id: "W-1",
         agent_id: "agent-7",
         base_snapshots: [],
-        lease_set_id: lease_set_id,
-        lease_repository_id: RepositoryScenario::DEFAULT_REPOSITORY_ID,
-        lease_policy_version: Coordinator::Write::LeaseResourceV2::POLICY_VERSION,
-        lease_resources: [],
-        lease_reserved_at: "2026-08-25T07:00:00.000000Z",
-        lease_renewed_at: nil,
-        lease_expires_at: "2026-08-25T08:15:00.000000Z",
-        lease_released_at: "2026-08-25T07:59:00.000000Z",
-        status: "active",
-        selected_candidate_id: nil,
-        selected_candidate_event: nil
+        status: "active"
       }.merge(overrides)
     )
   end
 
   def candidate(**overrides)
-    Coordinator::Write::Events::CandidateSubmittedV2.new(
+    Coordinator::Write::Candidates::StateV2.new(
       {
         candidate_id: "CAN-1",
         change_set_id: "CS-1",
@@ -148,22 +138,21 @@ RSpec.describe Coordinator::Write::Domain::WorkItems::Complete do
         base_commit_oid: "a" * 40,
         head_commit_oid: "b" * 40,
         checkpoint_kind: "final",
-        lease_set_id: lease_set_id,
-        lease_policy_version: Coordinator::Write::LeaseResourceV2::POLICY_VERSION,
-        lease_references: [
-          Coordinator::Write::LeaseReferenceV2.new(
-            resource_id: "01919191-9191-7191-8191-919191919190",
-            resource_kind: "file",
-            resource_path: "lib/candidate.rb",
-            base_blob_oid: "e" * 40,
-            lease_id: "01919191-9191-7191-8191-919191919193",
-            fencing_token: 1
-          )
-        ],
+        intention_set_id: intention_set_id,
         manifest_digest: "sha256:#{"d" * 64}",
         build_context_digest: nil,
-        evidence_status: "attributed_unverified",
-        submitted_at: "2026-08-25T07:50:00.000000Z"
+        manifest: Coordinator::Write::Events::CandidateChangeManifestCapturedV2.new(
+          candidate_id: "CAN-1", evidence_revision: 1,
+          files: [
+            Coordinator::Write::Candidates::ManifestFileV1.new(
+              status: "added", old_path: nil, new_path: "lib/candidate.rb",
+              old_blob_oid: nil, new_blob_oid: "e" * 40, old_mode: nil, new_mode: "100644"
+            )
+          ]
+        ),
+        build_context: nil, submission_event: candidate_event,
+        manifest_event: candidate_event.new(type: "CandidateChangeManifestCaptured"),
+        build_context_event: nil, surface_id: nil, surface_assignment_event: nil, latest_revision: 8
       }.merge(overrides)
     )
   end
@@ -172,7 +161,7 @@ RSpec.describe Coordinator::Write::Domain::WorkItems::Complete do
     @streams ||= Coordinator::Write::StreamFactory.new
   end
 
-  def lease_set_id
+  def intention_set_id
     "01919191-9191-7191-8191-919191919192"
   end
 end

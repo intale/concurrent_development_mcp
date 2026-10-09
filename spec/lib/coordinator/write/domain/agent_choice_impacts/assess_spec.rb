@@ -183,14 +183,6 @@ RSpec.describe Coordinator::Write::Domain::AgentChoiceImpacts::Assess do
           commit_oid: "a" * 40
         )
       ],
-      lease_set_id: nil,
-      lease_repository_id: nil,
-      lease_policy_version: nil,
-      lease_resources: [],
-      lease_reserved_at: nil,
-      lease_renewed_at: nil,
-      lease_expires_at: nil,
-      lease_released_at: nil,
       status: "active"
     )
   end

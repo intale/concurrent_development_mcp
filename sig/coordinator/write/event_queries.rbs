@@ -2,11 +2,6 @@ module Coordinator
   module Write
     module EventQueries
       GUIDANCE_MESSAGE_EVENT_TYPES: Array[String]
-      RESOURCE_LEASE_LIFECYCLE_EVENT_TYPES: Array[String]
-      RESOURCE_BOUNDARY_DECISION_DELTA_MAXIMUM_COUNT: Integer
-      RESOURCE_BOUNDARY_ROLLOVER_SOFT_COUNT: Integer
-      RESOURCE_BOUNDARY_ROLLOVER_DELTA_MAXIMUM_COUNT: Integer
-      RESOURCE_BOUNDARY_ACTIVE_LEASE_MAXIMUM_COUNT: Integer
       RESOURCE_BOUNDARY_MAXIMUM_GLOBAL_POSITION: Integer
       WORK_INTENTION_LIFECYCLE_EVENT_TYPES: Array[String]
       WORK_INTENTION_BOUNDARY_MAXIMUM_COUNT: Integer
@@ -20,12 +15,6 @@ module Coordinator
       def self.interpretation_acceptance: (String marker) -> GlobalMarkedEventReadCriteria
       def self.decision_activation: (String marker) -> GlobalMarkedEventReadCriteria
       def self.candidate_impact_surface_registration: (String marker) -> MarkedEventReadCriteria
-      def self.resource_lease_boundary_pages: (
-        String marker,
-        from_position: Integer,
-        to_position: Integer,
-        maximum_count: Integer
-      ) -> Array[GlobalMarkedEventPageCriteria]
       def self.work_intention_boundary: (Array[String] markers) -> GlobalMarkedEventReadCriteria
 
       COMMAND_REGISTRATION: EventReadCriteria
@@ -93,12 +82,6 @@ module Coordinator
       WORK_ITEM_COMPLETION_FOR_PROJECTION: EventReadCriteria
       ATTEMPT_FOR_WORK_ITEM_COMPLETION: EventReadCriteria
       ATTEMPT_FOR_ACQUISITION: EventReadCriteria
-      ATTEMPT_FOR_WRITE_SET_RESERVATION: EventReadCriteria
-      ATTEMPT_FOR_WRITE_SET_EXPANSION: EventReadCriteria
-      ATTEMPT_FOR_CANDIDATE_SUBMISSION: EventReadCriteria
-      ATTEMPT_LATEST_WRITE_SET_LIFECYCLE: GroupedEventReadCriteria
-      RESOURCE_LEASE_FOR_RESERVATION: GroupedEventReadCriteria
-      RESOURCE_LEASE_FOR_CANDIDATE_SUBMISSION: GroupedEventReadCriteria
     end
   end
 end

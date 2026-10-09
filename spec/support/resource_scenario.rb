@@ -32,11 +32,4 @@ module ResourceScenario
       )
     )
   end
-
-  def lease_events(event_store:, resource_id:)
-    event_store.read_grouped(
-      Coordinator::Write::StreamFactory.new.resource_lease(resource_id),
-      Coordinator::Write::EventQueries::RESOURCE_LEASE_FOR_RESERVATION
-    ).reverse
-  end
 end

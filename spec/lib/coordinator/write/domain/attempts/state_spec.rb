@@ -29,42 +29,32 @@ RSpec.describe Coordinator::Write::Domain::Attempts::State do
       work_item_id: "W-200",
       agent_id: "agent-a",
       base_snapshots: [ snapshot.to_h ],
-      lease_set_id: nil,
-      lease_repository_id: nil,
-      lease_policy_version: nil,
-      lease_resources: [],
-      lease_reserved_at: nil,
-      lease_renewed_at: nil,
-      lease_expires_at: nil,
-      lease_released_at: nil,
       status: "active",
-      selected_candidate_id: nil,
-      selected_candidate_event: nil,
-      selected_candidate_checkpoint_kind: nil
     )
     expect(state).to be_frozen
   end
 
-  it "retains separate Candidate attribution after the lean terminal fact" do
-    candidate_event = Coordinator::Write::EventReference.new(
-      event_id: SecureRandom.uuid_v7, type: "CandidateSubmitted",
-      stream_context: "DevelopmentIntegration", stream_name: "Candidate",
-      stream_id: "CAN-400", stream_revision: 0
-    )
-    attachment = Coordinator::Write::Events::CandidateAttachedToAttemptV1.new(
-      attempt_id: "A-300", change_set_id: "CS-100", work_item_id: "W-200",
-      candidate_id: "CAN-400", candidate_event:, repository_id: snapshot.repository_id,
-      target_branch: "main", object_format: snapshot.object_format, base_commit_oid: snapshot.commit_oid,
-      head_commit_oid: "a" * 40, checkpoint_kind: "final", manifest_digest: "sha256:#{'a' * 64}", build_context_digest: nil,
-      attached_at: "2026-08-20T14:30:00.000000Z"
-    )
+  it "applies lean completion without duplicating Candidate or intention state" do
     state = described_class.reduce([
-      *definition, attachment, Coordinator::Write::Events::AttemptCompletedV2.new(attempt_id: "A-300")
+      *definition, Coordinator::Write::Events::AttemptCompletedV2.new(attempt_id: "A-300")
+    ])
+
+    expect(state.status).to eq("completed")
+    expect(state.to_h.keys).to contain_exactly(
+      :attempt_id, :change_set_id, :work_item_id, :agent_id, :base_snapshots, :status
+    )
+    expect(state.base_snapshots).to eq([ snapshot ])
+    expect(state).to be_frozen
+  end
+
+  it "applies lean abandonment while retaining the Attempt assignments and base" do
+    state = described_class.reduce([
+      *definition, Coordinator::Write::Events::AttemptAbandonedV3.new(attempt_id: "A-300", reason: "Hand off")
     ])
 
     expect(state).to have_attributes(
-      status: "completed", selected_candidate_id: "CAN-400",
-      selected_candidate_event: candidate_event, selected_candidate_checkpoint_kind: "final"
+      status: "abandoned", attempt_id: "A-300", work_item_id: "W-200", agent_id: "agent-a"
     )
+    expect(state.base_snapshots).to eq([ snapshot ])
   end
 end
