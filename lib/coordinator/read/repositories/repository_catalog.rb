@@ -51,13 +51,12 @@ module Coordinator::Read
       end
 
       def registration_attributes(event, registration)
-        initial = registration.is_a?(Coordinator::Write::Events::RepositoryRegisteredV2)
         {
           repository_id: registration.repository_id,
           scope: registration.scope,
-          display_name: initial ? nil : registration.display_name,
-          paths: initial ? [] : registration.paths,
-          remotes: initial ? [] : registration.remotes,
+          display_name: nil,
+          paths: [],
+          remotes: [],
           registered_event: event_reference(event).to_h,
           registered_actor: actor(event).to_h,
           registered_markers: event.markers,
@@ -74,8 +73,7 @@ module Coordinator::Read
 
       def apply_fact!(record, event, registration)
         case registration
-        when Coordinator::Write::Events::RepositoryRegisteredV1,
-             Coordinator::Write::Events::RepositoryRegisteredV2
+        when Coordinator::Write::Events::RepositoryRegisteredV2
           verify_registration!(record, event, registration)
         when Coordinator::Write::Events::RepositoryDisplayNameChangedV1
           record.display_name = registration.display_name
@@ -95,11 +93,6 @@ module Coordinator::Read
       def verify_registration!(record, event, registration)
         matches = record.scope == registration.scope &&
                   record.registered_event.fetch("event_id") == event.id
-        unless registration.is_a?(Coordinator::Write::Events::RepositoryRegisteredV2)
-          matches &&= record.display_name == registration.display_name &&
-                      record.paths == registration.paths &&
-                      record.remotes == registration.remotes
-        end
         return if matches
 
         raise ProjectionStateError, "Repository identity changed within its source stream"

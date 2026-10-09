@@ -40,6 +40,16 @@ Then("one registration and binding pair is durable in that Resource stream") do
   events = resource_identity_events(@resource_id)
   assert_acceptance_equal(%w[ResourceRegistered ResourceBound], events.map(&:type), "Resource facts")
   assert_acceptance_equal([ 0, 1 ], events.map(&:stream_revision), "Resource revisions")
+  events.each do |fact|
+    assert_acceptance_equal(2, fact.metadata.fetch("schema_version"), "Current #{fact.type} schema")
+    assert_acceptance_equal(@resource_id, fact.stream.stream_id, "Resource fact stream identity")
+    assert_acceptance_equal(
+      %w[kind normalized_path repository_id resource_id], fact.data.keys.sort, "Cohesive #{fact.type} payload"
+    )
+  end
+  data = @resource_task_state.dig("result", "result", "structuredContent", "data")
+  assert_acceptance_equal(events.first.created_at.utc.iso8601(6), data.fetch("registered_at"), "Native registration time")
+  assert_acceptance_equal(events.last.created_at.utc.iso8601(6), data.fetch("bound_at"), "Native binding time")
 end
 
 Then("Resource discovery eventually reports it as {string}") do |status|

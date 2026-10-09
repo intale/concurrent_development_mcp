@@ -40,15 +40,6 @@ module Coordinator::Write
           data: event.data
         )
         state = case payload
-        when Events::RepositoryRegisteredV1
-          RepositoryRegistrationV2.new(
-            repository_id: payload.repository_id,
-            scope: payload.scope,
-            repository_key: payload.repository_key,
-            display_name: payload.display_name,
-            paths: payload.paths,
-            remotes: payload.remotes
-          )
         when Events::RepositoryRegisteredV2
           RepositoryRegistrationV2.new(
             repository_id: payload.repository_id,

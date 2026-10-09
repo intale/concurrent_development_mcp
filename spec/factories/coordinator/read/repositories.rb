@@ -15,7 +15,7 @@ FactoryBot.define do
       {
         "event_id" => SecureRandom.uuid_v7,
         "type" => "RepositoryRegistered",
-        "stream_context" => "DevelopmentRepository",
+        "stream_context" => "DevelopmentPlanning",
         "stream_name" => "Repository",
         "stream_id" => repository_id,
         "stream_revision" => 0
@@ -31,9 +31,9 @@ FactoryBot.define do
       ).marker
       [ marker ]
     end
-    registered_metadata { { "schema_version" => 1 } }
+    registered_metadata { { "schema_version" => 2 } }
     sequence(:registered_global_position, 200)
     registered_at_domain { Time.utc(2026, 8, 30, 12) }
-    registered_at_store { Time.utc(2026, 8, 30, 12, 0, 1) }
+    registered_at_store { registered_at_domain }
   end
 end

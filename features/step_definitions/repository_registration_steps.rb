@@ -47,6 +47,19 @@ Then("scoped Repository facts are durable without a server-derived location") do
   )
   event = events.find { _1.type == "RepositoryRegistered" }
 
+  assert_acceptance_equal(2, event.metadata.fetch("schema_version"), "Current Repository registration schema")
+  assert_acceptance_equal(
+    %w[repository_id repository_key scope], event.data.keys.sort, "Cohesive Repository registration payload"
+  )
+  events.each do |fact|
+    repeated_timestamps = fact.data.keys.grep(/\A(?:registered|added|removed|changed)_at\z/)
+    assert_acceptance_equal([], repeated_timestamps, "No duplicated occurrence timestamp in #{fact.type}")
+  end
+  assert_acceptance_equal(
+    event.created_at.utc.iso8601(6),
+    @repository_task_state.dig("result", "result", "structuredContent", "data", "registered_at"),
+    "Native Repository registration timestamp"
+  )
   assert_acceptance_equal(@repository_arguments.fetch(:scope), event.data.fetch("scope"), "Persisted scope")
   assert_acceptance_equal(@repository_arguments.fetch(:repository_key), event.data.fetch("repository_key"), "Persisted key")
   assert_acceptance_equal(

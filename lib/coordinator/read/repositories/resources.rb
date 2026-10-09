@@ -33,12 +33,9 @@ module Coordinator::Read
         record ||= create_skeleton(resource, event:)
 
         case resource
-        when Coordinator::Write::Events::ResourceIdentityV1::Registered,
-             Coordinator::Write::Events::ResourceIdentityV2::Registered
+        when Coordinator::Write::Events::ResourceIdentityV2::Registered
           store_registration(record, event, resource)
-        when Coordinator::Write::Events::ResourceIdentityV1::Bound,
-             Coordinator::Write::Events::ResourceIdentityV1::Unbound,
-             Coordinator::Write::Events::ResourceIdentityV2::Bound,
+        when Coordinator::Write::Events::ResourceIdentityV2::Bound,
              Coordinator::Write::Events::ResourceIdentityV2::Unbound
           store_transition(record, event, resource)
         end
@@ -89,8 +86,7 @@ module Coordinator::Read
       end
 
       def transition_attributes(event, resource)
-        bound = resource.is_a?(Coordinator::Write::Events::ResourceIdentityV1::Bound) ||
-                resource.is_a?(Coordinator::Write::Events::ResourceIdentityV2::Bound)
+        bound = resource.is_a?(Coordinator::Write::Events::ResourceIdentityV2::Bound)
         occurred_at = event.created_at
         evidence_attributes(event, occurred_at:, prefix: :latest_transition).merge(
           lifecycle_status: bound ? "current" : "inactive",

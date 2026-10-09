@@ -26,22 +26,6 @@ module RepositoryScenario
     "project:test/#{value}"
   end
 
-  def registration(
-    repository_id: DEFAULT_REPOSITORY_ID,
-    scope: DEFAULT_SCOPE,
-    display_name: "Billing test repository"
-  )
-    Coordinator::Write::Events::RepositoryRegisteredV1.new(
-      repository_id:,
-      scope:,
-      repository_key: "billing",
-      display_name:,
-      paths: [],
-      remotes: [],
-      registered_at: "2026-08-26T00:00:00.000000Z"
-    )
-  end
-
   def register(
     event_store:,
     key: "billing",

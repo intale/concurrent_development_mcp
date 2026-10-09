@@ -561,20 +561,34 @@ RSpec.describe Coordinator::Read::CommandResults::Assembler, :event_store do
       scope: command.scope,
       repository_key: command.repository_key
     )
-    append(
-      streams.repository(canonical_repository_id),
-      Coordinator::Write::Events::RepositoryRegisteredV1.new(
+    payloads = [
+      Coordinator::Write::Events::RepositoryRegisteredV2.new(
         repository_id: canonical_repository_id,
         scope: command.scope,
-        repository_key: command.repository_key,
-        display_name: command.display_name,
-        paths: command.paths,
-        remotes: command.remotes,
-        registered_at: occurred_at
-      ),
-      metadata: command_metadata,
-      markers: [ marker.marker ]
-    )
+        repository_key: command.repository_key
+      )
+    ]
+    if command.display_name
+      payloads << Coordinator::Write::Events::RepositoryDisplayNameChangedV1.new(
+        repository_id: canonical_repository_id, display_name: command.display_name
+      )
+    end
+    command.paths.each do |path|
+      payloads << Coordinator::Write::Events::RepositoryPathAddedV1.new(
+        repository_id: canonical_repository_id, path:
+      )
+    end
+    command.remotes.each do |remote|
+      payloads << Coordinator::Write::Events::RepositoryRemoteAddedV1.new(
+        repository_id: canonical_repository_id, remote:
+      )
+    end
+    payloads.map do |payload|
+      append(
+        streams.repository(canonical_repository_id), payload,
+        metadata: command_metadata, markers: [ marker.marker ]
+      )
+    end
   end
 
   def append_canonical_artifact

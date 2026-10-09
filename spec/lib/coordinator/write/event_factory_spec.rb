@@ -132,7 +132,11 @@ RSpec.describe Coordinator::Write::EventFactory do
       [ "DevelopmentArtifactObserved", 1 ],
       [ "DevelopmentArtifactClassificationCorrected", 1 ],
       [ "DevelopmentArtifactRelationDeclared", 1 ],
-      [ "DevelopmentArtifactRelationSuperseded", 1 ]
+      [ "DevelopmentArtifactRelationSuperseded", 1 ],
+      [ "RepositoryRegistered", 1 ],
+      [ "ResourceRegistered", 1 ],
+      [ "ResourceBound", 1 ],
+      [ "ResourceUnbound", 1 ]
     ]
 
     superseded.each do |type, schema_version|

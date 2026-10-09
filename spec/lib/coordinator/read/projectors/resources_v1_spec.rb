@@ -74,34 +74,40 @@ RSpec.describe Coordinator::Read::Projectors::ResourcesV1, :read_model do
     expect(record.updated_at).to eq(bound.created_at)
   end
 
+  it "rejects superseded identity schemas before claiming a projection event" do
+    event = resource_event(registered_payload, revision: 0, position: 100)
+    event.metadata["schema_version"] = 1
+
+    expect { projector.call(event) }.to raise_error(Coordinator::Read::InvalidProjectionSource)
+    expect(Coordinator::Read::Resource.count).to eq(0)
+    expect(processed_events).to be_empty
+  end
+
   def registered_payload
-    Coordinator::Write::Events::ResourceIdentityV1::Registered.new(
+    Coordinator::Write::Events::ResourceIdentityV2::Registered.new(
       resource_id:,
       repository_id:,
       kind: "file",
-      normalized_path: "app/models/projected.rb",
-      registered_at: "2026-08-30T12:00:00.000000Z"
+      normalized_path: "app/models/projected.rb"
     )
   end
 
   def bound_payload
-    Coordinator::Write::Events::ResourceIdentityV1::Bound.new(
+    Coordinator::Write::Events::ResourceIdentityV2::Bound.new(
       resource_id:,
       repository_id:,
       kind: "file",
-      normalized_path: "app/models/projected.rb",
-      bound_at: "2026-08-30T12:01:00.000000Z"
+      normalized_path: "app/models/projected.rb"
     )
   end
 
   def unbound_payload
-    Coordinator::Write::Events::ResourceIdentityV1::Unbound.new(
+    Coordinator::Write::Events::ResourceIdentityV2::Unbound.new(
       resource_id:,
       repository_id:,
       kind: "file",
       normalized_path: "app/models/projected.rb",
-      reason: "removed",
-      unbound_at: "2026-08-30T12:02:00.000000Z"
+      reason: "removed"
     )
   end
 

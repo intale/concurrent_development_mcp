@@ -2,9 +2,11 @@ module Coordinator
   module Read
     module Repositories
       class RepositoryCatalog
+        type repository_fact = Write::Events::RepositoryRegisteredV2 | Write::Events::RepositoryDisplayNameChangedV1 | Write::Events::RepositoryPathAddedV1 | Write::Events::RepositoryPathRemovedV1 | Write::Events::RepositoryRemoteAddedV1 | Write::Events::RepositoryRemoteRemovedV1
+
         def initialize: (?compound_marker_builder: Shared::CompoundMarkerBuilder) -> void
         def page: (RepositoryListQueryV1 query, ?repository_key: String?) -> RepositoryPageV1
-        def store: (event: PgEventstore::Event, registration: Write::Events::RepositoryRegisteredV1) -> Repository
+        def store: (event: PgEventstore::Event, registration: repository_fact) -> Repository
       end
     end
   end

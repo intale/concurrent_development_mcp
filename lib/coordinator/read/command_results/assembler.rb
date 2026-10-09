@@ -739,8 +739,7 @@ module Coordinator::Read
       def repository_registration(source)
         registration_event = event_for_any_payload(
           source,
-          Coordinator::Write::Events::RepositoryRegisteredV2,
-          Coordinator::Write::Events::RepositoryRegisteredV1
+          Coordinator::Write::Events::RepositoryRegisteredV2
         )
         registration_event ||= load_repository_registration_event(source.command)
         registration = @repository_registration_loader.call(registration_event.stream.stream_id)
@@ -766,13 +765,11 @@ module Coordinator::Read
         command = source.command
         registration_event = event_for_any_payload(
           source,
-          Coordinator::Write::Events::ResourceIdentityV2::Registered,
-          Coordinator::Write::Events::ResourceIdentityV1::Registered
+          Coordinator::Write::Events::ResourceIdentityV2::Registered
         )
         binding_event = event_for_any_payload(
           source,
-          Coordinator::Write::Events::ResourceIdentityV2::Bound,
-          Coordinator::Write::Events::ResourceIdentityV1::Bound
+          Coordinator::Write::Events::ResourceIdentityV2::Bound
         )
         outcome = if registration_event
                     "registered"
@@ -811,8 +808,7 @@ module Coordinator::Read
         registration = load_payload(registration_event)
         unbinding_event = event_for_any_payload(
           source,
-          Coordinator::Write::Events::ResourceIdentityV2::Unbound,
-          Coordinator::Write::Events::ResourceIdentityV1::Unbound
+          Coordinator::Write::Events::ResourceIdentityV2::Unbound
         )
         outcome = unbinding_event ? "removed" : "already_inactive"
         completion(

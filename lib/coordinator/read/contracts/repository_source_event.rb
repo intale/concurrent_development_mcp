@@ -28,7 +28,7 @@ module Coordinator::Read
       end
 
       rule(:event_type, :schema_version, :stream_revision) do
-        expected = values[:event_type] == "RepositoryRegistered" ? [ 1, 2 ] : [ 1 ]
+        expected = values[:event_type] == "RepositoryRegistered" ? [ 2 ] : [ 1 ]
         key(:schema_version).failure("unsupported Repository event schema") unless expected.include?(values[:schema_version])
         if values[:event_type] == "RepositoryRegistered"
           key(:stream_revision).failure("must be zero for RepositoryRegistered") unless values[:stream_revision].zero?

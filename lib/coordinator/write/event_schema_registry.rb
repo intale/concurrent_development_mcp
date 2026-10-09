@@ -6,18 +6,14 @@ module Coordinator::Write
     class SchemaMismatch < ArgumentError; end
 
     DEFAULT_DEFINITIONS = {
-      [ "RepositoryRegistered", 1 ] => Events::RepositoryRegisteredV1,
       [ "RepositoryRegistered", 2 ] => Events::RepositoryRegisteredV2,
       [ "RepositoryDisplayNameChanged", 1 ] => Events::RepositoryDisplayNameChangedV1,
       [ "RepositoryPathAdded", 1 ] => Events::RepositoryPathAddedV1,
       [ "RepositoryPathRemoved", 1 ] => Events::RepositoryPathRemovedV1,
       [ "RepositoryRemoteAdded", 1 ] => Events::RepositoryRemoteAddedV1,
       [ "RepositoryRemoteRemoved", 1 ] => Events::RepositoryRemoteRemovedV1,
-      [ "ResourceRegistered", 1 ] => Events::ResourceIdentityV1::Registered,
       [ "ResourceRegistered", 2 ] => Events::ResourceIdentityV2::Registered,
-      [ "ResourceBound", 1 ] => Events::ResourceIdentityV1::Bound,
       [ "ResourceBound", 2 ] => Events::ResourceIdentityV2::Bound,
-      [ "ResourceUnbound", 1 ] => Events::ResourceIdentityV1::Unbound,
       [ "ResourceUnbound", 2 ] => Events::ResourceIdentityV2::Unbound,
       [ "ChangeSetCreated", 1 ] => Events::ChangeSetCreatedV1,
       [ "ChangeSetCreated", 2 ] => Events::ChangeSetCreatedV2,

@@ -241,12 +241,11 @@ module McpResourceResolutionSpec
   end
 
   def seed_registration(identity, resource_id:)
-    payload = Coordinator::Write::Events::ResourceIdentityV1::Registered.new(
+    payload = Coordinator::Write::Events::ResourceIdentityV2::Registered.new(
       resource_id:,
       repository_id: identity.repository_id,
       kind: identity.kind,
-      normalized_path: identity.normalized_path,
-      registered_at: "2026-08-28T00:00:00.000000Z"
+      normalized_path: identity.normalized_path
     )
     event = Coordinator::Write::EventFactory.new.build!(
       event: payload,
@@ -335,6 +334,5 @@ module McpResourceResolutionSpec
   def task_events(task_id)
     event_store.read(streams.coordination_task(task_id), Coordinator::Write::EventQueries::COORDINATION_TASK_HISTORY)
   end
-
   end
 end

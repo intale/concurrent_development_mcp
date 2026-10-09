@@ -244,37 +244,11 @@ module Coordinator::Write
       def deserialize(event)
         return unless event
 
-        payload = @schema_registry.load(
+        @schema_registry.load(
           type: event.type,
           schema_version: event.metadata.fetch("schema_version"),
           data: event.data
         )
-        case payload
-        when Events::ResourceIdentityV1::Registered
-          Events::ResourceIdentityV2::Registered.new(
-            resource_id: payload.resource_id,
-            repository_id: payload.repository_id,
-            kind: payload.kind,
-            normalized_path: payload.normalized_path.unicode_normalize(:nfc)
-          )
-        when Events::ResourceIdentityV1::Bound
-          Events::ResourceIdentityV2::Bound.new(
-            resource_id: payload.resource_id,
-            repository_id: payload.repository_id,
-            kind: payload.kind,
-            normalized_path: payload.normalized_path.unicode_normalize(:nfc)
-          )
-        when Events::ResourceIdentityV1::Unbound
-          Events::ResourceIdentityV2::Unbound.new(
-            resource_id: payload.resource_id,
-            repository_id: payload.repository_id,
-            kind: payload.kind,
-            normalized_path: payload.normalized_path.unicode_normalize(:nfc),
-            reason: payload.reason
-          )
-        else
-          payload
-        end
       end
 
       def persist_resource_events(removal, identity:, command:, event_id:, caused_by:)

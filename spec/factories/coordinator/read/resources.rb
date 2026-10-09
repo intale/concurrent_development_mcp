@@ -11,7 +11,7 @@ FactoryBot.define do
       {
         "event_id" => SecureRandom.uuid_v7,
         "type" => "ResourceRegistered",
-        "stream_context" => "DevelopmentRepository",
+        "stream_context" => "DevelopmentCoordination",
         "stream_name" => "Resource",
         "stream_id" => resource_id,
         "stream_revision" => 0
@@ -19,15 +19,15 @@ FactoryBot.define do
     end
     registered_actor { { "kind" => "agent", "id" => "factory-agent", "authenticated" => false } }
     registered_markers { [ "resource:#{resource_id}" ] }
-    registered_metadata { { "schema_version" => 1 } }
+    registered_metadata { { "schema_version" => 2 } }
     sequence(:registered_global_position, 300)
     registered_at_domain { Time.utc(2026, 8, 30, 12) }
-    registered_at_store { Time.utc(2026, 8, 30, 12, 0, 1) }
+    registered_at_store { registered_at_domain }
     latest_transition_event do
       {
         "event_id" => SecureRandom.uuid_v7,
         "type" => "ResourceBound",
-        "stream_context" => "DevelopmentRepository",
+        "stream_context" => "DevelopmentCoordination",
         "stream_name" => "Resource",
         "stream_id" => resource_id,
         "stream_revision" => 1
@@ -35,10 +35,10 @@ FactoryBot.define do
     end
     latest_transition_actor { registered_actor }
     latest_transition_markers { registered_markers }
-    latest_transition_metadata { { "schema_version" => 1 } }
+    latest_transition_metadata { { "schema_version" => 2 } }
     sequence(:latest_transition_global_position, 400)
     latest_transition_at_domain { Time.utc(2026, 8, 30, 12, 1) }
-    latest_transition_at_store { Time.utc(2026, 8, 30, 12, 1, 1) }
+    latest_transition_at_store { latest_transition_at_domain }
 
     trait :inactive do
       lifecycle_status { "inactive" }
@@ -47,7 +47,7 @@ FactoryBot.define do
         {
           "event_id" => SecureRandom.uuid_v7,
           "type" => "ResourceUnbound",
-          "stream_context" => "DevelopmentRepository",
+          "stream_context" => "DevelopmentCoordination",
           "stream_name" => "Resource",
           "stream_id" => resource_id,
           "stream_revision" => 2

@@ -16,9 +16,9 @@ RSpec.describe Coordinator::Read::Projectors::RepositoriesV1, :read_model do
     expect(item).to have_attributes(
       repository_id:,
       scope: "project:alpha",
-      display_name: "Alpha",
-      paths: [ "/client/alpha" ],
-      remotes: [ "https://example.test/alpha.git" ],
+      display_name: nil,
+      paths: [],
+      remotes: [],
       registered: have_attributes(
         event: have_attributes(event_id: event.id, stream_revision: 0),
         actor: have_attributes(kind: "agent", id: "agent-repository"),
@@ -82,15 +82,20 @@ RSpec.describe Coordinator::Read::Projectors::RepositoriesV1, :read_model do
     expect(Coordinator::Read::Repository.find(repository_id).updated_at).to eq(events.last.created_at)
   end
 
+  it "rejects superseded registration schemas before claiming a projection event" do
+    event = registration_event
+    event.metadata["schema_version"] = 1
+
+    expect { projector.call(event) }.to raise_error(Coordinator::Read::InvalidProjectionSource)
+    expect(Coordinator::Read::Repository.count).to eq(0)
+    expect(processed_events).to be_empty
+  end
+
   def registration_event(stream: Coordinator::Write::StreamFactory.new.repository(repository_id))
-    payload = Coordinator::Write::Events::RepositoryRegisteredV1.new(
+    payload = Coordinator::Write::Events::RepositoryRegisteredV2.new(
       repository_id:,
       scope: "project:alpha",
-      repository_key: "alpha",
-      display_name: "Alpha",
-      paths: [ "/client/alpha" ],
-      remotes: [ "https://example.test/alpha.git" ],
-      registered_at: "2026-08-30T12:00:00.000000Z"
+      repository_key: "alpha"
     )
     ProjectionEventFactory.build(
       payload:,
