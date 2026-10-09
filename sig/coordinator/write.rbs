@@ -20,10 +20,10 @@ module Coordinator
                                 Commands::AcquireWorkItem |
                                 Commands::CompleteWorkItem |
                                 Commands::AbandonAttempt |
-                                Commands::ReserveWriteSet |
-                                Commands::ExpandWriteSet |
-                                Commands::RenewLeaseSet |
-                                Commands::ReleaseLeaseSet |
+                                Commands::DeclareWorkIntentionSet |
+                                Commands::ExpandWorkIntentionSet |
+                                Commands::RenewWorkIntentionSet |
+                                Commands::WithdrawWorkIntentionSet |
                                 Commands::RecordGuidance |
                                 Commands::ProposeDecisionInterpretation |
                                 Commands::AdjudicateDecisionInterpretation |

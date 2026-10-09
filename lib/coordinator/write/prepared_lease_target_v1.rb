@@ -2,7 +2,7 @@
 
 module Coordinator::Write
   class PreparedLeaseTargetV1 < Value
-    attribute :target, Types.Instance(ResourceLeaseTargetV1)
+    attribute :target, Types.Instance(WorkIntentionTargetV1)
     attribute :lease_id, Types::UuidV7
     attribute :event_id, Types::UuidV7
   end

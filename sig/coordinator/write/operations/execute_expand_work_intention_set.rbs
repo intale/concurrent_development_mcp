@@ -1,0 +1,12 @@
+module Coordinator
+  module Write
+    module Operations
+      class ExecuteExpandWorkIntentionSet
+        def initialize: (event_store: _EventStore, ?preparer: PrepareExpandWorkIntentionSet, ?decider: Domain::WorkIntentions::ExpandSet, ?input_digest: CommandInputDigest, ?clock: Shared::_Clock, ?id_generator: Shared::_IdGenerator, ?event_factory: EventFactory, ?schema_registry: EventSchemaRegistry, ?stream_factory: StreamFactory, ?completion_builder: CommandResultBuilder, ?repository_registration_loader: RepositoryRegistrationLoader, ?repository_marker_builder: RepositoryMarkerBuilder, ?resource_loader: WorkIntentionResourceLoader, ?set_loader: WorkIntentionSetLoader, ?intention_loader: WorkIntentionLoader, ?boundary_loader: WorkIntentionBoundaryLoader) -> void
+        %a{rbs:test:skip}
+        def call: (command_input input) -> Dry::Monads::Result
+        def call_command: (Commands::ExpandWorkIntentionSet command, ?caused_by: PgEventstore::Event?) -> Dry::Monads::Result
+      end
+    end
+  end
+end

@@ -23,10 +23,10 @@ module Coordinator::Write
         activate_change_set: Operations::ExecuteActivateChangeSet.new(event_store:),
         acquire_work_item: Operations::ExecuteAcquireWorkItem.new(event_store:),
         complete_work_item: Operations::ExecuteCompleteWorkItem.new(event_store:),
-        reserve_write_set: Operations::ExecuteReserveWriteSet.new(event_store:),
-        expand_write_set: Operations::ExecuteExpandWriteSet.new(event_store:),
-        renew_lease_set: Operations::ExecuteRenewLeaseSet.new(event_store:),
-        release_lease_set: Operations::ExecuteReleaseLeaseSet.new(event_store:),
+        declare_work_intention_set: Operations::ExecuteDeclareWorkIntentionSet.new(event_store:),
+        expand_work_intention_set: Operations::ExecuteExpandWorkIntentionSet.new(event_store:),
+        renew_work_intention_set: Operations::ExecuteRenewWorkIntentionSet.new(event_store:),
+        withdraw_work_intention_set: Operations::ExecuteWithdrawWorkIntentionSet.new(event_store:),
         record_guidance: Operations::ExecuteRecordGuidance.new(event_store:),
         propose_decision_interpretation: Operations::ExecuteProposeDecisionInterpretation.new(event_store:),
         adjudicate_decision_interpretation: Operations::ExecuteAdjudicateDecisionInterpretation.new(event_store:),
@@ -90,10 +90,10 @@ module Coordinator::Write
         @acquire_work_item = acquire_work_item
         @complete_work_item = complete_work_item
         @abandon_attempt = Operations::ExecuteAbandonAttempt.new(event_store:)
-        @reserve_write_set = reserve_write_set
-        @expand_write_set = expand_write_set
-        @renew_lease_set = renew_lease_set
-        @release_lease_set = release_lease_set
+        @declare_work_intention_set = declare_work_intention_set
+        @expand_work_intention_set = expand_work_intention_set
+        @renew_work_intention_set = renew_work_intention_set
+        @withdraw_work_intention_set = withdraw_work_intention_set
         @record_guidance = record_guidance
         @propose_decision_interpretation = propose_decision_interpretation
         @adjudicate_decision_interpretation = adjudicate_decision_interpretation

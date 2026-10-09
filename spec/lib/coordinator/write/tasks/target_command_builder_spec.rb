@@ -60,7 +60,7 @@ RSpec.describe Coordinator::Write::Tasks::TargetCommandBuilder do
           )
         ]
       ),
-      Coordinator::Write::Commands::ReserveWriteSet.new(
+      Coordinator::Write::Commands::DeclareWorkIntentionSet.new(
         command_id: "cmd-task-build-6",
         actor:,
         change_set_id: "CS-task-build",
@@ -69,56 +69,56 @@ RSpec.describe Coordinator::Write::Tasks::TargetCommandBuilder do
         repository_id:,
         base_commit_oid: "a" * 40,
         resources: [
-          Coordinator::Write::ResourceLeaseTargetV1.new(
+          Coordinator::Write::WorkIntentionTargetV1.new(
             resource_id: "0198e03a-d112-7000-8000-000000000006",
             base_blob_oid: "b" * 40,
           )
         ],
-        lease_duration_seconds: 300
+        ttl_seconds: 300
       ),
-      Coordinator::Write::Commands::ExpandWriteSet.new(
+      Coordinator::Write::Commands::ExpandWorkIntentionSet.new(
         command_id: "cmd-task-build-7",
         actor:,
         change_set_id: "CS-task-build",
         work_item_id: "W-task-build",
         attempt_id: "ATT-task-build",
-        lease_set_id: "0198e03a-d112-7000-8000-000000000007",
+        intention_set_id: "0198e03a-d112-7000-8000-000000000007",
         repository_id:,
         base_commit_oid: "a" * 40,
         resources: [
-          Coordinator::Write::ResourceLeaseTargetV1.new(
+          Coordinator::Write::WorkIntentionTargetV1.new(
             resource_id: "0198e03a-d112-7000-8000-000000000007",
             base_blob_oid: "c" * 40,
           )
         ]
       ),
-      Coordinator::Write::Commands::RenewLeaseSet.new(
+      Coordinator::Write::Commands::RenewWorkIntentionSet.new(
         command_id: "cmd-task-build-8",
         actor:,
         change_set_id: "CS-task-build",
         work_item_id: "W-task-build",
         attempt_id: "ATT-task-build",
-        lease_set_id: "0198e03a-d112-7000-8000-000000000007",
-        leases: [
-          Coordinator::Write::LeaseRenewalReferenceV2.new(
+        intention_set_id: "0198e03a-d112-7000-8000-000000000007",
+        intentions: [
+          Coordinator::Write::WorkIntentionFencedReferenceV1.new(
             resource_id: "0198e03a-d112-7000-8000-000000000007",
-            lease_id: "0198e03a-d112-7000-8000-000000000008",
+            intention_id: "0198e03a-d112-7000-8000-000000000008",
             fencing_token: 4
           )
         ],
-        lease_duration_seconds: 600
+        ttl_seconds: 600
       ),
-      Coordinator::Write::Commands::ReleaseLeaseSet.new(
+      Coordinator::Write::Commands::WithdrawWorkIntentionSet.new(
         command_id: "cmd-task-build-9",
         actor:,
         change_set_id: "CS-task-build",
         work_item_id: "W-task-build",
         attempt_id: "ATT-task-build",
-        lease_set_id: "0198e03a-d112-7000-8000-000000000007",
-        leases: [
-          Coordinator::Write::LeaseReleaseReferenceV2.new(
+        intention_set_id: "0198e03a-d112-7000-8000-000000000007",
+        intentions: [
+          Coordinator::Write::WorkIntentionFencedReferenceV1.new(
             resource_id: "0198e03a-d112-7000-8000-000000000007",
-            lease_id: "0198e03a-d112-7000-8000-000000000008",
+            intention_id: "0198e03a-d112-7000-8000-000000000008",
             fencing_token: 4
           )
         ]

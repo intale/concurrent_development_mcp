@@ -9,7 +9,7 @@ module Coordinator
             set_state: SetState,
             member_states: Array[State],
             boundary: WorkIntentionBoundaryV1,
-            command: Commands::ExpandWriteSet,
+            command: Commands::ExpandWorkIntentionSet,
             requests: Array[RequestedWorkIntentionV1],
             expanded_at: String
           ) -> Dry::Monads::Result

@@ -1,7 +1,7 @@
 module Coordinator
   module Write
     class PreparedLeaseTargetV1 < Shared::Value
-      def target: () -> ResourceLeaseTargetV1
+      def target: () -> WorkIntentionTargetV1
       def lease_id: () -> String
       def event_id: () -> String
     end

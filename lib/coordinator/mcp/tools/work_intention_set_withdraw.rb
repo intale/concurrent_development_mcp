@@ -8,7 +8,7 @@ module Coordinator
         title "Withdraw a work-intention set"
         description "Withdraw every active advisory Resource work intention in an Attempt's exact observed set."
         input_schema Schemas.work_intention_set_withdraw
-        operation "operations.submit_release_lease_set_task"
+        operation "operations.submit_withdraw_work_intention_set_task"
       end
     end
   end

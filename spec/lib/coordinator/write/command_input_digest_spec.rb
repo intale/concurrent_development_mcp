@@ -184,30 +184,30 @@ RSpec.describe Coordinator::Write::CommandInputDigest do
   end
 
   it "freezes the intention-set identity and normalized additions in the expansion digest" do
-    resource = Coordinator::Write::ResourceLeaseTargetV1.new(
+    resource = Coordinator::Write::WorkIntentionTargetV1.new(
       resource_id: "01919191-9191-7191-8191-919191919198",
       base_blob_oid: "b" * 40
     )
-    expansion_command = Coordinator::Write::Commands::ExpandWriteSet.new(
+    expansion_command = Coordinator::Write::Commands::ExpandWorkIntentionSet.new(
       command_id: "cmd-expand-300",
       actor: Coordinator::Write::Commands::Actor.new(kind: "agent", id: "agent-a"),
       change_set_id: "CS-100",
       work_item_id: "W-200",
       attempt_id: "A-300",
-      lease_set_id: "01919191-9191-7191-8191-919191919191",
+      intention_set_id: "01919191-9191-7191-8191-919191919191",
       repository_id: RepositoryScenario::DEFAULT_REPOSITORY_ID,
       base_commit_oid: "a" * 40,
       resources: [ resource ]
     )
 
-    document = digest.write_set_expand_document(expansion_command)
+    document = digest.work_intention_set_expand_document(expansion_command)
 
     expect(document).to eq(
-      Coordinator::Write::CommandInputDocuments::ExpandWriteSetV1.new(
+      Coordinator::Write::CommandInputDocuments::ExpandWorkIntentionSetV1.new(
         schema: "command-input/v1",
         command_id: "cmd-expand-300",
         tool_name: "work_intention_set_expand",
-        input: Coordinator::Write::CommandInputDocuments::ExpandWriteSetInputV1.new(
+        input: Coordinator::Write::CommandInputDocuments::ExpandWorkIntentionSetInputV1.new(
           actor: Coordinator::Write::CommandInputDocuments::ActorV1.new(
             actor_kind: "agent",
             actor_id: "agent-a"
@@ -218,12 +218,12 @@ RSpec.describe Coordinator::Write::CommandInputDigest do
           intention_set_id: "01919191-9191-7191-8191-919191919191",
           repository_id: RepositoryScenario::DEFAULT_REPOSITORY_ID,
           base_commit_oid: "a" * 40,
-          resources: [ Coordinator::Write::CommandInputDocuments::ResourceLeaseTargetV1.new(resource.to_h) ]
+          resources: [ Coordinator::Write::CommandInputDocuments::WorkIntentionTargetV1.new(resource.to_h) ]
         )
       )
     )
-    expect(digest.write_set_expand(expansion_command)).to match(/\Asha256:[0-9a-f]{64}\z/)
-    expect(digest.call(expansion_command)).to eq(digest.write_set_expand(expansion_command))
+    expect(digest.work_intention_set_expand(expansion_command)).to match(/\Asha256:[0-9a-f]{64}\z/)
+    expect(digest.call(expansion_command)).to eq(digest.work_intention_set_expand(expansion_command))
   end
 
   it "binds Decision correction replay to the exact authoritative predecessor" do

@@ -11,7 +11,7 @@ module Coordinator
           deadline. Shared is the default; incompatible overlap fails immediately with blocker context.
         TEXT
         input_schema Schemas.work_intention_set_expand
-        operation "operations.submit_expand_write_set_task"
+        operation "operations.submit_expand_work_intention_set_task"
       end
     end
   end

@@ -2,7 +2,7 @@ module Coordinator
   module Write
     module CommandInputDocuments
       TARGET_TYPES: Array[Class]
-      type value = RegisterRepositoryV1 | ResolveResourceV1 | RemoveResourceV1 | CreateChangeSetV1 | CreateWorkItemV1 | DeclareWorkItemDependencyV1 | ActivateChangeSetV1 | AcquireWorkItemV1 | CompleteWorkItemV1 | AbandonAttemptV1 | ReserveWriteSetV1 | ExpandWriteSetV1 | RenewLeaseSetV1 | ReleaseLeaseSetV1 | RecordGuidanceV1 | ProposeDecisionInterpretationV1 | AdjudicateDecisionInterpretationV1 | ActivateDecisionV1 | CorrectDecisionV1 | RecordAgentChoiceV1 | SubmitCandidateV1 | SubmitCandidateImpactSurfaceV1 | ClaimVerificationObligationV1 | SubmitCompatibilityAssessmentV1 | WaiveVerificationObligationV1 | RegisterMergeSnapshotV1 | SubmitMergeSnapshotVerificationV1 | RequestMergeAuthorizationV1 | RecordMergeObservationV1 | PrepareReleaseSetV1 | RecordRepositoryIntegrationV1 | RecordReleaseSetVerificationV1 | RecordReleaseSetActivationV1 | CompleteCompensatedReleaseSetV1 | PublishSkillRevisionV2 | CaptureDevelopmentArtifactV2 | UpdateDevelopmentArtifactV1 | CorrectDevelopmentArtifactClassificationV1 | DeclareDevelopmentArtifactRelationV1 | CreateOperationBatchV1 | CancelOperationBatchV1
+      type value = RegisterRepositoryV1 | ResolveResourceV1 | RemoveResourceV1 | CreateChangeSetV1 | CreateWorkItemV1 | DeclareWorkItemDependencyV1 | ActivateChangeSetV1 | AcquireWorkItemV1 | CompleteWorkItemV1 | AbandonAttemptV1 | DeclareWorkIntentionSetV1 | ExpandWorkIntentionSetV1 | RenewWorkIntentionSetV1 | WithdrawWorkIntentionSetV1 | RecordGuidanceV1 | ProposeDecisionInterpretationV1 | AdjudicateDecisionInterpretationV1 | ActivateDecisionV1 | CorrectDecisionV1 | RecordAgentChoiceV1 | SubmitCandidateV1 | SubmitCandidateImpactSurfaceV1 | ClaimVerificationObligationV1 | SubmitCompatibilityAssessmentV1 | WaiveVerificationObligationV1 | RegisterMergeSnapshotV1 | SubmitMergeSnapshotVerificationV1 | RequestMergeAuthorizationV1 | RecordMergeObservationV1 | PrepareReleaseSetV1 | RecordRepositoryIntegrationV1 | RecordReleaseSetVerificationV1 | RecordReleaseSetActivationV1 | CompleteCompensatedReleaseSetV1 | PublishSkillRevisionV2 | CaptureDevelopmentArtifactV2 | UpdateDevelopmentArtifactV1 | CorrectDevelopmentArtifactClassificationV1 | DeclareDevelopmentArtifactRelationV1 | CreateOperationBatchV1 | CancelOperationBatchV1
       type digest_value = value | ExpireResourceLeaseV1 | RequestReleaseSetCompensationV1 | CompleteActivatedReleaseSetV1 | SatisfyWorkItemDependencyV1 | CompleteChangeSetV1 | RecordOperationBatchItemOutcomeV1 | RequestOperationBatchContinuationV1 | CompleteOperationBatchV1 | CompleteOperationBatchCancellationV1
       type canonical_digest_value = digest_value | PublishSkillRevisionCanonicalV2 | CaptureDevelopmentArtifactCanonicalV2 | DeclareDevelopmentArtifactRelationCanonicalV1
 
@@ -153,7 +153,7 @@ module Coordinator
         def input: () -> AbandonAttemptInputV1
       end
 
-      class ResourceLeaseTargetV1 < Shared::Value
+      class WorkIntentionTargetV1 < Shared::Value
         def resource_id: () -> String
         def base_blob_oid: () -> String?
         def mode: () -> String
@@ -161,23 +161,23 @@ module Coordinator
         def context: () -> String?
       end
 
-      class ReserveWriteSetInputV1 < Shared::Value
+      class DeclareWorkIntentionSetInputV1 < Shared::Value
         def actor: () -> ActorV1
         def change_set_id: () -> String
         def work_item_id: () -> String
         def attempt_id: () -> String
         def repository_id: () -> String
         def base_commit_oid: () -> String
-        def resources: () -> Array[ResourceLeaseTargetV1]
+        def resources: () -> Array[WorkIntentionTargetV1]
         def ttl_seconds: () -> Integer
       end
 
-      class ReserveWriteSetV1 < BaseV1
+      class DeclareWorkIntentionSetV1 < BaseV1
         def tool_name: () -> String
-        def input: () -> ReserveWriteSetInputV1
+        def input: () -> DeclareWorkIntentionSetInputV1
       end
 
-      class ExpandWriteSetInputV1 < Shared::Value
+      class ExpandWorkIntentionSetInputV1 < Shared::Value
         def actor: () -> ActorV1
         def change_set_id: () -> String
         def work_item_id: () -> String
@@ -185,53 +185,53 @@ module Coordinator
         def intention_set_id: () -> String
         def repository_id: () -> String
         def base_commit_oid: () -> String
-        def resources: () -> Array[ResourceLeaseTargetV1]
+        def resources: () -> Array[WorkIntentionTargetV1]
       end
 
-      class ExpandWriteSetV1 < BaseV1
+      class ExpandWorkIntentionSetV1 < BaseV1
         def tool_name: () -> String
-        def input: () -> ExpandWriteSetInputV1
+        def input: () -> ExpandWorkIntentionSetInputV1
       end
 
-      class LeaseRenewalReferenceV1 < Shared::Value
+      class WorkIntentionRenewalReferenceV1 < Shared::Value
         def resource_id: () -> String
         def intention_id: () -> String
         def fencing_token: () -> Integer
       end
 
-      class RenewLeaseSetInputV1 < Shared::Value
+      class RenewWorkIntentionSetInputV1 < Shared::Value
         def actor: () -> ActorV1
         def change_set_id: () -> String
         def work_item_id: () -> String
         def attempt_id: () -> String
         def intention_set_id: () -> String
-        def intentions: () -> Array[LeaseRenewalReferenceV1]
+        def intentions: () -> Array[WorkIntentionRenewalReferenceV1]
         def ttl_seconds: () -> Integer
       end
 
-      class RenewLeaseSetV1 < BaseV1
+      class RenewWorkIntentionSetV1 < BaseV1
         def tool_name: () -> String
-        def input: () -> RenewLeaseSetInputV1
+        def input: () -> RenewWorkIntentionSetInputV1
       end
 
-      class LeaseReleaseReferenceV1 < Shared::Value
+      class WorkIntentionWithdrawalReferenceV1 < Shared::Value
         def resource_id: () -> String
         def intention_id: () -> String
         def fencing_token: () -> Integer
       end
 
-      class ReleaseLeaseSetInputV1 < Shared::Value
+      class WithdrawWorkIntentionSetInputV1 < Shared::Value
         def actor: () -> ActorV1
         def change_set_id: () -> String
         def work_item_id: () -> String
         def attempt_id: () -> String
         def intention_set_id: () -> String
-        def intentions: () -> Array[LeaseReleaseReferenceV1]
+        def intentions: () -> Array[WorkIntentionWithdrawalReferenceV1]
       end
 
-      class ReleaseLeaseSetV1 < BaseV1
+      class WithdrawWorkIntentionSetV1 < BaseV1
         def tool_name: () -> String
-        def input: () -> ReleaseLeaseSetInputV1
+        def input: () -> WithdrawWorkIntentionSetInputV1
       end
 
       class GuidanceAnchorsV1 < Shared::Value

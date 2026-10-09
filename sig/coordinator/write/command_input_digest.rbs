@@ -18,14 +18,14 @@ module Coordinator
       def work_item_acquire_document: (Commands::AcquireWorkItem command) -> CommandInputDocuments::AcquireWorkItemV1
       def work_item_complete: (Commands::CompleteWorkItem command) -> String
       def work_item_complete_document: (Commands::CompleteWorkItem command) -> CommandInputDocuments::CompleteWorkItemV1
-      def write_set_reserve: (Commands::ReserveWriteSet command) -> String
-      def write_set_reserve_document: (Commands::ReserveWriteSet command) -> CommandInputDocuments::ReserveWriteSetV1
-      def write_set_expand: (Commands::ExpandWriteSet command) -> String
-      def write_set_expand_document: (Commands::ExpandWriteSet command) -> CommandInputDocuments::ExpandWriteSetV1
-      def lease_renew: (Commands::RenewLeaseSet command) -> String
-      def lease_renew_document: (Commands::RenewLeaseSet command) -> CommandInputDocuments::RenewLeaseSetV1
-      def lease_release: (Commands::ReleaseLeaseSet command) -> String
-      def lease_release_document: (Commands::ReleaseLeaseSet command) -> CommandInputDocuments::ReleaseLeaseSetV1
+      def work_intention_set_declare: (Commands::DeclareWorkIntentionSet command) -> String
+      def work_intention_set_declare_document: (Commands::DeclareWorkIntentionSet command) -> CommandInputDocuments::DeclareWorkIntentionSetV1
+      def work_intention_set_expand: (Commands::ExpandWorkIntentionSet command) -> String
+      def work_intention_set_expand_document: (Commands::ExpandWorkIntentionSet command) -> CommandInputDocuments::ExpandWorkIntentionSetV1
+      def work_intention_set_renew: (Commands::RenewWorkIntentionSet command) -> String
+      def work_intention_set_renew_document: (Commands::RenewWorkIntentionSet command) -> CommandInputDocuments::RenewWorkIntentionSetV1
+      def work_intention_set_withdraw: (Commands::WithdrawWorkIntentionSet command) -> String
+      def work_intention_set_withdraw_document: (Commands::WithdrawWorkIntentionSet command) -> CommandInputDocuments::WithdrawWorkIntentionSetV1
       def lease_expire_policy: (Commands::ExpireResourceLease command) -> String
       def lease_expire_policy_document: (Commands::ExpireResourceLease command) -> CommandInputDocuments::ExpireResourceLeaseV1
       def guidance_record: (Commands::RecordGuidance command) -> String

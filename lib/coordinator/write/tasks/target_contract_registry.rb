@@ -96,26 +96,26 @@ module Coordinator::Write
         ),
         TargetContractV1.new(
           tool_name: "work_intention_set_declare",
-          input_document_class: CommandInputDocuments::ReserveWriteSetV1,
-          command_class: Commands::ReserveWriteSet,
+          input_document_class: CommandInputDocuments::DeclareWorkIntentionSetV1,
+          command_class: Commands::DeclareWorkIntentionSet,
           receipt_class: CommandReceiptData::WorkIntentionSetDeclaration
         ),
         TargetContractV1.new(
           tool_name: "work_intention_set_expand",
-          input_document_class: CommandInputDocuments::ExpandWriteSetV1,
-          command_class: Commands::ExpandWriteSet,
+          input_document_class: CommandInputDocuments::ExpandWorkIntentionSetV1,
+          command_class: Commands::ExpandWorkIntentionSet,
           receipt_class: CommandReceiptData::WorkIntentionSetExpansion
         ),
         TargetContractV1.new(
           tool_name: "work_intention_set_renew",
-          input_document_class: CommandInputDocuments::RenewLeaseSetV1,
-          command_class: Commands::RenewLeaseSet,
+          input_document_class: CommandInputDocuments::RenewWorkIntentionSetV1,
+          command_class: Commands::RenewWorkIntentionSet,
           receipt_class: CommandReceiptData::WorkIntentionSetRenewal
         ),
         TargetContractV1.new(
           tool_name: "work_intention_set_withdraw",
-          input_document_class: CommandInputDocuments::ReleaseLeaseSetV1,
-          command_class: Commands::ReleaseLeaseSet,
+          input_document_class: CommandInputDocuments::WithdrawWorkIntentionSetV1,
+          command_class: Commands::WithdrawWorkIntentionSet,
           receipt_class: CommandReceiptData::WorkIntentionSetWithdrawal
         ),
         TargetContractV1.new(

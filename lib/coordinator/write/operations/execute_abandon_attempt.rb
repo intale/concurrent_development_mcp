@@ -185,7 +185,7 @@ module Coordinator::Write
 
       def load_resources(states)
         resources = states.map do |state|
-          target = ResourceLeaseTargetV1.new(
+          target = WorkIntentionTargetV1.new(
             resource_id: state.resource_id,
             base_blob_oid: state.base_blob_oid
           )

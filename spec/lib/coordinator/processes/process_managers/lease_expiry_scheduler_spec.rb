@@ -172,7 +172,7 @@ RSpec.describe Coordinator::Processes::ProcessManagers::LeaseExpiryScheduler, :e
   end
 
   def renew(reservation, duration:)
-    Coordinator::Write::Operations::ExecuteRenewLeaseSet.new(event_store:).call(
+    Coordinator::Write::Operations::ExecuteRenewWorkIntentionSet.new(event_store:).call(
       command_id: "cmd-renew-a",
       actor: { kind: "agent", id: "agent-a" },
       change_set_id: "CS-LSE",

@@ -44,7 +44,7 @@ module Coordinator::Write
           return scope_denial if scope_denial
 
           current_by_resource = member_states.to_h { [ _1.resource_id, _1 ] }
-          requested_ids = command.leases.map(&:resource_id)
+          requested_ids = command.intentions.map(&:resource_id)
           current_ids = set_state.members.map(&:resource_id)
           unless requested_ids.sort_by(&:b) == current_ids.sort_by(&:b)
             return failure(
@@ -56,9 +56,9 @@ module Coordinator::Write
             )
           end
 
-          mismatch = command.leases.find do |reference|
+          mismatch = command.intentions.find do |reference|
             state = current_by_resource[reference.resource_id]
-            state.nil? || state.intention_id != reference.lease_id || state.fencing_token != reference.fencing_token
+            state.nil? || state.intention_id != reference.intention_id || state.fencing_token != reference.fencing_token
           end
           if mismatch
             state = current_by_resource[mismatch.resource_id]
@@ -68,7 +68,7 @@ module Coordinator::Write
               command,
               resource_id: mismatch.resource_id,
               current_intention_id: state&.intention_id,
-              requested_intention_id: mismatch.lease_id,
+              requested_intention_id: mismatch.intention_id,
               current_fencing_token: state&.fencing_token || 0,
               requested_fencing_token: mismatch.fencing_token
             )
@@ -99,13 +99,13 @@ module Coordinator::Write
             return failure(:attempt_owner_mismatch, "Attempt belongs to another agent attribution", command)
           end
           return failure(:work_intention_set_missing, "Attempt has no work-intention set", command) if set_state.absent?
-          unless set_state.set_id == command.lease_set_id
+          unless set_state.set_id == command.intention_set_id
             return failure(
               :work_intention_set_mismatch,
               "Work-intention set ID does not match",
               command,
               current_intention_set_id: set_state.set_id,
-              requested_intention_set_id: command.lease_set_id
+              requested_intention_set_id: command.intention_set_id
             )
           end
           return if set_state.attempt_id == command.attempt_id &&

@@ -18,7 +18,7 @@ module CandidateScenario
       kind: "file",
       path:
     )
-    reservation = execute(Coordinator::Write::Operations::ExecuteReserveWriteSet, {
+    reservation = execute(Coordinator::Write::Operations::ExecuteDeclareWorkIntentionSet, {
       command_id: "seed-reserve-#{prefix}",
       actor: { kind: "agent", id: agent_id },
       change_set_id: ids.fetch(:change_set_id),
@@ -96,7 +96,7 @@ module CandidateScenario
   def release(candidate, command_id: nil)
     input = candidate.fetch(:input)
     reservation = candidate.fetch(:reservation)
-    execute(Coordinator::Write::Operations::ExecuteReleaseLeaseSet, {
+    execute(Coordinator::Write::Operations::ExecuteWithdrawWorkIntentionSet, {
       command_id: command_id || "cmd-release-#{input.fetch(:candidate_id)}",
       actor: input.fetch(:actor),
       change_set_id: input.fetch(:change_set_id),

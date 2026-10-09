@@ -8,7 +8,7 @@ module Coordinator
             attempt_state: Domain::Attempts::State,
             existing_set_state: SetState,
             boundary: WorkIntentionBoundaryV1,
-            command: Commands::ReserveWriteSet,
+            command: Commands::DeclareWorkIntentionSet,
             requests: Array[RequestedWorkIntentionV1],
             set_id: String,
             expires_at: String,

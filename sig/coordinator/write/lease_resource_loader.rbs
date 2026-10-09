@@ -8,7 +8,7 @@ module Coordinator
         ?stream_factory: StreamFactory
       ) -> void
 
-      def call: (ResourceLeaseTargetV1 target, repository_id: String) -> Dry::Monads::Result
+      def call: (WorkIntentionTargetV1 target, repository_id: String) -> Dry::Monads::Result
     end
   end
 end

@@ -194,7 +194,7 @@ RSpec.describe Coordinator::Write::Operations::ExecuteCompleteWorkItem, :event_s
       kind: "file",
       path:
     )
-    reservation = execute!(Coordinator::Write::Operations::ExecuteReserveWriteSet, {
+    reservation = execute!(Coordinator::Write::Operations::ExecuteDeclareWorkIntentionSet, {
       command_id: "cmd-#{prefix}-reserve-#{index}",
       actor: { kind: "agent", id: "agent-a" },
       change_set_id: ids.fetch(:change_set_id),

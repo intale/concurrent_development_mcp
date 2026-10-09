@@ -107,7 +107,7 @@ class AcceptanceContentionBarrier
 
   def command_completed(trace)
     return unless trace.method_id == :call_command
-    return unless trace.defined_class.name&.end_with?("::ExecuteReserveWriteSet")
+    return unless trace.defined_class.name&.end_with?("::ExecuteDeclareWorkIntentionSet")
 
     @mutex.synchronize do
       command_id = @thread_commands.delete(Thread.current.object_id)

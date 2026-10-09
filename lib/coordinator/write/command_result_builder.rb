@@ -122,7 +122,7 @@ module Coordinator::Write
       )
     end
 
-    def write_set_reserve(command:, reservation:, input_digest:, persisted_events:, completed_at:)
+    def work_intention_set_declare(command:, reservation:, input_digest:, persisted_events:, completed_at:)
       build_completion(
         command:,
         tool_name: "work_intention_set_declare",
@@ -150,7 +150,7 @@ module Coordinator::Write
       )
     end
 
-    def write_set_expand(command:, expansion:, input_digest:, persisted_events:, completed_at:)
+    def work_intention_set_expand(command:, expansion:, input_digest:, persisted_events:, completed_at:)
       build_completion(
         command:,
         tool_name: "work_intention_set_expand",
@@ -179,7 +179,7 @@ module Coordinator::Write
       )
     end
 
-    def lease_renew(command:, renewal:, input_digest:, persisted_events:, completed_at:)
+    def work_intention_set_renew(command:, renewal:, input_digest:, persisted_events:, completed_at:)
       build_completion(
         command:,
         tool_name: "work_intention_set_renew",
@@ -209,7 +209,7 @@ module Coordinator::Write
       )
     end
 
-    def lease_release(command:, release:, input_digest:, persisted_events:, completed_at:)
+    def work_intention_set_withdraw(command:, release:, input_digest:, persisted_events:, completed_at:)
       build_completion(
         command:,
         tool_name: "work_intention_set_withdraw",

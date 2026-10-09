@@ -62,7 +62,7 @@ module CandidateObligationScenario
       attempt_id: "A-#{prefix}"
     }
     CandidateScenario.seed_attempt(ids:, agent_id: "agent-a")
-    reservation = execute(Coordinator::Write::Operations::ExecuteReserveWriteSet, {
+    reservation = execute(Coordinator::Write::Operations::ExecuteDeclareWorkIntentionSet, {
       command_id: "seed-reserve-#{prefix}",
       actor: { kind: "agent", id: "agent-a" },
       change_set_id: ids.fetch(:change_set_id),
@@ -231,7 +231,7 @@ module CandidateObligationScenario
       path:,
       base_blob_oid: "c" * 40
     )
-    execute(Coordinator::Write::Operations::ExecuteReserveWriteSet, {
+    execute(Coordinator::Write::Operations::ExecuteDeclareWorkIntentionSet, {
       command_id: "seed-reserve-#{role}-#{prefix}",
       actor: { kind: "agent", id: "agent-a" },
       change_set_id: ids.fetch(:change_set_id),

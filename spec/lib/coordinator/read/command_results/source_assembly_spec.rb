@@ -520,13 +520,13 @@ RSpec.describe Coordinator::Read::CommandResults::Assembler, :event_store do
     let(:first_expiry) { "2026-10-09T11:00:00.000000Z" }
     let(:second_expiry) { "2026-10-09T12:00:00.000000Z" }
     let(:command) do
-      Coordinator::Write::Commands::RenewLeaseSet.new(
+      Coordinator::Write::Commands::RenewWorkIntentionSet.new(
         command_id:,
         actor: Coordinator::Write::Commands::Actor.new(kind: "agent", id: "assembly-spec"),
         change_set_id: "CS-command-result", work_item_id: "W-command-result",
-        attempt_id: "A-command-result", lease_set_id: set_id,
-        leases: [ Coordinator::Write::LeaseRenewalReferenceV2.new(resource_id:, lease_id: intention_id, fencing_token: 1) ],
-        lease_duration_seconds: 600
+        attempt_id: "A-command-result", intention_set_id: set_id,
+        intentions: [ Coordinator::Write::WorkIntentionFencedReferenceV1.new(resource_id:, intention_id:, fencing_token: 1) ],
+        ttl_seconds: 600
       )
     end
 
@@ -580,13 +580,13 @@ RSpec.describe Coordinator::Read::CommandResults::Assembler, :event_store do
 
     context "for a declaration followed by later renewal and expansion" do
       let(:command) do
-        Coordinator::Write::Commands::ReserveWriteSet.new(
+        Coordinator::Write::Commands::DeclareWorkIntentionSet.new(
           command_id:,
           actor: Coordinator::Write::Commands::Actor.new(kind: "agent", id: "assembly-spec"),
           change_set_id: "CS-command-result", work_item_id: "W-command-result",
           attempt_id: "A-command-result", repository_id: RepositoryScenario::DEFAULT_REPOSITORY_ID,
-          base_commit_oid: "a" * 40, lease_duration_seconds: 600,
-          resources: [ Coordinator::Write::ResourceLeaseTargetV1.new(resource_id:, base_blob_oid: nil, purpose: "Current edit") ]
+          base_commit_oid: "a" * 40, ttl_seconds: 600,
+          resources: [ Coordinator::Write::WorkIntentionTargetV1.new(resource_id:, base_blob_oid: nil, purpose: "Current edit") ]
         )
       end
 
@@ -608,13 +608,13 @@ RSpec.describe Coordinator::Read::CommandResults::Assembler, :event_store do
     context "for an expansion followed by another expansion" do
       let(:expansion_resource_id) { resource_id }
       let(:command) do
-        Coordinator::Write::Commands::ExpandWriteSet.new(
+        Coordinator::Write::Commands::ExpandWorkIntentionSet.new(
           command_id:,
           actor: Coordinator::Write::Commands::Actor.new(kind: "agent", id: "assembly-spec"),
           change_set_id: "CS-command-result", work_item_id: "W-command-result",
-          attempt_id: "A-command-result", lease_set_id: set_id,
+          attempt_id: "A-command-result", intention_set_id: set_id,
           repository_id: RepositoryScenario::DEFAULT_REPOSITORY_ID, base_commit_oid: "a" * 40,
-          resources: [ Coordinator::Write::ResourceLeaseTargetV1.new(resource_id: expansion_resource_id, base_blob_oid: nil, purpose: "Current edit") ]
+          resources: [ Coordinator::Write::WorkIntentionTargetV1.new(resource_id: expansion_resource_id, base_blob_oid: nil, purpose: "Current edit") ]
         )
       end
 

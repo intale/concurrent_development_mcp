@@ -73,7 +73,7 @@ RSpec.describe Coordinator::Write::Operations::ExecuteSubmitCandidate, :event_st
 
   it "serializes withdrawal before submission so stale intentions cannot produce a partial Candidate" do
     reservation = setup_reservation
-    Coordinator::Write::Operations::ExecuteReleaseLeaseSet.new(event_store:).call(
+    Coordinator::Write::Operations::ExecuteWithdrawWorkIntentionSet.new(event_store:).call(
       command_id: "cmd-release-before-candidate",
       actor: { kind: "agent", id: "agent-a" },
       change_set_id: "CS-LSE",

@@ -1,0 +1,12 @@
+module Coordinator
+  module Write
+    class PreparedWorkIntentionSetDeclaration < Shared::Value
+      def declared_at: () -> String
+      def expires_at: () -> String
+      def input_digest: () -> String
+      def intention_set_id: () -> String
+      def resources: () -> Array[PreparedWorkIntentionTargetV1]
+      def set_event_id: () -> String
+    end
+  end
+end

@@ -75,7 +75,7 @@ module ResourceLeaseOperationScenario
       }
     end
     resource_ids = targets.map { _1.fetch(:resource_id) }
-    result = Coordinator::Write::Operations::ExecuteReserveWriteSet.new(event_store:).call(
+    result = Coordinator::Write::Operations::ExecuteDeclareWorkIntentionSet.new(event_store:).call(
       command_id:,
       actor: { kind: "agent", id: agent_id },
       change_set_id: "CS-LSE",

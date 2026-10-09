@@ -110,20 +110,20 @@ module Coordinator
       self["operations.execute_abandon_attempt"].method(:prepare)
     end
 
-    register("operations.prepare_reserve_write_set", memoize: true) do
-      Write::Operations::PrepareReserveWriteSet.new
+    register("operations.prepare_declare_work_intention_set", memoize: true) do
+      Write::Operations::PrepareDeclareWorkIntentionSet.new
     end
 
-    register("operations.prepare_expand_write_set", memoize: true) do
-      Write::Operations::PrepareExpandWriteSet.new
+    register("operations.prepare_expand_work_intention_set", memoize: true) do
+      Write::Operations::PrepareExpandWorkIntentionSet.new
     end
 
-    register("operations.prepare_renew_lease_set", memoize: true) do
-      Write::Operations::PrepareRenewLeaseSet.new
+    register("operations.prepare_renew_work_intention_set", memoize: true) do
+      Write::Operations::PrepareRenewWorkIntentionSet.new
     end
 
-    register("operations.prepare_release_lease_set", memoize: true) do
-      Write::Operations::PrepareReleaseLeaseSet.new
+    register("operations.prepare_withdraw_work_intention_set", memoize: true) do
+      Write::Operations::PrepareWithdrawWorkIntentionSet.new
     end
 
     register("operations.prepare_record_guidance", memoize: true) do
@@ -1412,10 +1412,10 @@ module Coordinator
       )
     end
 
-    register("operations.execute_reserve_write_set") do
-      Write::Operations::ExecuteReserveWriteSet.new(
+    register("operations.execute_declare_work_intention_set") do
+      Write::Operations::ExecuteDeclareWorkIntentionSet.new(
         event_store: self["event_store"],
-        preparer: self["operations.prepare_reserve_write_set"],
+        preparer: self["operations.prepare_declare_work_intention_set"],
         decider: self["domain.resource_leases.reserve"],
         input_digest: self["command_input_digest"],
         clock: self["clock"],
@@ -1426,10 +1426,10 @@ module Coordinator
       )
     end
 
-    register("operations.execute_expand_write_set") do
-      Write::Operations::ExecuteExpandWriteSet.new(
+    register("operations.execute_expand_work_intention_set") do
+      Write::Operations::ExecuteExpandWorkIntentionSet.new(
         event_store: self["event_store"],
-        preparer: self["operations.prepare_expand_write_set"],
+        preparer: self["operations.prepare_expand_work_intention_set"],
         decider: self["domain.resource_leases.expand"],
         input_digest: self["command_input_digest"],
         clock: self["clock"],
@@ -1441,10 +1441,10 @@ module Coordinator
       )
     end
 
-    register("operations.execute_renew_lease_set") do
-      Write::Operations::ExecuteRenewLeaseSet.new(
+    register("operations.execute_renew_work_intention_set") do
+      Write::Operations::ExecuteRenewWorkIntentionSet.new(
         event_store: self["event_store"],
-        preparer: self["operations.prepare_renew_lease_set"],
+        preparer: self["operations.prepare_renew_work_intention_set"],
         decider: self["domain.resource_leases.renew"],
         input_digest: self["command_input_digest"],
         clock: self["clock"],
@@ -1456,10 +1456,10 @@ module Coordinator
       )
     end
 
-    register("operations.execute_release_lease_set") do
-      Write::Operations::ExecuteReleaseLeaseSet.new(
+    register("operations.execute_withdraw_work_intention_set") do
+      Write::Operations::ExecuteWithdrawWorkIntentionSet.new(
         event_store: self["event_store"],
-        preparer: self["operations.prepare_release_lease_set"],
+        preparer: self["operations.prepare_withdraw_work_intention_set"],
         decider: self["domain.resource_leases.release"],
         input_digest: self["command_input_digest"],
         clock: self["clock"],
@@ -2100,10 +2100,10 @@ module Coordinator
         activate_change_set: self["operations.execute_activate_change_set"],
         acquire_work_item: self["operations.execute_acquire_work_item"],
         complete_work_item: self["operations.execute_complete_work_item"],
-        reserve_write_set: self["operations.execute_reserve_write_set"],
-        expand_write_set: self["operations.execute_expand_write_set"],
-        renew_lease_set: self["operations.execute_renew_lease_set"],
-        release_lease_set: self["operations.execute_release_lease_set"],
+        declare_work_intention_set: self["operations.execute_declare_work_intention_set"],
+        expand_work_intention_set: self["operations.execute_expand_work_intention_set"],
+        renew_work_intention_set: self["operations.execute_renew_work_intention_set"],
+        withdraw_work_intention_set: self["operations.execute_withdraw_work_intention_set"],
         record_guidance: self["operations.execute_record_guidance"],
         propose_decision_interpretation: self["operations.execute_propose_decision_interpretation"],
         adjudicate_decision_interpretation: self["operations.execute_adjudicate_decision_interpretation"],
@@ -2243,30 +2243,30 @@ module Coordinator
       )
     end
 
-    register("operations.submit_reserve_write_set_task") do
+    register("operations.submit_declare_work_intention_set_task") do
       Write::Operations::PrepareAndSubmitCoordinationTask.new(
-        preparer: self["operations.prepare_reserve_write_set"],
+        preparer: self["operations.prepare_declare_work_intention_set"],
         submitter: self["operations.submit_coordination_task"]
       )
     end
 
-    register("operations.submit_expand_write_set_task") do
+    register("operations.submit_expand_work_intention_set_task") do
       Write::Operations::PrepareAndSubmitCoordinationTask.new(
-        preparer: self["operations.prepare_expand_write_set"],
+        preparer: self["operations.prepare_expand_work_intention_set"],
         submitter: self["operations.submit_coordination_task"]
       )
     end
 
-    register("operations.submit_renew_lease_set_task") do
+    register("operations.submit_renew_work_intention_set_task") do
       Write::Operations::PrepareAndSubmitCoordinationTask.new(
-        preparer: self["operations.prepare_renew_lease_set"],
+        preparer: self["operations.prepare_renew_work_intention_set"],
         submitter: self["operations.submit_coordination_task"]
       )
     end
 
-    register("operations.submit_release_lease_set_task") do
+    register("operations.submit_withdraw_work_intention_set_task") do
       Write::Operations::PrepareAndSubmitCoordinationTask.new(
-        preparer: self["operations.prepare_release_lease_set"],
+        preparer: self["operations.prepare_withdraw_work_intention_set"],
         submitter: self["operations.submit_coordination_task"]
       )
     end

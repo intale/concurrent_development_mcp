@@ -8,7 +8,7 @@ module Coordinator
             attempt_state: Domain::Attempts::State,
             set_state: SetState,
             member_states: Array[State],
-            command: Commands::RenewLeaseSet,
+            command: Commands::RenewWorkIntentionSet,
             renewed_at: String,
             expires_at: String
           ) -> Dry::Monads::Result

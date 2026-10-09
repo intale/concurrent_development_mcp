@@ -124,13 +124,13 @@ module Coordinator::Write
             return failure(:attempt_owner_mismatch, "Attempt belongs to another agent attribution", command)
           end
           return failure(:work_intention_set_missing, "Attempt has no work-intention set", command) if set_state.absent?
-          unless set_state.set_id == command.lease_set_id
+          unless set_state.set_id == command.intention_set_id
             return failure(
               :work_intention_set_mismatch,
               "Work-intention set ID does not match",
               command,
               current_intention_set_id: set_state.set_id,
-              requested_intention_set_id: command.lease_set_id
+              requested_intention_set_id: command.intention_set_id
             )
           end
           unless set_state.attempt_id == command.attempt_id &&

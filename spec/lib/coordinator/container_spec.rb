@@ -16,10 +16,10 @@ RSpec.describe Coordinator::Container do
     dependency_satisfaction_operation = described_class["operations.execute_satisfy_work_item_dependency"]
     change_set_completion_operation = described_class["operations.execute_complete_change_set"]
     acquisition_operation = described_class["operations.execute_acquire_work_item"]
-    reservation_operation = described_class["operations.execute_reserve_write_set"]
-    expansion_operation = described_class["operations.execute_expand_write_set"]
-    renewal_operation = described_class["operations.execute_renew_lease_set"]
-    release_operation = described_class["operations.execute_release_lease_set"]
+    reservation_operation = described_class["operations.execute_declare_work_intention_set"]
+    expansion_operation = described_class["operations.execute_expand_work_intention_set"]
+    renewal_operation = described_class["operations.execute_renew_work_intention_set"]
+    release_operation = described_class["operations.execute_withdraw_work_intention_set"]
     expiry_operation = described_class["operations.execute_expire_resource_lease"]
     guidance_operation = described_class["operations.execute_record_guidance"]
     interpretation_operation = described_class["operations.execute_propose_decision_interpretation"]
@@ -86,10 +86,10 @@ RSpec.describe Coordinator::Container do
       operations.submit_declare_work_item_dependency_task
       operations.submit_activate_change_set_task
       operations.submit_acquire_work_item_task
-      operations.submit_reserve_write_set_task
-      operations.submit_expand_write_set_task
-      operations.submit_renew_lease_set_task
-      operations.submit_release_lease_set_task
+      operations.submit_declare_work_intention_set_task
+      operations.submit_expand_work_intention_set_task
+      operations.submit_renew_work_intention_set_task
+      operations.submit_withdraw_work_intention_set_task
       operations.submit_record_guidance_task
       operations.submit_propose_decision_interpretation_task
       operations.submit_adjudicate_decision_interpretation_task
@@ -122,10 +122,10 @@ RSpec.describe Coordinator::Container do
       Coordinator::Write::Operations::ExecuteCompleteChangeSet
     )
     expect(acquisition_operation).to be_a(Coordinator::Write::Operations::ExecuteAcquireWorkItem)
-    expect(reservation_operation).to be_a(Coordinator::Write::Operations::ExecuteReserveWriteSet)
-    expect(expansion_operation).to be_a(Coordinator::Write::Operations::ExecuteExpandWriteSet)
-    expect(renewal_operation).to be_a(Coordinator::Write::Operations::ExecuteRenewLeaseSet)
-    expect(release_operation).to be_a(Coordinator::Write::Operations::ExecuteReleaseLeaseSet)
+    expect(reservation_operation).to be_a(Coordinator::Write::Operations::ExecuteDeclareWorkIntentionSet)
+    expect(expansion_operation).to be_a(Coordinator::Write::Operations::ExecuteExpandWorkIntentionSet)
+    expect(renewal_operation).to be_a(Coordinator::Write::Operations::ExecuteRenewWorkIntentionSet)
+    expect(release_operation).to be_a(Coordinator::Write::Operations::ExecuteWithdrawWorkIntentionSet)
     expect(expiry_operation).to be_a(Coordinator::Write::Operations::ExecuteExpireResourceLease)
     expect(guidance_operation).to be_a(Coordinator::Write::Operations::ExecuteRecordGuidance)
     expect(interpretation_operation).to be_a(

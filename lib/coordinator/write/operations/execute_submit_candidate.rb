@@ -194,7 +194,7 @@ module Coordinator::Write
         observations = set_state.members.map do |member|
           intention = @work_intention_loader.call(member.intention_id).state
           resource_result = @work_intention_resource_loader.call(
-            ResourceLeaseTargetV1.new(
+            WorkIntentionTargetV1.new(
               resource_id: member.resource_id,
               base_blob_oid: intention.base_blob_oid
             ),

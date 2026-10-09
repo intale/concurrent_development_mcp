@@ -86,10 +86,10 @@ module Coordinator::Write
             reason: command.reason
           )
         )
-      when Commands::ReserveWriteSet then write_set_reserve_document(command)
-      when Commands::ExpandWriteSet then write_set_expand_document(command)
-      when Commands::RenewLeaseSet then lease_renew_document(command)
-      when Commands::ReleaseLeaseSet then lease_release_document(command)
+      when Commands::DeclareWorkIntentionSet then work_intention_set_declare_document(command)
+      when Commands::ExpandWorkIntentionSet then work_intention_set_expand_document(command)
+      when Commands::RenewWorkIntentionSet then work_intention_set_renew_document(command)
+      when Commands::WithdrawWorkIntentionSet then work_intention_set_withdraw_document(command)
       when Commands::RecordGuidance then guidance_record_document(command)
       when Commands::ProposeDecisionInterpretation then decision_interpretation_propose_document(command)
       when Commands::AdjudicateDecisionInterpretation then decision_interpretation_adjudicate_document(command)
@@ -246,16 +246,16 @@ module Coordinator::Write
       )
     end
 
-    def write_set_reserve(command)
-      @canonical_json.sha256(write_set_reserve_document(command).to_h)
+    def work_intention_set_declare(command)
+      @canonical_json.sha256(work_intention_set_declare_document(command).to_h)
     end
 
-    def write_set_reserve_document(command)
-      CommandInputDocuments::ReserveWriteSetV1.new(
+    def work_intention_set_declare_document(command)
+      CommandInputDocuments::DeclareWorkIntentionSetV1.new(
         schema: "command-input/v1",
         command_id: command.command_id,
         tool_name: "work_intention_set_declare",
-        input: CommandInputDocuments::ReserveWriteSetInputV1.new(
+        input: CommandInputDocuments::DeclareWorkIntentionSetInputV1.new(
           actor: actor_document(command.actor),
           change_set_id: command.change_set_id,
           work_item_id: command.work_item_id,
@@ -263,83 +263,83 @@ module Coordinator::Write
           repository_id: command.repository_id,
           base_commit_oid: command.base_commit_oid,
           resources: command.resources.map do |resource|
-            CommandInputDocuments::ResourceLeaseTargetV1.new(resource.to_h)
+            CommandInputDocuments::WorkIntentionTargetV1.new(resource.to_h)
           end,
-          ttl_seconds: command.lease_duration_seconds
+          ttl_seconds: command.ttl_seconds
         )
       )
     end
 
-    def write_set_expand(command)
-      @canonical_json.sha256(write_set_expand_document(command).to_h)
+    def work_intention_set_expand(command)
+      @canonical_json.sha256(work_intention_set_expand_document(command).to_h)
     end
 
-    def write_set_expand_document(command)
-      CommandInputDocuments::ExpandWriteSetV1.new(
+    def work_intention_set_expand_document(command)
+      CommandInputDocuments::ExpandWorkIntentionSetV1.new(
         schema: "command-input/v1",
         command_id: command.command_id,
         tool_name: "work_intention_set_expand",
-        input: CommandInputDocuments::ExpandWriteSetInputV1.new(
+        input: CommandInputDocuments::ExpandWorkIntentionSetInputV1.new(
           actor: actor_document(command.actor),
           change_set_id: command.change_set_id,
           work_item_id: command.work_item_id,
           attempt_id: command.attempt_id,
-          intention_set_id: command.lease_set_id,
+          intention_set_id: command.intention_set_id,
           repository_id: command.repository_id,
           base_commit_oid: command.base_commit_oid,
           resources: command.resources.map do |resource|
-            CommandInputDocuments::ResourceLeaseTargetV1.new(resource.to_h)
+            CommandInputDocuments::WorkIntentionTargetV1.new(resource.to_h)
           end
         )
       )
     end
 
-    def lease_renew(command)
-      @canonical_json.sha256(lease_renew_document(command).to_h)
+    def work_intention_set_renew(command)
+      @canonical_json.sha256(work_intention_set_renew_document(command).to_h)
     end
 
-    def lease_renew_document(command)
-      CommandInputDocuments::RenewLeaseSetV1.new(
+    def work_intention_set_renew_document(command)
+      CommandInputDocuments::RenewWorkIntentionSetV1.new(
         schema: "command-input/v1",
         command_id: command.command_id,
         tool_name: "work_intention_set_renew",
-        input: CommandInputDocuments::RenewLeaseSetInputV1.new(
+        input: CommandInputDocuments::RenewWorkIntentionSetInputV1.new(
           actor: actor_document(command.actor),
           change_set_id: command.change_set_id,
           work_item_id: command.work_item_id,
           attempt_id: command.attempt_id,
-          intention_set_id: command.lease_set_id,
-          intentions: command.leases.map do |reference|
-            CommandInputDocuments::LeaseRenewalReferenceV1.new(
+          intention_set_id: command.intention_set_id,
+          intentions: command.intentions.map do |reference|
+            CommandInputDocuments::WorkIntentionRenewalReferenceV1.new(
               resource_id: reference.resource_id,
-              intention_id: reference.lease_id,
+              intention_id: reference.intention_id,
               fencing_token: reference.fencing_token
             )
           end,
-          ttl_seconds: command.lease_duration_seconds
+          ttl_seconds: command.ttl_seconds
         )
       )
     end
 
-    def lease_release(command)
-      @canonical_json.sha256(lease_release_document(command).to_h)
+    def work_intention_set_withdraw(command)
+      @canonical_json.sha256(work_intention_set_withdraw_document(command).to_h)
     end
 
-    def lease_release_document(command)
-      CommandInputDocuments::ReleaseLeaseSetV1.new(
+    def work_intention_set_withdraw_document(command)
+      CommandInputDocuments::WithdrawWorkIntentionSetV1.new(
         schema: "command-input/v1",
         command_id: command.command_id,
         tool_name: "work_intention_set_withdraw",
-        input: CommandInputDocuments::ReleaseLeaseSetInputV1.new(
+        input: CommandInputDocuments::WithdrawWorkIntentionSetInputV1.new(
           actor: actor_document(command.actor),
           change_set_id: command.change_set_id,
           work_item_id: command.work_item_id,
           attempt_id: command.attempt_id,
-          intention_set_id: command.lease_set_id,
-          intentions: command.leases.map do |reference|
-            CommandInputDocuments::LeaseReleaseReferenceV1.new(
+          intention_set_id: command.intention_set_id,
+          intentions: command.intentions.map do |reference|
+            CommandInputDocuments::WorkIntentionWithdrawalReferenceV1.new(
               resource_id: reference.resource_id,
-              intention_id: reference.lease_id,
+              intention_id: reference.intention_id,
               fencing_token: reference.fencing_token
             )
           end

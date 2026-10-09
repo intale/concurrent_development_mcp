@@ -280,7 +280,7 @@ module ReleaseSetScenario
       attempt_id:,
       base_snapshots: [ { repository_id:, commit_oid: base_oid } ]
     })
-    reservation = execute(Coordinator::Write::Operations::ExecuteReserveWriteSet, {
+    reservation = execute(Coordinator::Write::Operations::ExecuteDeclareWorkIntentionSet, {
       command_id: "seed-release-reserve-#{prefix}-#{index}",
       actor: { kind: "agent", id: "agent-#{index}" },
       change_set_id:,
@@ -328,7 +328,7 @@ module ReleaseSetScenario
   def complete_candidate(candidate, prefix:, index:)
     input = candidate.fetch(:input)
     reservation = candidate.fetch(:reservation)
-    execute(Coordinator::Write::Operations::ExecuteReleaseLeaseSet, {
+    execute(Coordinator::Write::Operations::ExecuteWithdrawWorkIntentionSet, {
       command_id: "seed-release-lease-release-#{prefix}-#{index}",
       actor: input.fetch(:actor),
       change_set_id: input.fetch(:change_set_id),

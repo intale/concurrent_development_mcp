@@ -1,0 +1,9 @@
+module Coordinator
+  module Write
+    class PreparedWorkIntentionSetWithdrawal < Shared::Value
+      def withdrawn_at: () -> String
+      def input_digest: () -> String
+      def withdrawals: () -> Array[PreparedWorkIntentionWithdrawalV1]
+    end
+  end
+end

@@ -154,7 +154,7 @@ module Coordinator::Write
       attribute :input, AbandonAttemptInputV1
     end
 
-    class ResourceLeaseTargetV1 < Value
+    class WorkIntentionTargetV1 < Value
       attribute :resource_id, Types::ResourceId
       attribute :base_blob_oid, Types::GitOid.optional
       attribute :mode, Types::WorkIntentionMode
@@ -162,8 +162,8 @@ module Coordinator::Write
       attribute :context, Types::WorkIntentionContext.optional
     end
 
-    class ReserveWriteSetInputV1 < Value
-      Resource = ResourceLeaseTargetV1
+    class DeclareWorkIntentionSetInputV1 < Value
+      Resource = WorkIntentionTargetV1
 
       attribute :actor, ActorV1
       attribute :change_set_id, Types::Identifier
@@ -175,13 +175,13 @@ module Coordinator::Write
       attribute :ttl_seconds, Types::LeaseDurationSeconds
     end
 
-    class ReserveWriteSetV1 < BaseV1
+    class DeclareWorkIntentionSetV1 < BaseV1
       attribute :tool_name, Types::String.enum("work_intention_set_declare")
-      attribute :input, ReserveWriteSetInputV1
+      attribute :input, DeclareWorkIntentionSetInputV1
     end
 
-    class ExpandWriteSetInputV1 < Value
-      Resource = ResourceLeaseTargetV1
+    class ExpandWorkIntentionSetInputV1 < Value
+      Resource = WorkIntentionTargetV1
 
       attribute :actor, ActorV1
       attribute :change_set_id, Types::Identifier
@@ -193,19 +193,19 @@ module Coordinator::Write
       attribute :resources, Types::Array.of(Resource).constrained(min_size: 1, max_size: 32)
     end
 
-    class ExpandWriteSetV1 < BaseV1
+    class ExpandWorkIntentionSetV1 < BaseV1
       attribute :tool_name, Types::String.enum("work_intention_set_expand")
-      attribute :input, ExpandWriteSetInputV1
+      attribute :input, ExpandWorkIntentionSetInputV1
     end
 
-    class LeaseRenewalReferenceV1 < Value
+    class WorkIntentionRenewalReferenceV1 < Value
       attribute :resource_id, Types::ResourceId
       attribute :intention_id, Types::UuidV7
       attribute :fencing_token, Types::FencingToken
     end
 
-    class RenewLeaseSetInputV1 < Value
-      Reference = LeaseRenewalReferenceV1
+    class RenewWorkIntentionSetInputV1 < Value
+      Reference = WorkIntentionRenewalReferenceV1
 
       attribute :actor, ActorV1
       attribute :change_set_id, Types::Identifier
@@ -216,19 +216,19 @@ module Coordinator::Write
       attribute :ttl_seconds, Types::LeaseDurationSeconds
     end
 
-    class RenewLeaseSetV1 < BaseV1
+    class RenewWorkIntentionSetV1 < BaseV1
       attribute :tool_name, Types::String.enum("work_intention_set_renew")
-      attribute :input, RenewLeaseSetInputV1
+      attribute :input, RenewWorkIntentionSetInputV1
     end
 
-    class LeaseReleaseReferenceV1 < Value
+    class WorkIntentionWithdrawalReferenceV1 < Value
       attribute :resource_id, Types::ResourceId
       attribute :intention_id, Types::UuidV7
       attribute :fencing_token, Types::FencingToken
     end
 
-    class ReleaseLeaseSetInputV1 < Value
-      Reference = LeaseReleaseReferenceV1
+    class WithdrawWorkIntentionSetInputV1 < Value
+      Reference = WorkIntentionWithdrawalReferenceV1
 
       attribute :actor, ActorV1
       attribute :change_set_id, Types::Identifier
@@ -238,9 +238,9 @@ module Coordinator::Write
       attribute :intentions, Types::Array.of(Reference).constrained(min_size: 1, max_size: 32)
     end
 
-    class ReleaseLeaseSetV1 < BaseV1
+    class WithdrawWorkIntentionSetV1 < BaseV1
       attribute :tool_name, Types::String.enum("work_intention_set_withdraw")
-      attribute :input, ReleaseLeaseSetInputV1
+      attribute :input, WithdrawWorkIntentionSetInputV1
     end
 
     class GuidanceAnchorsV1 < Value
@@ -983,10 +983,10 @@ module Coordinator::Write
       AcquireWorkItemV1,
       CompleteWorkItemV1,
       AbandonAttemptV1,
-      ReserveWriteSetV1,
-      ExpandWriteSetV1,
-      RenewLeaseSetV1,
-      ReleaseLeaseSetV1,
+      DeclareWorkIntentionSetV1,
+      ExpandWorkIntentionSetV1,
+      RenewWorkIntentionSetV1,
+      WithdrawWorkIntentionSetV1,
       RecordGuidanceV1,
       ProposeDecisionInterpretationV1,
       AdjudicateDecisionInterpretationV1,

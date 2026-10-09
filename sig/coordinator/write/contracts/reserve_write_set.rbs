@@ -1,9 +1,0 @@
-module Coordinator
-  module Write
-    module Contracts
-      class ReserveWriteSet
-        def call: (command_input) -> Dry::Validation::Result
-      end
-    end
-  end
-end

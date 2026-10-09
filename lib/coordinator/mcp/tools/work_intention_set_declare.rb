@@ -12,7 +12,7 @@ module Coordinator
           fails immediately with blocker purpose and context; the coordinator never queues or preempts work.
         TEXT
         input_schema Schemas.work_intention_set_declare
-        operation "operations.submit_reserve_write_set_task"
+        operation "operations.submit_declare_work_intention_set_task"
       end
     end
   end

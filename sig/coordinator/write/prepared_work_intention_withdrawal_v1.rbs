@@ -1,0 +1,8 @@
+module Coordinator
+  module Write
+    class PreparedWorkIntentionWithdrawalV1 < Shared::Value
+      def reference: () -> WorkIntentionFencedReferenceV1
+      def event_id: () -> String
+    end
+  end
+end

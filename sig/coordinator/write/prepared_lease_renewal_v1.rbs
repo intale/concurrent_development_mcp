@@ -1,8 +1,0 @@
-module Coordinator
-  module Write
-    class PreparedLeaseRenewalV1 < Shared::Value
-      def reference: () -> LeaseRenewalReferenceV2
-      def event_id: () -> String
-    end
-  end
-end

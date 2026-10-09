@@ -92,7 +92,7 @@ module Coordinator::Write
       end
 
       def persist_expiration(write, command:, state:, expected_revision:, event_id:, caused_by:)
-        target = ResourceLeaseTargetV1.new(
+        target = WorkIntentionTargetV1.new(
           resource_id: state.resource_id,
           base_blob_oid: state.base_blob_oid
         )

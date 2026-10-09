@@ -29,7 +29,7 @@ module DependencyProgressScenario
     ids = scenario.fetch(:ids)
     input = scenario.fetch(:candidate_input)
     reservation = scenario.fetch(:reservation)
-    execute(Coordinator::Write::Operations::ExecuteReleaseLeaseSet, {
+    execute(Coordinator::Write::Operations::ExecuteWithdrawWorkIntentionSet, {
       command_id: "release-progress-#{ids.fetch(:candidate_id)}",
       actor: input.fetch(:actor),
       change_set_id: ids.fetch(:change_set_id),
@@ -177,7 +177,7 @@ module DependencyProgressScenario
       kind: "file",
       path: "lib/progress.rb"
     )
-    execute(Coordinator::Write::Operations::ExecuteReserveWriteSet, {
+    execute(Coordinator::Write::Operations::ExecuteDeclareWorkIntentionSet, {
       command_id: "reserve-#{ids.fetch(:attempt_id)}",
       actor: { kind: "agent", id: "agent-a" },
       change_set_id: ids.fetch(:change_set_id),

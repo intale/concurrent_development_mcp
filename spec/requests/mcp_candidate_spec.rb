@@ -147,7 +147,7 @@ RSpec.describe "CAN-01 MCP Candidate coordination" do
   it "completes a withdrawn-intention Candidate Task without fabricating a withdrawal timestamp", :event_store do
     arguments = CandidateScenario.prepare(prefix: "mcp-candidate-withdrawn").fetch(:input)
     CandidateScenario.execute(
-      Coordinator::Write::Operations::ExecuteReleaseLeaseSet,
+      Coordinator::Write::Operations::ExecuteWithdrawWorkIntentionSet,
       arguments.slice(:actor, :change_set_id, :work_item_id, :attempt_id, :intention_set_id, :intentions)
         .merge(command_id: "cmd-withdraw-before-candidate")
     )

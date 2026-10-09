@@ -2,7 +2,7 @@ module Coordinator
   module Write
     class WorkIntentionResourceLoader
       def initialize: (event_store: _EventStore, ?lease_resource_loader: LeaseResourceLoader) -> void
-      def call: (ResourceLeaseTargetV1 target, repository_id: String) -> Dry::Monads::Result
+      def call: (WorkIntentionTargetV1 target, repository_id: String) -> Dry::Monads::Result
     end
   end
 end

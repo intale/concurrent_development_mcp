@@ -51,7 +51,7 @@ module Coordinator::Write
       active_states = states.select { _1.active_at?(at) }
       observations = if resolve_active_observations
                        active_states.map do |state|
-                         target = ResourceLeaseTargetV1.new(
+                         target = WorkIntentionTargetV1.new(
                            resource_id: state.resource_id,
                            base_blob_oid: state.base_blob_oid
                          )

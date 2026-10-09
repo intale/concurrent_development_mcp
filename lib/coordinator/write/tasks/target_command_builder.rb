@@ -135,9 +135,9 @@ module Coordinator::Write
         )
       end
 
-      def build_reserve_write_set(document)
+      def build_declare_work_intention_set(document)
         input = document.input
-        Commands::ReserveWriteSet.new(
+        Commands::DeclareWorkIntentionSet.new(
           command_id: document.command_id,
           actor: build_actor(input.actor),
           change_set_id: input.change_set_id,
@@ -145,59 +145,59 @@ module Coordinator::Write
           attempt_id: input.attempt_id,
           repository_id: input.repository_id,
           base_commit_oid: input.base_commit_oid,
-          resources: input.resources.map { ResourceLeaseTargetV1.new(_1.to_h) },
-          lease_duration_seconds: input.ttl_seconds
+          resources: input.resources.map { WorkIntentionTargetV1.new(_1.to_h) },
+          ttl_seconds: input.ttl_seconds
         )
       end
 
-      def build_expand_write_set(document)
+      def build_expand_work_intention_set(document)
         input = document.input
-        Commands::ExpandWriteSet.new(
+        Commands::ExpandWorkIntentionSet.new(
           command_id: document.command_id,
           actor: build_actor(input.actor),
           change_set_id: input.change_set_id,
           work_item_id: input.work_item_id,
           attempt_id: input.attempt_id,
-          lease_set_id: input.intention_set_id,
+          intention_set_id: input.intention_set_id,
           repository_id: input.repository_id,
           base_commit_oid: input.base_commit_oid,
-          resources: input.resources.map { ResourceLeaseTargetV1.new(_1.to_h) }
+          resources: input.resources.map { WorkIntentionTargetV1.new(_1.to_h) }
         )
       end
 
-      def build_renew_lease_set(document)
+      def build_renew_work_intention_set(document)
         input = document.input
-        Commands::RenewLeaseSet.new(
+        Commands::RenewWorkIntentionSet.new(
           command_id: document.command_id,
           actor: build_actor(input.actor),
           change_set_id: input.change_set_id,
           work_item_id: input.work_item_id,
           attempt_id: input.attempt_id,
-          lease_set_id: input.intention_set_id,
-          leases: input.intentions.map do |reference|
-            LeaseRenewalReferenceV2.new(
+          intention_set_id: input.intention_set_id,
+          intentions: input.intentions.map do |reference|
+            WorkIntentionFencedReferenceV1.new(
               resource_id: reference.resource_id,
-              lease_id: reference.intention_id,
+              intention_id: reference.intention_id,
               fencing_token: reference.fencing_token
             )
           end,
-          lease_duration_seconds: input.ttl_seconds
+          ttl_seconds: input.ttl_seconds
         )
       end
 
-      def build_release_lease_set(document)
+      def build_withdraw_work_intention_set(document)
         input = document.input
-        Commands::ReleaseLeaseSet.new(
+        Commands::WithdrawWorkIntentionSet.new(
           command_id: document.command_id,
           actor: build_actor(input.actor),
           change_set_id: input.change_set_id,
           work_item_id: input.work_item_id,
           attempt_id: input.attempt_id,
-          lease_set_id: input.intention_set_id,
-          leases: input.intentions.map do |reference|
-            LeaseReleaseReferenceV2.new(
+          intention_set_id: input.intention_set_id,
+          intentions: input.intentions.map do |reference|
+            WorkIntentionFencedReferenceV1.new(
               resource_id: reference.resource_id,
-              lease_id: reference.intention_id,
+              intention_id: reference.intention_id,
               fencing_token: reference.fencing_token
             )
           end

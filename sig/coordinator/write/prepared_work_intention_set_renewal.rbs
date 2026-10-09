@@ -1,0 +1,10 @@
+module Coordinator
+  module Write
+    class PreparedWorkIntentionSetRenewal < Shared::Value
+      def renewed_at: () -> String
+      def expires_at: () -> String
+      def input_digest: () -> String
+      def renewals: () -> Array[PreparedWorkIntentionRenewalV1]
+    end
+  end
+end
