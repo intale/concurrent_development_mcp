@@ -127,7 +127,12 @@ RSpec.describe Coordinator::Write::EventFactory do
       [ "CoordinationTaskSubmitted", 1 ],
       [ "CoordinationTaskCompleted", 1 ],
       [ "SkillRevisionPublished", 1 ],
-      [ "DevelopmentArtifactCaptured", 1 ]
+      [ "DevelopmentArtifactCaptured", 1 ],
+      [ "DevelopmentArtifactCaptured", 2 ],
+      [ "DevelopmentArtifactObserved", 1 ],
+      [ "DevelopmentArtifactClassificationCorrected", 1 ],
+      [ "DevelopmentArtifactRelationDeclared", 1 ],
+      [ "DevelopmentArtifactRelationSuperseded", 1 ]
     ]
 
     superseded.each do |type, schema_version|

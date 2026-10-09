@@ -71,7 +71,7 @@ module Coordinator::Write
         return target if target.failure?
 
         source_state = @loader.load(artifact_relation.source_artifact_id)
-        unless source_state.created || source_state.capture
+        unless source_state.created
           return Failure(OutcomeError.new(
             code: :development_artifact_not_found,
             message: "Source Development Artifact was not found",
@@ -198,7 +198,7 @@ module Coordinator::Write
       def event_markers(event, artifact_relation:, command_id:)
         case event
         when Events::DevelopmentArtifactRelationDeclaredV2
-          @marker_builder.relation_v2(artifact_relation:, command_id:)
+          @marker_builder.relation(artifact_relation:, command_id:)
         when Events::DevelopmentArtifactRelationSupersededV2
           @marker_builder.supersession(event:, command_id:)
         else

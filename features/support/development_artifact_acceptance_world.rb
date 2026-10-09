@@ -95,7 +95,7 @@ module DevelopmentArtifactAcceptanceWorld
         event_types: %w[
           DevelopmentArtifactCreated DevelopmentArtifactScopeChanged DevelopmentArtifactTitleChanged
           DevelopmentArtifactKindChanged DevelopmentArtifactLabelAdded DevelopmentArtifactLabelRemoved
-          DevelopmentArtifactSourceChanged DevelopmentArtifactContentChanged DevelopmentArtifactCaptured
+          DevelopmentArtifactSourceChanged DevelopmentArtifactContentChanged
         ],
         maximum_count: Coordinator::Shared::Types::DEVELOPMENT_ARTIFACT_HISTORY_MAXIMUM_COUNT,
         direction: :asc
@@ -109,8 +109,8 @@ module DevelopmentArtifactAcceptanceWorld
       Coordinator::Write::EventReadCriteria.new(
         event_types: %w[
           DevelopmentArtifactObservationRecorded DevelopmentArtifactObservationFactLinked
-          DevelopmentArtifactClassificationCorrectionRecorded DevelopmentArtifactObserved
-          DevelopmentArtifactClassificationCorrected
+          DevelopmentArtifactClassificationCorrectionRecorded
+
         ],
         maximum_count: Coordinator::Shared::Types::DEVELOPMENT_ARTIFACT_OBSERVATION_HISTORY_MAXIMUM_COUNT,
         direction: :asc

@@ -22,7 +22,7 @@ FactoryBot.define do
     captured_event do
       {
         "event_id" => SecureRandom.uuid_v7,
-        "type" => "DevelopmentArtifactCaptured",
+        "type" => "DevelopmentArtifactCreated",
         "stream_context" => "DevelopmentMemory",
         "stream_name" => "DevelopmentArtifact",
         "stream_id" => artifact_id,
@@ -31,7 +31,7 @@ FactoryBot.define do
     end
     captured_actor { { "kind" => "agent", "id" => "factory-agent", "authenticated" => false } }
     captured_markers { [ "development-artifact:#{artifact_id}" ] }
-    captured_metadata { { "schema_version" => 2 } }
+    captured_metadata { { "schema_version" => 1 } }
     sequence(:captured_global_position, 800)
     stream_revision { 0 }
     captured_at_domain { Time.utc(2026, 8, 30, 12) }
@@ -71,7 +71,7 @@ FactoryBot.define do
     observed_event do
       {
         "event_id" => SecureRandom.uuid_v7,
-        "type" => "DevelopmentArtifactObserved",
+        "type" => "DevelopmentArtifactObservationRecorded",
         "stream_context" => "DevelopmentMemory",
         "stream_name" => "DevelopmentArtifactObservation",
         "stream_id" => observation_id,
@@ -93,6 +93,38 @@ FactoryBot.define do
     classified_at_store { observed_at_store }
     current_global_position { [ observed_global_position, classified_global_position ].compact.max }
     sequence(:observed_sequence, 1)
+
+    fact_links do
+      facts = {
+        "created" => [ "DevelopmentArtifactCreated", {} ],
+        "scope" => [ "DevelopmentArtifactScopeChanged", { "scope" => scope } ],
+        "title" => [ "DevelopmentArtifactTitleChanged", { "title" => title } ],
+        "kind" => [ "DevelopmentArtifactKindChanged", { "kind" => kind } ],
+        "source" => [ "DevelopmentArtifactSourceChanged", {
+          "source_kind" => source_kind, "locator" => source_locator,
+          "revision" => source_revision, "observed_at" => source_observed_at.utc.iso8601(6)
+        } ],
+        "content" => [ "DevelopmentArtifactContentChanged", {
+          "content" => content_encoding == "utf-8" ? content_text : content_base64
+        } ]
+      }
+      facts.map.with_index do |(role, (type, data)), index|
+        association(
+          :coordinator_read_development_artifact_observation_fact_link,
+          strategy: :build,
+          observation: nil,
+          observation_id:,
+          artifact_id:,
+          role:,
+          observed_fact_event: {
+            "event_id" => SecureRandom.uuid_v7, "type" => type,
+            "stream_context" => "DevelopmentMemory", "stream_name" => "DevelopmentArtifact",
+            "stream_id" => artifact_id, "stream_revision" => index
+          },
+          observed_fact_data: { "artifact_id" => artifact_id, **data }
+        )
+      end
+    end
   end
 
   factory :coordinator_read_development_artifact_observation_fact_link,
@@ -101,7 +133,7 @@ FactoryBot.define do
     link_event_id { SecureRandom.uuid_v7 }
     observation_id { observation.observation_id }
     artifact_id { observation.artifact_id }
-    role { "artifact-property" }
+    role { "title" }
     link_event do
       {
         "event_id" => link_event_id,

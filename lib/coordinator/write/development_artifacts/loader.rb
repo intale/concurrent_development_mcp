@@ -20,18 +20,7 @@ module Coordinator::Write
       def load_with_revision(artifact_id)
         raw_events = @event_store.read(
           @stream_factory.development_artifact(artifact_id),
-          EventReadCriteria.new(
-            event_types: [
-              "DevelopmentArtifactCreated", "DevelopmentArtifactScopeChanged",
-              "DevelopmentArtifactTitleChanged", "DevelopmentArtifactKindChanged",
-              "DevelopmentArtifactLabelAdded", "DevelopmentArtifactLabelRemoved",
-              "DevelopmentArtifactSourceChanged", "DevelopmentArtifactContentChanged",
-              "DevelopmentArtifactCaptured", "DevelopmentArtifactRelationDeclared",
-              "DevelopmentArtifactRelationSuperseded"
-            ],
-            maximum_count: Types::DEVELOPMENT_ARTIFACT_HISTORY_MAXIMUM_COUNT,
-            direction: :asc
-          )
+          EventQueries::DEVELOPMENT_ARTIFACT_HISTORY
         )
         events = raw_events.map { load_event(_1) }
 
@@ -52,17 +41,7 @@ module Coordinator::Write
       def load_observation(observation_id)
         events = @event_store.read(
           @stream_factory.development_artifact_observation(observation_id),
-          EventReadCriteria.new(
-            event_types: [
-              "DevelopmentArtifactObservationRecorded",
-              "DevelopmentArtifactObservationFactLinked",
-              "DevelopmentArtifactClassificationCorrectionRecorded",
-              "DevelopmentArtifactObserved",
-              "DevelopmentArtifactClassificationCorrected"
-            ],
-            maximum_count: Types::DEVELOPMENT_ARTIFACT_OBSERVATION_HISTORY_MAXIMUM_COUNT,
-            direction: :asc
-          )
+          EventQueries::DEVELOPMENT_ARTIFACT_OBSERVATION_HISTORY
         ).map { load_event(_1) }
 
         Domain::DevelopmentArtifacts::ObservationState.reduce(events)

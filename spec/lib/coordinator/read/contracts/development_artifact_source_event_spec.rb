@@ -8,10 +8,10 @@ RSpec.describe Coordinator::Read::Contracts::DevelopmentArtifactSourceEvent do
   let(:base) do
     {
       event_type: "DevelopmentArtifactRelationDeclared",
-      schema_version: 1,
+      schema_version: 2,
       stream_context: "DevelopmentMemory",
-      stream_name: "DevelopmentArtifact",
-      stream_id: artifact_id,
+      stream_name: "DevelopmentArtifactRelation",
+      stream_id: relation_id,
       stream_revision: 1,
       global_position: 1,
       command_id: "command-1",
@@ -22,8 +22,8 @@ RSpec.describe Coordinator::Read::Contracts::DevelopmentArtifactSourceEvent do
     }
   end
 
-  it "accepts legacy relation facts on the artifact stream" do
-    expect(contract.call(base)).to be_success
+  it "rejects relation facts on the artifact stream" do
+    expect(contract.call(base.merge(stream_name: "DevelopmentArtifact", stream_id: artifact_id))).to be_failure
   end
 
   it "accepts current relation facts on their dedicated relation stream" do
@@ -40,7 +40,7 @@ RSpec.describe Coordinator::Read::Contracts::DevelopmentArtifactSourceEvent do
   end
 
   it "rejects a legacy relation fact on the relation stream" do
-    result = contract.call(base.merge(stream_name: "DevelopmentArtifactRelation"))
+    result = contract.call(base.merge(schema_version: 1))
 
     expect(result).to be_failure
   end

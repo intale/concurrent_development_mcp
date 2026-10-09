@@ -3,13 +3,11 @@ module Coordinator
     module Domain
       module DevelopmentArtifacts
         class State < Shared::Value
-          type capture_event = Events::DevelopmentArtifactCapturedV2
           type granular_event = Events::DevelopmentArtifactCreatedV1 | Events::DevelopmentArtifactScopeChangedV1 | Events::DevelopmentArtifactTitleChangedV1 | Events::DevelopmentArtifactKindChangedV1 | Events::DevelopmentArtifactLabelAddedV1 | Events::DevelopmentArtifactLabelRemovedV1 | Events::DevelopmentArtifactSourceChangedV1 | Events::DevelopmentArtifactContentChangedV1
           def self.initial: () -> State
-          type history_event = capture_event | granular_event | Events::DevelopmentArtifactRelationDeclaredV1 | Events::DevelopmentArtifactRelationSupersededV1
+          type history_event = granular_event
 
           def self.reduce: (Array[history_event] events, ?metadata_by_event: Hash[Integer, Hash[String, untyped]]) -> State
-          def capture: () -> capture_event?
           def created: () -> Events::DevelopmentArtifactCreatedV1?
           def scope: () -> Events::DevelopmentArtifactScopeChangedV1?
           def title: () -> Events::DevelopmentArtifactTitleChangedV1?
@@ -19,12 +17,6 @@ module Coordinator
           def content: () -> Events::DevelopmentArtifactContentChangedV1?
           def content_metadata: () -> Write::DevelopmentArtifacts::ContentDescriptorV1?
           def source_collector: () -> String?
-          def relations: () -> Array[Events::DevelopmentArtifactRelationDeclaredV1]
-          def supersessions: () -> Array[Events::DevelopmentArtifactRelationSupersededV1]
-          def relation: (String relation_id) -> Events::DevelopmentArtifactRelationDeclaredV1?
-          def supersession_for: (String relation_id) -> Events::DevelopmentArtifactRelationSupersededV1?
-          def active_relation: (String relation_id) -> Events::DevelopmentArtifactRelationDeclaredV1?
-          def active_relations: () -> Array[Events::DevelopmentArtifactRelationDeclaredV1]
         end
       end
     end

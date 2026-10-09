@@ -75,7 +75,7 @@ module Coordinator::Write
 
       def decide(command:, state:, current_revision:)
         return @decider.call(artifact_id: command.artifact_id, changes: command.changes, state:) unless
-          state.created || state.capture
+          state.created
         return revision_conflict(command, current_revision) unless current_revision == command.expected_revision
 
         @decider.call(artifact_id: command.artifact_id, changes: command.changes, state:)

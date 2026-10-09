@@ -156,7 +156,7 @@ module Coordinator::Write
       end
 
       def value_of(value, attribute)
-        value.respond_to?(attribute) ? value.public_send(attribute) : value
+        value&.public_send(attribute)
       end
 
       def event_metadata(event, command)

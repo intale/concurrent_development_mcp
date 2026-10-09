@@ -34,51 +34,15 @@ RSpec.describe "Development Artifact queries", :read_model do
     expect(content.warnings.sole).to include("passive data")
   end
 
-  it "serves pre-cutover projected identities until the migration rebuilds the read side" do
-    artifact = create(
-      :coordinator_read_development_artifact,
-      artifact_id: "artifact:v1:#{'b' * 64}"
-    )
-    observation = create(
-      :coordinator_read_development_artifact_observation,
-      artifact:,
-      observation_id: "artifact-observation:v1:#{'c' * 64}"
-    )
-    peer = create(
-      :coordinator_read_development_artifact,
-      artifact_id: "artifact:v1:#{'d' * 64}"
-    )
-    create(
-      :coordinator_read_development_artifact_observation,
-      artifact: peer,
-      observation_id: "artifact-observation:v1:#{'e' * 64}"
-    )
-    create(
-      :coordinator_read_development_artifact_relation,
-      source_artifact: artifact,
-      relation_id: "artifact-relation:v1:#{'f' * 64}",
-      target_id: peer.artifact_id
-    )
+  it "rejects retired digest-derived identifiers at public read boundaries" do
+    artifact_id = "artifact:v1:#{'b' * 64}"
+    observation_id = "artifact-observation:v1:#{'c' * 64}"
+    get = Coordinator::Read::Queries::DevelopmentArtifactGet.new.call(artifact_id:, observation_id:).value!
+    content = Coordinator::Read::Queries::DevelopmentArtifactContentGet.new.call(artifact_id:).value!
 
-    get = Coordinator::Read::Queries::DevelopmentArtifactGet.new.call(
-      artifact_id: artifact.artifact_id,
-      observation_id: observation.observation_id
-    ).value!
-    content = Coordinator::Read::Queries::DevelopmentArtifactContentGet.new.call(
-      artifact_id: artifact.artifact_id
-    ).value!
-
-    expect(get).to have_attributes(status: "ok")
-    expect(get.data.artifact.artifact).to have_attributes(
-      artifact_id: artifact.artifact_id,
-      observation_id: observation.observation_id
-    )
-    expect(get.data.artifact.relationships.sole).to have_attributes(
-      relation_id: "artifact-relation:v1:#{'f' * 64}",
-      peer_id: peer.artifact_id,
-      follow_action: nil
-    )
-    expect(content.data.content).to have_attributes(artifact_id: artifact.artifact_id)
+    expect(get).to have_attributes(status: "invalid")
+    expect(content).to have_attributes(status: "invalid")
+    expect(Coordinator::Read::DevelopmentArtifact.count).to eq(0)
   end
 
   it "reports invalid and unavailable projected artifacts without consulting the write side" do

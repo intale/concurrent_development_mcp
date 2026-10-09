@@ -516,37 +516,18 @@ module Coordinator::Read
           source,
           Coordinator::Write::Events::DevelopmentArtifactObservationRecordedV1
         )
-        legacy_observed_event = event_for_any_payload(
-          source,
-          Coordinator::Write::Events::DevelopmentArtifactObservedV1
-        )
-        capture_event = event_for_any_payload(
-          source,
-          Coordinator::Write::Events::DevelopmentArtifactCapturedV2
-        )
-        if created_event || recorded_event || source.persisted_events.empty?
-          artifact = command.artifact
-          observed = command.observation
-          outcome = if created_event
-                      "captured"
-          elsif recorded_event
-                      "observed"
-          else
-                      "existing"
-          end
-          recorded_at = event_timestamp(recorded_event || created_event) || source.completed_at
+        artifact = command.artifact
+        observed = command.observation
+        fact_link = payload(source, Coordinator::Write::Events::DevelopmentArtifactObservationFactLinkedV1)
+        artifact_id = fact_link&.artifact_id || artifact.artifact_id
+        outcome = if created_event
+                    "captured"
+        elsif recorded_event
+                    "observed"
         else
-          observation = payload(source, Coordinator::Write::Events::DevelopmentArtifactObservedV1) ||
-                        load_observation(command.observation.observation_id).observation
-          capture = payload(source, Coordinator::Write::Events::DevelopmentArtifactCapturedV2) || load_first(
-            @stream_factory.development_artifact(observation.observation.artifact_id),
-            Coordinator::Write::EventQueries::DEVELOPMENT_ARTIFACT_CAPTURE
-          )
-          artifact = capture.artifact
-          observed = observation.observation
-          outcome = legacy_observed_event ? "observed" : "existing"
-          recorded_at = event_timestamp(legacy_observed_event || capture_event) || source.completed_at
+                    "existing"
         end
+        recorded_at = event_timestamp(recorded_event || created_event) || source.completed_at
         completion(
           source,
           summary: {
@@ -555,7 +536,7 @@ module Coordinator::Read
             "existing" => "Development Artifact observation already exists."
           }.fetch(outcome),
           data: Coordinator::Write::CommandReceiptData::DevelopmentArtifactCapture.new(
-            artifact_id: artifact.artifact_id,
+            artifact_id:,
             observation_id: observed.observation_id,
             classification_revision: 1,
             scope: observed.scope,
@@ -569,7 +550,7 @@ module Coordinator::Read
             Coordinator::Write::NextAction.new(
               tool: "development_artifact_get",
               arguments: Coordinator::Write::NextAction::DevelopmentArtifactArguments.new(
-                artifact_id: artifact.artifact_id,
+                artifact_id:,
                 observation_id: observed.observation_id
               )
             )
@@ -580,28 +561,18 @@ module Coordinator::Read
       def development_artifact_classification(source, args:)
         command = source.command
         history = load_observation_payloads(command.observation_id)
-        granular = history.any? do |event|
-          event.is_a?(Coordinator::Write::Events::DevelopmentArtifactObservationRecordedV1) ||
-            event.is_a?(Coordinator::Write::Events::DevelopmentArtifactObservationFactLinkedV1) ||
-            event.is_a?(Coordinator::Write::Events::DevelopmentArtifactClassificationCorrectionRecordedV1)
-        end
-        correction = payload(source, Coordinator::Write::Events::DevelopmentArtifactClassificationCorrectedV1)
         correction_record = payload(
           source,
           Coordinator::Write::Events::DevelopmentArtifactClassificationCorrectionRecordedV1
         )
-        outcome = correction || correction_record ? "corrected" : "existing"
-        state = granular ? nil : ArtifactObservationState.reduce(history)
-        artifact_id = correction&.artifact_id || correction_record&.artifact_id ||
-          (granular ? observation_artifact_id(history) : state.observation.observation.artifact_id)
-        title = correction&.title || command.title || state&.title
-        kind = correction&.kind || command.kind || state&.kind
-        labels = correction&.labels || command.labels || state&.labels
-        revision = correction&.classification_revision || correction_record&.classification_revision ||
-          (granular ? granular_classification_revision(history) : state.classification_revision)
+        outcome = correction_record ? "corrected" : "existing"
+        artifact_id = correction_record&.artifact_id || observation_artifact_id(history)
+        title = command.title
+        kind = command.kind
+        labels = command.labels
+        revision = correction_record&.classification_revision || granular_classification_revision(history)
         corrected_event = event_for_any_payload(
           source,
-          Coordinator::Write::Events::DevelopmentArtifactClassificationCorrectedV1,
           Coordinator::Write::Events::DevelopmentArtifactClassificationCorrectionRecordedV1
         )
         raise InvalidProjectionSource, "Classification source has no Artifact identity" unless artifact_id
@@ -695,16 +666,13 @@ module Coordinator::Read
         command = source.command
         declaration_event = event_for_any_payload(
           source,
-          Coordinator::Write::Events::DevelopmentArtifactRelationDeclaredV1,
           Coordinator::Write::Events::DevelopmentArtifactRelationDeclaredV2
         ) || load_artifact_relation_event(command)
         declaration = load_payload(declaration_event)
         artifact_relation = relation_from_declaration(declaration)
-        supersession = payload(source, Coordinator::Write::Events::DevelopmentArtifactRelationSupersededV1) ||
-                       payload(source, Coordinator::Write::Events::DevelopmentArtifactRelationSupersededV2)
+        supersession = payload(source, Coordinator::Write::Events::DevelopmentArtifactRelationSupersededV2)
         supersession_event = event_for_any_payload(
           source,
-          Coordinator::Write::Events::DevelopmentArtifactRelationSupersededV1,
           Coordinator::Write::Events::DevelopmentArtifactRelationSupersededV2
         )
         outcome = if supersession
@@ -743,10 +711,6 @@ module Coordinator::Read
       end
 
       def relation_from_declaration(declaration)
-        return declaration.artifact_relation if declaration.is_a?(
-          Coordinator::Write::Events::DevelopmentArtifactRelationDeclaredV1
-        )
-
         Coordinator::Write::DevelopmentArtifacts::RelationV1.new(
           relation_id: declaration.relation_id,
           source_artifact_id: declaration.source_artifact_id,
@@ -769,8 +733,7 @@ module Coordinator::Read
       def superseded_relation_id(supersession)
         return unless supersession
 
-        supersession.respond_to?(:superseded_relation_id) ?
-          supersession.superseded_relation_id : supersession.relation_id
+        supersession.relation_id
       end
 
       def repository_registration(source)
@@ -967,10 +930,6 @@ module Coordinator::Read
         event
       end
 
-      def load_observation(observation_id)
-        ArtifactObservationState.reduce(load_observation_payloads(observation_id))
-      end
-
       def load_observation_payloads(observation_id)
         @event_store.read(
           @stream_factory.development_artifact_observation(observation_id),
@@ -983,8 +942,6 @@ module Coordinator::Read
           case event
           when Coordinator::Write::Events::DevelopmentArtifactObservationFactLinkedV1
             event.artifact_id
-          when Coordinator::Write::Events::DevelopmentArtifactObservedV1
-            event.observation.artifact_id
           end
         end.first
       end
@@ -997,18 +954,16 @@ module Coordinator::Read
 
       def load_artifact_relation_event(command)
         marker = @development_artifact_marker_builder.relation_natural_key(command.artifact_relation)
-        event = %w[DevelopmentArtifact DevelopmentArtifactRelation].lazy.map do |stream_name|
-          @event_store.read_global_marked(
+        event = @event_store.read_global_marked(
             Coordinator::Write::GlobalMarkedEventReadCriteria.new(
               stream_context: "DevelopmentMemory",
-              stream_name:,
+              stream_name: "DevelopmentArtifactRelation",
               event_types: [ "DevelopmentArtifactRelationDeclared" ],
               markers: [ marker ],
               maximum_count: 1,
               direction: :asc
             )
-          ).first
-        end.find(&:itself)
+        ).first
         raise InvalidProjectionSource, "Development Artifact relation source does not exist" unless event
 
         event

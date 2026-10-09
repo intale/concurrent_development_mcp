@@ -16,23 +16,6 @@ module Coordinator::Write
         @compound_marker_builder = compound_marker_builder
       end
 
-      def capture(event:, command_id:)
-        markers = [ "command:#{command_id}" ]
-        case event
-        when Events::DevelopmentArtifactCapturedV2
-          markers << "development-artifact:#{event.artifact.artifact_id}"
-          markers << natural_key(event.artifact)
-        when Events::DevelopmentArtifactObservedV1
-          markers << "development-artifact:#{event.observation.artifact_id}"
-          markers << "development-artifact-observation:#{event.observation.observation_id}"
-        when Events::DevelopmentArtifactCreatedV1
-          markers << "development-artifact:#{event.artifact_id}"
-        else
-          raise "Unexpected Development Artifact capture event #{event.class.name}"
-        end
-        markers.freeze
-      end
-
       def artifact(event:, command_id:, natural_key: nil)
         markers = [ "development-artifact:#{event.artifact_id}", "command:#{command_id}" ]
         markers << natural_key if natural_key
@@ -80,15 +63,6 @@ module Coordinator::Write
         ].freeze
       end
 
-      def relation_v2(artifact_relation:, command_id:)
-        [
-          "development-artifact:#{artifact_relation.source_artifact_id}",
-          "development-artifact-relation:#{artifact_relation.relation_id}",
-          relation_natural_key(artifact_relation),
-          "command:#{command_id}"
-        ].freeze
-      end
-
       def relation_natural_key(artifact_relation)
         target = artifact_relation.target
         components = [
@@ -121,7 +95,7 @@ module Coordinator::Write
       def supersession(event:, command_id:)
         markers = [
           "development-artifact:#{event.source_artifact_id}",
-          "development-artifact-relation:#{event.respond_to?(:superseded_relation_id) ? event.superseded_relation_id : event.relation_id}",
+          "development-artifact-relation:#{event.relation_id}",
           "command:#{command_id}"
         ]
         markers.insert(2, "development-artifact-relation:#{event.replacement_relation_id}") if event.replacement_relation_id

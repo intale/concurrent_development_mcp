@@ -222,8 +222,8 @@ RSpec.describe "ART-01 MCP Development Artifacts" do
       "scope" => "project:alpha",
       "classification_revision" => 1,
       "classification_reason" => nil,
-      "observed" => include("event" => include("type" => "DevelopmentArtifactObserved")),
-      "classified" => include("event" => include("type" => "DevelopmentArtifactObserved"))
+      "observed" => include("event" => include("type" => "DevelopmentArtifactObservationRecorded")),
+      "classified" => include("event" => include("type" => "DevelopmentArtifactObservationRecorded"))
     )
     expect(metadata.to_s).not_to include("Current MCP artifact body", "Observed MCP artifact body")
     projected_content = content.dig("data", "content")
@@ -950,7 +950,7 @@ RSpec.describe "ART-01 MCP Development Artifacts" do
           DevelopmentArtifactLabelRemoved
           DevelopmentArtifactSourceChanged
           DevelopmentArtifactContentChanged
-          DevelopmentArtifactCaptured
+
         ],
         maximum_count: Coordinator::Shared::Types::DEVELOPMENT_ARTIFACT_HISTORY_MAXIMUM_COUNT,
         direction: :asc
@@ -966,8 +966,8 @@ RSpec.describe "ART-01 MCP Development Artifacts" do
           DevelopmentArtifactObservationRecorded
           DevelopmentArtifactObservationFactLinked
           DevelopmentArtifactClassificationCorrectionRecorded
-          DevelopmentArtifactObserved
-          DevelopmentArtifactClassificationCorrected
+
+
         ],
         maximum_count: Coordinator::Shared::Types::DEVELOPMENT_ARTIFACT_OBSERVATION_HISTORY_MAXIMUM_COUNT,
         direction: :asc

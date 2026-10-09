@@ -9,7 +9,6 @@ module Coordinator::Read
         required(:event_type).filled(
           :string,
           included_in?: %w[
-            DevelopmentArtifactCaptured
             DevelopmentArtifactCreated
             DevelopmentArtifactScopeChanged
             DevelopmentArtifactTitleChanged
@@ -18,11 +17,9 @@ module Coordinator::Read
             DevelopmentArtifactLabelRemoved
             DevelopmentArtifactSourceChanged
             DevelopmentArtifactContentChanged
-            DevelopmentArtifactObserved
             DevelopmentArtifactObservationRecorded
             DevelopmentArtifactObservationFactLinked
             DevelopmentArtifactClassificationCorrectionRecorded
-            DevelopmentArtifactClassificationCorrected
             DevelopmentArtifactRelationDeclared
             DevelopmentArtifactRelationSuperseded
           ]
@@ -54,7 +51,7 @@ module Coordinator::Read
         pattern =
           if values[:stream_name] == "DevelopmentArtifactObservation"
             Types::DEVELOPMENT_ARTIFACT_OBSERVATION_ID_PATTERN
-          elsif values[:stream_name] == "DevelopmentArtifactRelation" && values[:schema_version] == 2
+          elsif values[:stream_name] == "DevelopmentArtifactRelation"
             Types::DEVELOPMENT_ARTIFACT_RELATION_ID_PATTERN
           else
             Types::DEVELOPMENT_ARTIFACT_ID_PATTERN
@@ -64,16 +61,14 @@ module Coordinator::Read
 
       rule(:event_type, :stream_name) do
         observation_event = %w[
-          DevelopmentArtifactObserved
           DevelopmentArtifactObservationRecorded
           DevelopmentArtifactObservationFactLinked
-          DevelopmentArtifactClassificationCorrected
           DevelopmentArtifactClassificationCorrectionRecorded
         ].include?(values[:event_type])
         relation_event = %w[DevelopmentArtifactRelationDeclared DevelopmentArtifactRelationSuperseded].include?(values[:event_type])
         expected_stream = if observation_event
           "DevelopmentArtifactObservation"
-        elsif relation_event && values[:schema_version] == 2
+        elsif relation_event
           "DevelopmentArtifactRelation"
         else
           "DevelopmentArtifact"
@@ -82,9 +77,7 @@ module Coordinator::Read
       end
 
       rule(:event_type, :schema_version) do
-        expected_version = values[:event_type] == "DevelopmentArtifactCaptured" ? 2 : 1
-        expected_version = 2 if %w[DevelopmentArtifactRelationDeclared DevelopmentArtifactRelationSuperseded].include?(values[:event_type]) &&
-          values[:stream_name] == "DevelopmentArtifactRelation"
+        expected_version = %w[DevelopmentArtifactRelationDeclared DevelopmentArtifactRelationSuperseded].include?(values[:event_type]) ? 2 : 1
         next if values[:schema_version] == expected_version
 
         key(:schema_version).failure("must be #{expected_version} for this Artifact event type")

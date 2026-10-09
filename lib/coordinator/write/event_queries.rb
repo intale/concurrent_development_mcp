@@ -166,16 +166,17 @@ module Coordinator::Write
 
     DEVELOPMENT_ARTIFACT_HISTORY = EventReadCriteria.new(
       event_types: [
-        "DevelopmentArtifactCaptured",
-        "DevelopmentArtifactRelationDeclared",
-        "DevelopmentArtifactRelationSuperseded"
+        "DevelopmentArtifactCreated", "DevelopmentArtifactScopeChanged",
+        "DevelopmentArtifactTitleChanged", "DevelopmentArtifactKindChanged",
+        "DevelopmentArtifactLabelAdded", "DevelopmentArtifactLabelRemoved",
+        "DevelopmentArtifactSourceChanged", "DevelopmentArtifactContentChanged"
       ],
       maximum_count: Types::DEVELOPMENT_ARTIFACT_HISTORY_MAXIMUM_COUNT,
       direction: :asc
     )
 
     DEVELOPMENT_ARTIFACT_CAPTURE = EventReadCriteria.new(
-      event_types: [ "DevelopmentArtifactCaptured" ],
+      event_types: [ "DevelopmentArtifactCreated" ],
       maximum_count: 1,
       direction: :asc
     )
@@ -184,9 +185,7 @@ module Coordinator::Write
       event_types: [
         "DevelopmentArtifactObservationRecorded",
         "DevelopmentArtifactObservationFactLinked",
-        "DevelopmentArtifactClassificationCorrectionRecorded",
-        "DevelopmentArtifactObserved",
-        "DevelopmentArtifactClassificationCorrected"
+        "DevelopmentArtifactClassificationCorrectionRecorded"
       ],
       maximum_count: Types::DEVELOPMENT_ARTIFACT_OBSERVATION_HISTORY_MAXIMUM_COUNT,
       direction: :asc

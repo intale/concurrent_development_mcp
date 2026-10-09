@@ -200,7 +200,7 @@ RSpec.describe Coordinator::Read::CommandResults::Assembler, :event_store do
         outcome: "observed",
         content_sha256: content.content_sha256
       )
-      expect(result.emitted_events.map(&:event_id)).to eq([ observation.id ])
+      expect(result.emitted_events.map(&:event_id)).to eq(observation.map(&:id))
     end
   end
 
@@ -578,45 +578,38 @@ RSpec.describe Coordinator::Read::CommandResults::Assembler, :event_store do
   end
 
   def append_canonical_artifact
-    source_command_id = SecureRandom.uuid_v7
-    artifact = Coordinator::Write::DevelopmentArtifacts::ArtifactV2.new(
-      proposed_artifact.to_h.merge(artifact_id: canonical_artifact_id)
-    )
-    payload = Coordinator::Write::Events::DevelopmentArtifactCapturedV2.new(
-      artifact:,
-      captured_at: occurred_at
-    )
     append(
       streams.development_artifact(canonical_artifact_id),
-      payload,
-      metadata: command_metadata(
-        command_id: source_command_id,
-        policy_version: "development-artifact-repository/v1"
-      ),
-      markers: Coordinator::Write::DevelopmentArtifacts::MarkerBuilder.new.capture(
-        event: payload,
-        command_id: source_command_id
-      )
+      Coordinator::Write::Events::DevelopmentArtifactCreatedV1.new(artifact_id: canonical_artifact_id),
+      metadata: command_metadata(policy_version: "development-artifact-repository/v1"),
+      markers: []
     )
   end
 
   def append_canonical_artifact_observation
-    observation = Coordinator::Write::DevelopmentArtifacts::ArtifactObservationV1.new(
-      proposed_observation.to_h.merge(artifact_id: canonical_artifact_id)
-    )
-    payload = Coordinator::Write::Events::DevelopmentArtifactObservedV1.new(
-      observation:,
-      recorded_at: occurred_at
-    )
-    append(
+    recorded = append(
       streams.development_artifact_observation(observation_id),
-      payload,
+      Coordinator::Write::Events::DevelopmentArtifactObservationRecordedV1.new(observation_id:),
       metadata: command_metadata(policy_version: "development-artifact-repository/v1"),
-      markers: Coordinator::Write::DevelopmentArtifacts::MarkerBuilder.new.capture(
-        event: payload,
-        command_id:
-      )
+      markers: [ "command:#{command_id}" ]
     )
+    fact = event_store.read(streams.development_artifact(canonical_artifact_id), Coordinator::Write::EventQueries::DEVELOPMENT_ARTIFACT_CAPTURE).sole
+    linked = append(
+      streams.development_artifact_observation(observation_id),
+      Coordinator::Write::Events::DevelopmentArtifactObservationFactLinkedV1.new(
+        observation_id:,
+        artifact_id: canonical_artifact_id,
+        role: "created",
+        observed_fact: Coordinator::Write::EventReference.new(
+          event_id: fact.id, type: fact.type, stream_context: fact.stream.context,
+          stream_name: fact.stream.stream_name, stream_id: fact.stream.stream_id,
+          stream_revision: fact.stream_revision
+        )
+      ),
+      metadata: command_metadata(policy_version: "development-artifact-repository/v1"),
+      markers: [ "command:#{command_id}" ]
+    )
+    [ recorded, linked ]
   end
 
   def append_canonical_artifact_relation
@@ -624,12 +617,18 @@ RSpec.describe Coordinator::Read::CommandResults::Assembler, :event_store do
     relation = Coordinator::Write::DevelopmentArtifacts::RelationV1.new(
       proposed_relation.to_h.merge(relation_id: canonical_relation_id)
     )
-    payload = Coordinator::Write::Events::DevelopmentArtifactRelationDeclaredV1.new(
-      artifact_relation: relation,
-      declared_at: occurred_at
+    payload = Coordinator::Write::Events::DevelopmentArtifactRelationDeclaredV2.new(
+      relation_id: canonical_relation_id,
+      source_artifact_id: relation.source_artifact_id,
+      relation: relation.relation,
+      target_kind: relation.target.kind,
+      target_id: relation.target.id,
+      path: relation.relation_attributes.path,
+      fragment: relation.relation_attributes.fragment,
+      normalized_locator: relation.relation_attributes.normalized_locator
     )
     append(
-      streams.development_artifact(source_artifact_id),
+      streams.development_artifact_relation(canonical_relation_id),
       payload,
       metadata: command_metadata(
         command_id: source_command_id,

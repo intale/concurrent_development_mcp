@@ -62,7 +62,7 @@ module Coordinator::Write
           code: :development_artifact_identity_conflict,
           message: "Artifact UUIDv7 is already occupied",
           details: { artifact_id: command.artifact.artifact_id }
-        )) if state.created || state.capture
+        )) if state.created
 
         fact_references = proposed_fact_references(command.artifact.artifact_id, command, preparation)
         decision_result = @decider.call(

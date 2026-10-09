@@ -96,7 +96,7 @@ module Coordinator::Write
           [
             @stream_factory.development_artifact(target.id),
             EventReadCriteria.new(
-              event_types: [ "DevelopmentArtifactCreated", "DevelopmentArtifactCaptured" ],
+              event_types: [ "DevelopmentArtifactCreated" ],
               maximum_count: 1,
               direction: :asc
             ),

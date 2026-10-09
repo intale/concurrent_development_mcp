@@ -11,7 +11,7 @@ module Coordinator::Write
         end
 
         def call(artifact_id:, changes:, state:)
-          return missing(artifact_id) unless state.created || state.capture
+          return missing(artifact_id) unless state.created
 
           writes = []
           changed_properties = []
@@ -28,7 +28,7 @@ module Coordinator::Write
             changed_properties << "kind"
           end
           if changes.labels
-            existing = Array(state.labels).map { value_of(_1, :label) }
+            existing = Array(state.labels)
             (changes.labels - existing).each do |label|
               writes << write(artifact_id, Events::DevelopmentArtifactLabelAddedV1.new(artifact_id:, label:))
             end
@@ -71,7 +71,7 @@ module Coordinator::Write
         end
 
         def value_of(value, attribute)
-          value.respond_to?(attribute) ? value.public_send(attribute) : value
+          value&.public_send(attribute)
         end
 
         def content_changed?(current, incoming, current_metadata)
@@ -80,7 +80,7 @@ module Coordinator::Write
           incoming_representation = incoming.respond_to?(:text) ? incoming.text : incoming.base64
           current_representation = value_of(current, :content)
           return true unless current_representation == incoming_representation
-          # A legacy or malformed fact without its server-computed descriptor is
+          # A fact without its server-computed descriptor is
           # not sufficient evidence for a no-op. Re-emit the canonical fact so
           # subsequent decisions can compare the complete representation.
           return true unless current_metadata

@@ -837,3 +837,36 @@ Then("the next cursor exposes the active replacement once without regressing the
   )
   assert_acceptance_equal("active", page.fetch("items").sole.fetch("status"), "Replacement status")
 end
+
+Then("Artifact evidence uses current facts and native event timestamps") do
+  @artifact_outcomes.each do |outcome|
+    artifact_id = outcome.dig("data", "artifact_id")
+    observation_id = outcome.dig("data", "observation_id")
+    facts = artifact_events(artifact_id)
+    observation_facts = artifact_observation_events(observation_id)
+    created = facts.find { _1.type == "DevelopmentArtifactCreated" }
+    recorded = observation_facts.find { _1.type == "DevelopmentArtifactObservationRecorded" }
+    view = artifact_view(artifact_id, observation_id:).dig("data", "artifact", "artifact")
+
+    assert_acceptance_equal([ "artifact_id" ], created.data.keys, "Minimal creation fact")
+    assert_acceptance_equal([ "observation_id" ], recorded.data.keys, "Minimal observation fact")
+    assert_acceptance_equal(created.id, view.dig("captured", "event", "event_id"), "Creation source identity")
+    assert_acceptance_equal(recorded.id, view.dig("observed", "event", "event_id"), "Observation source identity")
+    assert_acceptance_equal(created.created_at.utc.iso8601(6), view.dig("captured", "occurred_at"), "Native creation time")
+    assert_acceptance_equal(recorded.created_at.utc.iso8601(6), view.dig("observed", "occurred_at"), "Native observation time")
+    (facts + observation_facts).each do |event|
+      assert_acceptance_equal(1, event.metadata.fetch("schema_version"), "Current granular schema")
+      assert_acceptance(
+        Coordinator::Shared::Types::UUID_V7_PATTERN.match?(event.stream.stream_id),
+        "UUIDv7 Artifact stream identity"
+      )
+      assert_acceptance((event.data.keys & %w[captured_at recorded_at corrected_at completed_at]).empty?, "Duplicated occurrence time")
+    end
+    content = facts.find { _1.type == "DevelopmentArtifactContentChanged" }
+    assert_acceptance_equal(%w[artifact_id content], content.data.keys.sort, "Cohesive content data")
+    assert_acceptance(
+      %w[encoding media_type byte_size content_sha256].all? { content.metadata.key?(_1) },
+      "Typed server-computed content descriptors"
+    )
+  end
+end

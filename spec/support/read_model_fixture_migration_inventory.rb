@@ -75,6 +75,7 @@ module ReadModelFixtureMigrationInventory
   # several streams. Their source/envelope fixtures use the real event store,
   # not commands, subscriptions or a full write-to-read fixture journey.
   PERSISTED_SOURCE_PROJECTOR_SPECS = %w[
+    spec/lib/coordinator/read/projectors/development_artifacts_v1_spec.rb
     spec/lib/coordinator/read/projectors/skills_v1_spec.rb
   ].freeze
 end

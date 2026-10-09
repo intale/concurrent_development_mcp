@@ -437,112 +437,6 @@ module Coordinator::Read
         )
       end
 
-      def store_capture(event:, capture:)
-        artifact = capture.artifact
-        record = Coordinator::Read::DevelopmentArtifact.find_by(artifact_id: artifact.artifact_id)
-        verify_artifact!(record, artifact) if record
-        record ||= Coordinator::Read::DevelopmentArtifact.new(artifact_id: artifact.artifact_id)
-        record.assign_attributes(capture_attributes(event, capture))
-        record.stream_revision = [ record.stream_revision.to_i, event.stream_revision ].max
-        save_projection!(record, event)
-        record
-      end
-
-      def store_observation(event:, observed:)
-        observation = observed.observation
-        record = Coordinator::Read::DevelopmentArtifactObservation.find_or_initialize_by(
-          observation_id: observation.observation_id
-        )
-        verify_observation_identity!(record, observation) if record.artifact_id
-        return record if record.observed_event&.fetch("event_id") == event.id
-
-        attributes = observation_attributes(event, observed)
-        if record.classification_revision <= 1
-          attributes.merge!(
-            classification_attributes(
-              event,
-              title: observation.title,
-              kind: observation.kind,
-              labels: observation.labels,
-              revision: 1,
-              reason: nil,
-              occurred_at: observed.recorded_at
-            )
-          )
-        end
-        assign_observation_change(record, attributes, global_position: event.global_position, event:)
-      end
-
-      def store_classification(event:, correction:)
-        record = Coordinator::Read::DevelopmentArtifactObservation.find_or_initialize_by(
-          observation_id: correction.observation_id
-        )
-        if record.artifact_id && record.artifact_id != correction.artifact_id
-          raise ProjectionStateError, "Artifact classification changed observation identity"
-        end
-        if record.classification_revision > correction.classification_revision
-          return record
-        end
-        if record.classification_revision == correction.classification_revision && record.classified_event
-          verify_classification!(record, correction)
-          return record
-        end
-
-        attributes = {
-          artifact_id: correction.artifact_id,
-          classification_revision: correction.classification_revision,
-          title: correction.title,
-          kind: correction.kind,
-          labels: correction.labels
-        }.merge(
-          classification_attributes(
-            event,
-            title: correction.title,
-            kind: correction.kind,
-            labels: correction.labels,
-            revision: correction.classification_revision,
-            reason: correction.reason,
-            occurred_at: correction.corrected_at
-          )
-        )
-        assign_observation_change(record, attributes, global_position: event.global_position, event:)
-      end
-
-      def store_relation(event:, declaration:)
-        relation = declaration.artifact_relation
-        record = Coordinator::Read::DevelopmentArtifactRelation.find_by(
-          relation_id: relation.relation_id
-        )
-        verify_relation!(record, relation) if record
-        record ||= Coordinator::Read::DevelopmentArtifactRelation.new(
-          relation_id: relation.relation_id
-        )
-        record.assign_attributes(relation_attributes(event, declaration))
-        save_projection!(record, event)
-        record
-      end
-
-      def store_supersession(event:, supersession:)
-        record = Coordinator::Read::DevelopmentArtifactRelationSupersession.find_by(
-          superseded_relation_id: supersession.superseded_relation_id
-        )
-        if record
-          verify_supersession!(record, supersession)
-          return record
-        end
-
-        record = Coordinator::Read::DevelopmentArtifactRelationSupersession.new(
-          superseded_relation_id: supersession.superseded_relation_id
-        )
-        record.assign_attributes(
-          supersession_attributes(event, supersession).merge(
-            observed_sequence: next_relation_observed_sequence
-          )
-        )
-        save_projection!(record, event)
-        record
-      end
-
       private
 
       def exact_locator_scope(query)
@@ -677,70 +571,6 @@ module Coordinator::Read
         ).select(:source_artifact_id)
       end
 
-      def capture_attributes(event, capture)
-        artifact = capture.artifact
-        {
-          scope: artifact.scope,
-          title: artifact.title,
-          kind: artifact.kind,
-          labels: artifact.labels,
-          **content_attributes(artifact.content),
-          source_kind: artifact.source.kind,
-          source_locator: artifact.source.locator,
-          source_revision: artifact.source.revision,
-          source_observed_at: artifact.source.observed_at,
-          source_collector: artifact.source.collector,
-          captured_event: event_reference(event).to_h,
-          captured_actor: actor(event).to_h,
-          captured_markers: event.markers,
-          captured_metadata: event.metadata,
-          captured_causation_id: event.causation_id,
-          captured_correlation_id: event.correlation_id,
-          captured_global_position: event.global_position,
-          captured_at_domain: capture.captured_at,
-          captured_at_store: event.created_at
-        }
-      end
-
-      def content_attributes(content)
-        {
-          content_encoding: content.encoding,
-          content_media_type: content.media_type,
-          content_text: content.respond_to?(:text) ? content.text : nil,
-          content_base64: content.respond_to?(:base64) ? content.base64 : nil,
-          content_sha256: content.content_sha256,
-          content_byte_size: content.byte_size
-        }
-      end
-
-      def observation_attributes(event, observed)
-        observation_value_attributes(observed.observation).merge(
-          observed_evidence_attributes(event, occurred_at: observed.recorded_at)
-        )
-      end
-
-      def observation_value_attributes(observation)
-        {
-          artifact_id: observation.artifact_id,
-          scope: observation.scope,
-          source_kind: observation.source.kind,
-          source_locator: observation.source.locator,
-          source_revision: observation.source.revision,
-          source_observed_at: observation.source.observed_at,
-          source_collector: observation.source.collector
-        }
-      end
-
-      def classification_attributes(event, title:, kind:, labels:, revision:, reason:, occurred_at:)
-        {
-          title:,
-          kind:,
-          labels:,
-          classification_revision: revision,
-          classification_reason: reason
-        }.merge(classified_evidence_attributes(event, occurred_at:))
-      end
-
       def observed_evidence_attributes(event, occurred_at:)
         evidence_attributes(event, prefix: "observed", occurred_at:)
       end
@@ -811,110 +641,8 @@ module Coordinator::Read
         record.save!(touch: false)
       end
 
-      def relation_attributes(event, declaration)
-        relation = declaration.artifact_relation
-        {
-          source_artifact_id: relation.source_artifact_id,
-          relation: relation.relation,
-          target_kind: relation.target.kind,
-          target_id: relation.target.id,
-          target_status: relation.target.status,
-          target_name: relation.target.name,
-          target_scope: relation.target.scope,
-          path: relation.relation_attributes.path,
-          fragment: relation.relation_attributes.fragment,
-          normalized_locator: relation.relation_attributes.normalized_locator,
-          declared_event: event_reference(event).to_h,
-          declared_actor: actor(event).to_h,
-          declared_markers: event.markers,
-          declared_metadata: event.metadata,
-          declared_causation_id: event.causation_id,
-          declared_correlation_id: event.correlation_id,
-          declared_global_position: event.global_position,
-          declared_at_domain: declaration.declared_at,
-          declared_at_store: event.created_at
-        }
-      end
-
       def target_status_for(target_kind)
         target_kind == "external" ? "unverified" : "verified"
-      end
-
-      def supersession_attributes(event, supersession)
-        {
-          source_artifact_id: supersession.source_artifact_id,
-          replacement_relation_id: supersession.replacement_relation_id,
-          reason: supersession.reason,
-          superseded_event: event_reference(event).to_h,
-          superseded_actor: actor(event).to_h,
-          superseded_markers: event.markers,
-          superseded_metadata: event.metadata,
-          superseded_causation_id: event.causation_id,
-          superseded_correlation_id: event.correlation_id,
-          superseded_global_position: event.global_position,
-          superseded_at_domain: supersession.superseded_at,
-          superseded_at_store: event.created_at
-        }
-      end
-
-      def verify_artifact!(record, artifact)
-        expected = content_attributes(artifact.content)
-        matches = expected.all? { |attribute, value| record.public_send(attribute) == value }
-        return if matches
-
-        raise ProjectionStateError, "Artifact identity changed across capture events"
-      end
-
-      def verify_observation_identity!(record, observation)
-        matches = record.artifact_id == observation.artifact_id
-        if matches && record.observed_event
-          matches = record.scope == observation.scope &&
-                    record.source_kind == observation.source.kind &&
-                    record.source_locator == observation.source.locator &&
-                    record.source_revision == observation.source.revision &&
-                    record.source_observed_at.utc.iso8601(6) == observation.source.observed_at &&
-                    record.source_collector == observation.source.collector
-        end
-        return if matches
-
-        raise ProjectionStateError, "Artifact observation identity changed across events"
-      end
-
-      def verify_classification!(record, correction)
-        matches = record.artifact_id == correction.artifact_id &&
-                  record.title == correction.title &&
-                  record.kind == correction.kind &&
-                  record.labels == correction.labels &&
-                  record.classification_reason == correction.reason
-        return if matches
-
-        raise ProjectionStateError, "Artifact classification revision changed across events"
-      end
-
-      def verify_relation!(record, relation)
-        attributes = relation.relation_attributes
-        matches = record.source_artifact_id == relation.source_artifact_id &&
-                  record.relation == relation.relation &&
-                  record.target_kind == relation.target.kind &&
-                  record.target_id == relation.target.id &&
-                  record.target_status == relation.target.status &&
-                  record.target_name == relation.target.name &&
-                  record.target_scope == relation.target.scope &&
-                  record.path == attributes.path &&
-                  record.fragment == attributes.fragment &&
-                  record.normalized_locator == attributes.normalized_locator
-        return if matches
-
-        raise ProjectionStateError, "Artifact relation identity changed across declaration events"
-      end
-
-      def verify_supersession!(record, supersession)
-        matches = record.source_artifact_id == supersession.source_artifact_id &&
-                  record.replacement_relation_id == supersession.replacement_relation_id &&
-                  record.reason == supersession.reason
-        return if matches
-
-        raise ProjectionStateError, "Artifact relation supersession changed across events"
       end
 
       def build_view(record, observation)
@@ -1142,18 +870,13 @@ module Coordinator::Read
             "development_artifact_observation_fact_links.role = '#{escaped_role}')"
         end.join(" AND ")
         completeness_sql = [
-          "development_artifact_observations.observed_event ->> 'type' = :legacy_type OR (",
           "development_artifact_observations.content_encoding IS NOT NULL AND ",
           "development_artifact_observations.content_media_type IS NOT NULL AND ",
           "development_artifact_observations.content_sha256 IS NOT NULL AND ",
           "development_artifact_observations.content_byte_size IS NOT NULL AND ",
-          granular_requirements,
-          ")"
+          granular_requirements
         ].join
-        relation.where(
-          completeness_sql,
-          legacy_type: "DevelopmentArtifactObserved"
-        )
+        relation.where(completeness_sql)
       end
 
       def active_relations

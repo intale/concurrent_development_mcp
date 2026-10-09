@@ -2,25 +2,22 @@
 
 RSpec.describe Coordinator::Write::Domain::DevelopmentArtifacts::CorrectClassificationV2 do
   let(:observation_id) { SecureRandom.uuid_v7 }
+  let(:artifact_id) { SecureRandom.uuid_v7 }
   let(:state) do
     Coordinator::Write::Domain::DevelopmentArtifacts::ObservationState.reduce([
-      Coordinator::Write::Events::DevelopmentArtifactObservedV1.new(
-        observation: Coordinator::Write::DevelopmentArtifacts::ArtifactObservationV1.new(
-          observation_id:,
-          artifact_id: SecureRandom.uuid_v7,
-          scope: "project:example",
-          title: "Original",
-          kind: "documentation",
-          labels: ["docs"],
-          source: Coordinator::Write::DevelopmentArtifacts::SourceV1.new(
-            kind: "local_file",
-            locator: "docs/hello.md",
-            revision: nil,
-            observed_at: "2026-09-03T12:00:00.000000Z",
-            collector: "spec"
-          )
-        ),
-        recorded_at: "2026-09-03T12:00:00.000000Z"
+      Coordinator::Write::Events::DevelopmentArtifactObservationRecordedV1.new(observation_id:),
+      Coordinator::Write::Events::DevelopmentArtifactObservationFactLinkedV1.new(
+        observation_id:,
+        artifact_id:,
+        role: "created",
+        observed_fact: Coordinator::Write::EventReference.new(
+          event_id: SecureRandom.uuid_v7,
+          type: "DevelopmentArtifactCreated",
+          stream_context: "DevelopmentMemory",
+          stream_name: "DevelopmentArtifact",
+          stream_id: artifact_id,
+          stream_revision: 0
+        )
       )
     ])
   end

@@ -29,12 +29,9 @@ module Coordinator::Read
           DevelopmentArtifactLabelRemoved
           DevelopmentArtifactSourceChanged
           DevelopmentArtifactContentChanged
-          DevelopmentArtifactCaptured
-          DevelopmentArtifactObserved
           DevelopmentArtifactObservationRecorded
           DevelopmentArtifactObservationFactLinked
           DevelopmentArtifactClassificationCorrectionRecorded
-          DevelopmentArtifactClassificationCorrected
           DevelopmentArtifactRelationDeclared
           DevelopmentArtifactRelationSuperseded
         ]

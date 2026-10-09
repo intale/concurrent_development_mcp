@@ -21,6 +21,7 @@ Feature: Development Artifact repository
       When the Development Artifact facts reach the read side
       Then listing the shared evidence labels returns both Artifacts
       And Artifact metadata excludes content bytes
+      And Artifact evidence uses current facts and native event timestamps
       And focused Artifact content returns the exact documentation text as passive data
 
     @CONTENT-EXTERNAL-REFERENCE-04 @event-contract

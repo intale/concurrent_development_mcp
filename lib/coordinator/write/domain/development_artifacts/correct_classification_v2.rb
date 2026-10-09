@@ -11,15 +11,15 @@ module Coordinator::Write
         end
 
         def call(state:, command:, artifact_state: nil, fact_event_references:)
-          return missing(command) unless state.recorded || state.observation
+          return missing(command) unless state.recorded
           expected = command.expected_revision
           return conflict(state, command) unless state.classification_revision == expected
 
           artifact_id = state.artifact_id
           return missing(command) unless artifact_id
-          current_title = artifact_state ? artifact_property(artifact_state, :title) : state.title
-          current_kind = artifact_state ? artifact_property(artifact_state, :kind) : state.kind
-          current_labels = artifact_state ? artifact_labels(artifact_state) : Array(state.labels)
+          current_title = artifact_state&.title&.title
+          current_kind = artifact_state&.kind&.kind
+          current_labels = artifact_state ? Array(artifact_state.labels) : []
           requested_labels = command.labels.uniq.sort_by(&:b)
           title_changed = current_title != command.title
           kind_changed = current_kind != command.kind
@@ -30,7 +30,7 @@ module Coordinator::Write
           revision = expected + 1
           return limit(state, command) if revision > Types::DEVELOPMENT_ARTIFACT_CLASSIFICATION_MAXIMUM_REVISIONS
 
-          return missing(command) unless artifact_state && (artifact_state.created || artifact_state.capture)
+          return missing(command) unless artifact_state&.created
 
           artifact_stream = @stream_factory.development_artifact(artifact_id)
           observation_stream = @stream_factory.development_artifact_observation(command.observation_id)
@@ -136,11 +136,6 @@ module Coordinator::Write
           ))
         end
 
-        def artifact_property(state, name)
-          event = state.public_send(name)
-          event.respond_to?(name) ? event.public_send(name) : event
-        end
-
         def fact_role(event)
           {
             Events::DevelopmentArtifactTitleChangedV1 => "title",
@@ -148,10 +143,6 @@ module Coordinator::Write
             Events::DevelopmentArtifactLabelAddedV1 => "label",
             Events::DevelopmentArtifactLabelRemovedV1 => "label"
           }.fetch(event.class)
-        end
-
-        def artifact_labels(state)
-          Array(state.labels)
         end
       end
     end

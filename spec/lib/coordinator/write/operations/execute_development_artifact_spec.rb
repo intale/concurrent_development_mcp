@@ -467,7 +467,7 @@ RSpec.describe "Development Artifact write operations", :event_store do
         event_types: %w[
           DevelopmentArtifactCreated DevelopmentArtifactScopeChanged DevelopmentArtifactTitleChanged
           DevelopmentArtifactKindChanged DevelopmentArtifactLabelAdded DevelopmentArtifactLabelRemoved
-          DevelopmentArtifactSourceChanged DevelopmentArtifactContentChanged DevelopmentArtifactCaptured
+          DevelopmentArtifactSourceChanged DevelopmentArtifactContentChanged
           DevelopmentArtifactRelationDeclared DevelopmentArtifactRelationSuperseded
         ],
         maximum_count: Coordinator::Shared::Types::DEVELOPMENT_ARTIFACT_HISTORY_MAXIMUM_COUNT,
@@ -482,8 +482,8 @@ RSpec.describe "Development Artifact write operations", :event_store do
       Coordinator::Write::EventReadCriteria.new(
         event_types: %w[
           DevelopmentArtifactObservationRecorded DevelopmentArtifactObservationFactLinked
-          DevelopmentArtifactClassificationCorrectionRecorded DevelopmentArtifactObserved
-          DevelopmentArtifactClassificationCorrected
+          DevelopmentArtifactClassificationCorrectionRecorded
+
         ],
         maximum_count: 128,
         direction: :asc

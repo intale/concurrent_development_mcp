@@ -5,8 +5,6 @@ module Coordinator
         class ObservationState < Shared::Value
           def self.initial: () -> ObservationState
           def self.reduce: (Array[Events::Base] events) -> ObservationState
-          def observation: () -> Events::DevelopmentArtifactObservedV1?
-          def corrections: () -> Array[Events::DevelopmentArtifactClassificationCorrectedV1]
           def recorded: () -> Events::DevelopmentArtifactObservationRecordedV1?
           def link: () -> Events::DevelopmentArtifactObservationFactLinkedV1?
           def links: () -> Array[Events::DevelopmentArtifactObservationFactLinkedV1]
@@ -14,9 +12,6 @@ module Coordinator
           def artifact_id: () -> String?
           def fact_event_ids: () -> Array[String]
           def classification_revision: () -> Integer
-          def title: () -> String?
-          def kind: () -> String?
-          def labels: () -> Array[String]?
         end
       end
     end
