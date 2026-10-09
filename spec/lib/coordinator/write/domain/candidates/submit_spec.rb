@@ -27,7 +27,7 @@ RSpec.describe Coordinator::Write::Domain::Candidates::Submit do
     ])
     expect(plan.events.fetch(6)).to have_attributes(
       candidate_id: "CAN-41",
-      intention_set_id: command.lease_set_id
+      intention_set_id: command.intention_set_id
     )
     expect(plan.events.fetch(7)).to have_attributes(
       candidate_id: "CAN-41",
@@ -77,69 +77,112 @@ RSpec.describe Coordinator::Write::Domain::Candidates::Submit do
     wrong_owner = attempt_state(agent_id: "agent-other")
 
     expect(decide(attempt: inactive).failure.code).to eq(:attempt_not_active)
+    expect(decide(attempt: attempt_state(status: "completed")).failure.code).to eq(:attempt_not_active)
     expect(decide(attempt: wrong_scope).failure.code).to eq(:attempt_scope_mismatch)
     expect(decide(attempt: wrong_owner).failure.code).to eq(:attempt_actor_mismatch)
+  end
+
+  it "requires the declared set to belong to the exact Attempt coordination scope" do
+    expect(decide(set: nil).failure.code).to eq(:work_intention_set_missing)
+    [
+      { set_id: uuid("9") }, { repository_id: uuid("9") },
+      { attempt_id: "A-other" }, { work_item_id: "W-other" }, { change_set_id: "CS-other" }
+    ].each do |changes|
+      expect(decide(set: intention_set(**changes)).failure.code).to eq(:work_intention_set_mismatch)
+    end
+  end
+
+  it "rejects withdrawn and expired intentions without inferring withdrawal time from their deadlines" do
+    withdrawn = decide(current_intentions: [ current_intention(withdrawn: true) ])
+    expired = decide(current_intentions: [ current_intention(expired: true) ])
+
+    expect(withdrawn.failure.code).to eq(:work_intention_set_withdrawn)
+    expect(withdrawn.failure.details).not_to have_key(:withdrawn_at)
+    expect(expired.failure.code).to eq(:work_intention_not_active)
+  end
+
+  it "rejects wrong intention scope, owner, repository base and observed fencing evidence" do
+    [
+      { set_id: uuid("9") }, { change_set_id: "CS-other" }, { work_item_id: "W-other" },
+      { attempt_id: "A-other" }, { agent_id: "agent-other" }, { repository_id: uuid("9") },
+      { object_format: "sha256" }, { base_commit_oid: "e" * 40 }
+    ].each do |changes|
+      expect(decide(current_intentions: [ current_intention(**changes) ]).failure.code)
+        .to eq(:work_intention_not_active)
+    end
+    expect(decide(current_intentions: [ current_intention(fencing_token: 2) ]).failure.code)
+      .to eq(:work_intention_observations_mismatch)
+  end
+
+  it "requires the observed Resource identity to match its intention" do
+    observation = current_intention
+    wrong_resource = Coordinator::Write::WorkIntentionResourceV1.new(
+      observation.resource.attributes.merge(resource_id: uuid("9"))
+    )
+    inconsistent = Coordinator::Write::WorkIntentionObservationV1.new(state: observation.state, resource: wrong_resource)
+
+    expect(decide(current_intentions: [ inconsistent ]).failure.code).to eq(:work_intention_not_active)
   end
 
   it "denies incomplete, stale, and inactive work-intention observations" do
     command = prepared_command
     mismatched = copy_command(
       command,
-      leases: [ Coordinator::Write::Candidates::LeaseObservationV1.new(
-        resource_id: lease_reference.resource_id,
-        lease_id: uuid("9"),
+      intentions: [ Coordinator::Write::WorkIntentionFencedReferenceV1.new(
+        resource_id: intention_reference.resource_id,
+        intention_id: uuid("9"),
         fencing_token: 1
       ) ]
     )
-    expired = current_lease(expires_at: "2026-08-23T11:29:59.000000Z")
+    expired = current_intention(expires_at: "2026-08-23T11:29:59.000000Z")
 
     expect(decide(command: mismatched).failure.code).to eq(:work_intention_observations_mismatch)
-    expect(decide(current_leases: []).failure.code).to eq(:work_intention_not_active)
-    expect(decide(current_leases: [ expired ]).failure.code).to eq(:work_intention_not_active)
+    expect(decide(current_intentions: []).failure.code).to eq(:work_intention_not_active)
+    expect(decide(current_intentions: [ expired ]).failure.code).to eq(:work_intention_not_active)
   end
 
-  it "accepts the exact lease set independently of reservation and observation order" do
-    second_reference = lease_reference_for(
+  it "accepts the exact intention set independently of declaration and observation order" do
+    second_reference = intention_reference_for(
       kind: "file",
       path: "Gemfile",
       base_blob_oid: "e" * 40,
       resource_id: uuid("7"),
-      lease_id: uuid("8")
+      intention_id: uuid("8")
     )
     command = copy_command(
       prepared_command,
-      leases: [ second_reference, lease_reference ].map do |reference|
-        Coordinator::Write::Candidates::LeaseObservationV1.new(
+      intentions: [ second_reference, intention_reference ].map do |reference|
+        Coordinator::Write::WorkIntentionFencedReferenceV1.new(
           resource_id: reference.resource_id,
-          lease_id: reference.lease_id,
+          intention_id: reference.intention_id,
           fencing_token: reference.fencing_token
         )
       end
     )
-    attempt = attempt_state(references: [ lease_reference, second_reference ])
-    current_leases = [ current_lease(reference: second_reference), current_lease ]
+    set = intention_set(references: [ intention_reference, second_reference ])
+    current_intentions = [ current_intention(reference: second_reference), current_intention ]
 
-    expect(decide(command:, attempt:, current_leases:)).to be_success
+    expect(decide(command:, set:, current_intentions:)).to be_success
   end
 
   it "denies undeclared resources and mismatched old-side base evidence" do
     undeclared_command = prepared_command(
       files: [ manifest_file(old_path: "lib/other.rb", new_path: "lib/other.rb") ]
     )
-    mismatched_reference = Coordinator::Write::LeaseReferenceV2.new(
-      lease_reference.to_h.merge(base_blob_oid: "e" * 40)
+    mismatched_reference = Coordinator::Write::WorkIntentionReceiptReferenceV1.new(
+      intention_reference.to_h.merge(base_blob_oid: "e" * 40)
     )
-    mismatched_attempt = attempt_state(reference: mismatched_reference)
-    mismatched_lease = current_lease(reference: mismatched_reference, base_blob_oid: "e" * 40)
+    mismatched_set = intention_set(reference: mismatched_reference)
+    mismatched_intention = current_intention(reference: mismatched_reference, base_blob_oid: "e" * 40)
 
     expect(decide(command: undeclared_command).failure.code).to eq(:candidate_resources_not_covered)
     expect(
-      decide(attempt: mismatched_attempt, current_leases: [ mismatched_lease ]).failure.code
+      decide(set: mismatched_set, current_intentions: [ mismatched_intention ]).failure.code
     ).to eq(:manifest_base_evidence_mismatch)
   end
 
-  it "authorizes manifest files covered by a leased directory without comparing tree evidence to blobs" do
-    reference = lease_reference_for(kind: "directory", path: "lib", base_blob_oid: "e" * 40)
+  it "authorizes manifest files covered by a declared directory without comparing tree evidence to blobs" do
+    reference = intention_reference_for(kind: "directory", path: "lib", base_blob_oid: "e" * 40)
     command = prepared_command(
       reference:,
       files: [ manifest_file(old_path: "lib/nested/example.rb", new_path: "lib/nested/example.rb") ]
@@ -147,18 +190,19 @@ RSpec.describe Coordinator::Write::Domain::Candidates::Submit do
 
     result = decide(
       command:,
-      attempt: attempt_state(reference:),
-      current_leases: [ current_lease(reference:) ]
+      set: intention_set(reference:),
+      current_intentions: [ current_intention(reference:) ]
     )
 
     expect(result).to be_success
-    expect(result.value!.events.fetch(6).intention_set_id).to eq(command.lease_set_id)
+    expect(result.value!.events.fetch(6).intention_set_id).to eq(command.intention_set_id)
   end
 
   def decide(
     command: prepared_command,
     attempt: active_attempt,
-    current_leases: [ current_lease ],
+    set: intention_set,
+    current_intentions: [ current_intention ],
     existing_candidate: nil,
     existing_head: nil
   )
@@ -167,7 +211,8 @@ RSpec.describe Coordinator::Write::Domain::Candidates::Submit do
         existing_candidate:,
         existing_head:,
         attempt:,
-        current_leases:
+        intention_set: set,
+        current_intentions:
       ),
       command:,
       submitted_at: "2026-08-23T11:30:00.000000Z",
@@ -175,7 +220,7 @@ RSpec.describe Coordinator::Write::Domain::Candidates::Submit do
     )
   end
 
-  def prepared_command(files: [ manifest_file ], build_context: nil, reference: lease_reference)
+  def prepared_command(files: [ manifest_file ], build_context: nil, reference: intention_reference)
     input = {
       command_id: "cmd-candidate-1",
       actor: { kind: "agent", id: "agent-7" },
@@ -192,7 +237,7 @@ RSpec.describe Coordinator::Write::Domain::Candidates::Submit do
       intentions: [
         {
           resource_id: reference.resource_id,
-          intention_id: reference.lease_id,
+          intention_id: reference.intention_id,
           fencing_token: reference.fencing_token
         }
       ],
@@ -209,34 +254,34 @@ RSpec.describe Coordinator::Write::Domain::Candidates::Submit do
     attempt_state
   end
 
-  def attempt_state(
-    status: "active",
-    reference: lease_reference,
-    references: [ reference ],
-    work_item_id: "W-1",
-    agent_id: "agent-7"
-  )
+  def attempt_state(status: "active", work_item_id: "W-1", agent_id: "agent-7")
     Coordinator::Write::Domain::Attempts::State.new(
-      attempt_id: "A-18",
-      change_set_id: "CS-1",
-      work_item_id:,
-      agent_id:,
-      base_snapshots: [
-        Coordinator::Write::RepositorySnapshotV1.new(
-          repository_id:,
-          object_format: "sha1",
-          commit_oid: "a" * 40
-        )
-      ],
-      lease_set_id: uuid("1"),
-      lease_repository_id: repository_id,
-      lease_policy_version: Coordinator::Write::LeaseResourceV2::POLICY_VERSION,
-      lease_resources: references,
-      lease_reserved_at: "2026-08-23T11:00:00.000000Z",
-      lease_renewed_at: nil,
-      lease_expires_at: "2026-08-23T12:00:00.000000Z",
-      lease_released_at: nil,
-      status:
+      Coordinator::Write::Domain::Attempts::State.initial.attributes.merge(
+        attempt_id: "A-18",
+        change_set_id: "CS-1",
+        work_item_id:,
+        agent_id:,
+        base_snapshots: [
+          Coordinator::Write::RepositorySnapshotV1.new(
+            repository_id:, object_format: "sha1", commit_oid: "a" * 40
+          )
+        ],
+        status:
+      )
+    )
+  end
+
+  def intention_set(reference: intention_reference, references: [ reference ], **changes)
+    Coordinator::Write::Domain::WorkIntentions::SetState.new(
+      {
+        set_id: uuid("1"), attempt_id: "A-18", change_set_id: "CS-1",
+        work_item_id: "W-1", repository_id:,
+        members: references.map do |item|
+          Coordinator::Write::WorkIntentionReferenceV1.new(
+            intention_id: item.intention_id, resource_id: item.resource_id
+          )
+        end
+      }.merge(changes)
     )
   end
 
@@ -244,7 +289,7 @@ RSpec.describe Coordinator::Write::Domain::Candidates::Submit do
     Coordinator::Write::Commands::SubmitCandidate.new(
       command.to_h.merge(
         actor: command.actor,
-        leases: command.leases,
+        intentions: command.intentions,
         manifest: command.manifest,
         build_context: command.build_context,
         actual_resources: command.actual_resources
@@ -252,58 +297,50 @@ RSpec.describe Coordinator::Write::Domain::Candidates::Submit do
     )
   end
 
-  def current_lease(
-    reference: lease_reference,
+  def current_intention(
+    reference: intention_reference,
     expires_at: "2026-08-23T12:00:00.000001Z",
-    base_blob_oid: reference.base_blob_oid
+    base_blob_oid: reference.base_blob_oid,
+    **changes
   )
-    state = Coordinator::Write::Domain::ResourceLeases::State.new(
-      lease_id: reference.lease_id,
-      lease_set_id: uuid("1"),
-      resource_id: reference.resource_id,
-      resource_kind: reference.resource_kind,
-      resource_path: reference.resource_path,
-      policy_version: Coordinator::Write::LeaseResourceV2::POLICY_VERSION,
-      mode: "exclusive",
-      change_set_id: "CS-1",
-      work_item_id: "W-1",
-      attempt_id: "A-18",
-      agent_id: "agent-7",
-      repository_id:,
-      object_format: "sha1",
-      base_commit_oid: "a" * 40,
-      base_blob_oid:,
-      fencing_token: reference.fencing_token,
-      acquired_at: "2026-08-23T11:00:00.000000Z",
-      renewed_at: nil,
-      expires_at:,
-      released_at: nil,
-      expired_at: nil
+    state = Coordinator::Write::Domain::WorkIntentions::State.new(
+      Coordinator::Write::Domain::WorkIntentions::State.initial.attributes.merge(
+        intention_id: reference.intention_id, set_id: uuid("1"), resource_id: reference.resource_id,
+        change_set_id: "CS-1", work_item_id: "W-1", attempt_id: "A-18", agent_id: "agent-7",
+        repository_id:, object_format: "sha1", base_commit_oid: "a" * 40, base_blob_oid:,
+        mode: reference.mode, purpose: reference.purpose, context: reference.context,
+        fencing_token: reference.fencing_token, expires_at:
+      ).merge(changes)
     )
-    Coordinator::Write::CurrentLeaseObservationV2.new(reference:, state:)
+    resource = Coordinator::Write::WorkIntentionResourceV1.new(
+      resource_id: reference.resource_id, kind: reference.resource_kind,
+      path: reference.resource_path, base_blob_oid:
+    )
+    Coordinator::Write::WorkIntentionObservationV1.new(state:, resource:)
   end
 
-  def lease_reference
-    @lease_reference ||= lease_reference_for(
+  def intention_reference
+    @intention_reference ||= intention_reference_for(
       kind: "file",
       path: "lib/example.rb",
       base_blob_oid: "c" * 40
     )
   end
 
-  def lease_reference_for(
+  def intention_reference_for(
     kind:,
     path:,
     base_blob_oid:,
     resource_id: kind == "file" ? uuid("5") : uuid("6"),
-    lease_id: uuid("2")
+    intention_id: uuid("2")
   )
-    Coordinator::Write::LeaseReferenceV2.new(
-      lease_id:,
+    Coordinator::Write::WorkIntentionReceiptReferenceV1.new(
+      intention_id:,
       resource_id:,
       resource_kind: kind,
       resource_path: path,
       base_blob_oid:,
+      mode: "shared", purpose: "Implement the current WorkItem", context: nil,
       fencing_token: 1
     )
   end

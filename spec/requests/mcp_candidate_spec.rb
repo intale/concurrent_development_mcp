@@ -144,6 +144,27 @@ RSpec.describe "CAN-01 MCP Candidate coordination" do
     expect(command_events("cmd-mcp-candidate-stale")).to be_empty
   end
 
+  it "completes a withdrawn-intention Candidate Task without fabricating a withdrawal timestamp", :event_store do
+    arguments = CandidateScenario.prepare(prefix: "mcp-candidate-withdrawn").fetch(:input)
+    CandidateScenario.execute(
+      Coordinator::Write::Operations::ExecuteReleaseLeaseSet,
+      arguments.slice(:actor, :change_set_id, :work_item_id, :attempt_id, :intention_set_id, :intentions)
+        .merge(command_id: "cmd-withdraw-before-candidate")
+    )
+    task_id = call_tool("candidate_submit", arguments, id: 1).dig("result", "taskId")
+    execute_task(task_id)
+    completed = task_request("tasks/get", task_id, id: 2)
+    result = completed.dig("result", "result")
+
+    expect(completed.dig("result", "status")).to eq("completed")
+    expect(result.fetch("isError")).to be(true)
+    expect(result.dig("structuredContent", "data", "code")).to eq("work_intention_set_withdrawn")
+    details = result.dig("structuredContent", "data", "details")
+    expect(details).to include("attempt_id" => arguments.fetch(:attempt_id))
+    expect(details).not_to have_key("withdrawn_at")
+    expect(CandidateScenario.candidate_events(arguments.fetch(:candidate_id))).to be_empty
+  end
+
   it "rejects malformed evidence before allocating a Task", :event_store do
     arguments = CandidateScenario.prepare(prefix: "mcp-candidate-invalid").fetch(:input)
     arguments[:intentions] = []

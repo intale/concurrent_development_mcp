@@ -43,10 +43,10 @@ module Coordinator::Write
           attempt_denial = denied_attempt(state.attempt, command)
           return attempt_denial if attempt_denial
 
-          write_set_denial = denied_write_set(state, command, submitted_at:)
-          return write_set_denial if write_set_denial
+          intention_denial = denied_work_intentions(state, command, submitted_at:)
+          return intention_denial if intention_denial
 
-          denied_manifest_resources(state.attempt, command)
+          denied_manifest_resources(state.current_intentions, command)
         end
 
         def denied_attempt(attempt, command)
@@ -70,40 +70,30 @@ module Coordinator::Write
           scoped_failure(:repository_base_mismatch, "Repository base does not match the Attempt", command)
         end
 
-        def denied_write_set(state, command, submitted_at:)
-          attempt = state.attempt
-          unless attempt.lease_set_id
+        def denied_work_intentions(state, command, submitted_at:)
+          set = state.intention_set
+          unless set && !set.absent?
             return scoped_failure(:work_intention_set_missing, "Attempt has no declared work-intention set", command)
           end
-          if attempt.lease_released_at
-            return failure(
-              :work_intention_set_withdrawn,
-              "Attempt work-intention set has been withdrawn",
-              change_set_id: command.change_set_id,
-              work_item_id: command.work_item_id,
-              attempt_id: command.attempt_id,
-              withdrawn_at: attempt.lease_released_at
-            )
-          end
-          unless attempt.lease_set_id == command.lease_set_id &&
-                 attempt.lease_repository_id == command.repository_id &&
-                 attempt.lease_policy_version == LeaseResourceV2::POLICY_VERSION
+          unless set.set_id == command.intention_set_id && set.repository_id == command.repository_id &&
+                 set.change_set_id == command.change_set_id && set.work_item_id == command.work_item_id &&
+                 set.attempt_id == command.attempt_id
             return failure(
               :work_intention_set_mismatch,
               "Work-intention set does not match the Attempt",
               change_set_id: command.change_set_id,
               work_item_id: command.work_item_id,
               attempt_id: command.attempt_id,
-              current_intention_set_id: attempt.lease_set_id,
-              requested_intention_set_id: command.lease_set_id
+              current_intention_set_id: set.set_id,
+              requested_intention_set_id: command.intention_set_id
             )
           end
 
-          expected = attempt.lease_resources
-            .map { [ _1.resource_id, _1.lease_id, _1.fencing_token ] }
+          expected = set.members
+            .map { [ _1.resource_id, _1.intention_id ] }
             .sort_by { _1.first.b }
-          submitted = command.leases
-            .map { [ _1.resource_id, _1.lease_id, _1.fencing_token ] }
+          submitted = command.intentions
+            .map { [ _1.resource_id, _1.intention_id ] }
             .sort_by { _1.first.b }
           unless submitted == expected
             return failure(
@@ -115,9 +105,10 @@ module Coordinator::Write
             )
           end
 
-          observed_references = state.current_leases.map(&:reference).sort_by { _1.resource_id.b }
-          expected_references = attempt.lease_resources.sort_by { _1.resource_id.b }
-          unless observed_references == expected_references
+          observed = state.current_intentions
+            .map { [ _1.state.resource_id, _1.state.intention_id ] }
+            .sort_by { _1.first.to_s.b }
+          unless observed == expected
             return scoped_failure(
               :work_intention_not_active,
               "Current intention evidence is incomplete for the Attempt work-intention set",
@@ -125,28 +116,48 @@ module Coordinator::Write
             )
           end
 
-          invalid = state.current_leases.find { !current_lease?(_1, state.attempt, command, submitted_at:) }
+          fences = state.current_intentions.to_h { [ _1.state.resource_id, _1.state.fencing_token ] }
+          unless command.intentions.all? { fences.fetch(_1.resource_id) == _1.fencing_token }
+            return failure(
+              :work_intention_observations_mismatch,
+              "Submitted fencing evidence is not the current work-intention set",
+              attempt_id: command.attempt_id,
+              expected_resource_ids: expected.map(&:first),
+              submitted_resource_ids: submitted.map(&:first)
+            )
+          end
+
+          if state.current_intentions.all? { _1.state.withdrawn }
+            return scoped_failure(:work_intention_set_withdrawn, "Attempt work-intention set has been withdrawn", command)
+          end
+
+          submitted_by_resource = command.intentions.to_h { [ _1.resource_id, _1 ] }
+          invalid = state.current_intentions.find do |observation|
+            reference = submitted_by_resource.fetch(observation.state.resource_id)
+            !current_intention?(observation, reference, command, submitted_at:)
+          end
           return unless invalid
 
           failure(
             :work_intention_not_active,
             "A submitted work-intention observation is stale or inactive",
             attempt_id: command.attempt_id,
-            resource_id: invalid.reference.resource_id,
-            submitted_intention_id: invalid.reference.lease_id,
-            current_intention_id: invalid.state.lease_id,
+            resource_id: invalid.state.resource_id,
+            submitted_intention_id: submitted_by_resource.fetch(invalid.state.resource_id).intention_id,
+            current_intention_id: invalid.state.intention_id,
             current_fencing_token: invalid.state.fencing_token,
             expires_at: invalid.state.expires_at
           )
         end
 
-        def current_lease?(observation, attempt, command, submitted_at:)
-          reference = observation.reference
+        def current_intention?(observation, reference, command, submitted_at:)
           state = observation.state
+          resource = observation.resource
           state.active_at?(submitted_at) &&
-            state.lease_id == reference.lease_id &&
-            state.lease_set_id == command.lease_set_id &&
+            state.intention_id == reference.intention_id &&
+            state.set_id == command.intention_set_id &&
             state.resource_id == reference.resource_id &&
+            resource.resource_id == reference.resource_id &&
             state.fencing_token == reference.fencing_token &&
             state.change_set_id == command.change_set_id &&
             state.work_item_id == command.work_item_id &&
@@ -155,12 +166,12 @@ module Coordinator::Write
             state.repository_id == command.repository_id &&
             state.object_format == command.object_format &&
             state.base_commit_oid == command.base_commit_oid &&
-            state.policy_version == attempt.lease_policy_version
+            state.base_blob_oid == resource.base_blob_oid
         end
 
-        def denied_manifest_resources(attempt, command)
-          leased = attempt.lease_resources
-          missing = command.actual_resources.reject { covering_lease(leased, _1) }
+        def denied_manifest_resources(intentions, command)
+          resources = intentions.map(&:resource)
+          missing = command.actual_resources.reject { covering_intention(resources, _1) }
           unless missing.empty?
             return failure(
               :candidate_resources_not_covered,
@@ -171,14 +182,14 @@ module Coordinator::Write
           end
 
           mismatch = command.actual_resources.find do |resource|
-            reference = leased.find do |candidate|
-              candidate.resource_kind == "file" && candidate.resource_path == resource.path
+            reference = resources.find do |candidate|
+              candidate.kind == "file" && candidate.path == resource.path
             end
             reference && reference.base_blob_oid != resource.base_blob_oid
           end
           return unless mismatch
 
-          reference = leased.find { _1.resource_kind == "file" && _1.resource_path == mismatch.path }
+          reference = resources.find { _1.kind == "file" && _1.path == mismatch.path }
           failure(
             :manifest_base_evidence_mismatch,
             "Candidate manifest old-side evidence differs from the declared base",
@@ -190,12 +201,11 @@ module Coordinator::Write
           )
         end
 
-        def covering_lease(leased, resource)
-          leased.find do |reference|
-            (reference.resource_kind == "file" && reference.resource_path == resource.path) ||
-              (reference.resource_kind == "directory" &&
-                (resource.path == reference.resource_path ||
-                  resource.path.start_with?("#{reference.resource_path}/")))
+        def covering_intention(intentions, resource)
+          intentions.find do |reference|
+            (reference.kind == "file" && reference.path == resource.path) ||
+              (reference.kind == "directory" &&
+                (resource.path == reference.path || resource.path.start_with?("#{reference.path}/")))
           end
         end
 
@@ -251,7 +261,7 @@ module Coordinator::Write
               stream: candidate_stream,
               event: Events::CandidateWorkIntentionSetAssignedV1.new(
                 candidate_id: command.candidate_id,
-                intention_set_id: command.lease_set_id
+                intention_set_id: command.intention_set_id
               )
             ),
             EventWrite.new(

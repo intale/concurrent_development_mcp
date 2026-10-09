@@ -508,12 +508,12 @@ module Coordinator::Write
           base_commit_oid: command.base_commit_oid,
           head_commit_oid: command.head_commit_oid,
           checkpoint_kind: command.checkpoint_kind,
-          intention_set_id: command.lease_set_id,
-          intentions: command.leases.map do |lease|
-            CommandInputDocuments::CandidateLeaseObservationV1.new(
-              resource_id: lease.resource_id,
-              intention_id: lease.lease_id,
-              fencing_token: lease.fencing_token
+          intention_set_id: command.intention_set_id,
+          intentions: command.intentions.map do |intention|
+            CommandInputDocuments::CandidateWorkIntentionObservationV1.new(
+              resource_id: intention.resource_id,
+              intention_id: intention.intention_id,
+              fencing_token: intention.fencing_token
             )
           end,
           change_manifest: candidate_manifest_document(command.manifest),

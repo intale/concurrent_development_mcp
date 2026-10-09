@@ -1,0 +1,9 @@
+module Coordinator
+  module Write
+    class WorkIntentionFencedReferenceV1 < Coordinator::Shared::Value
+      attr_reader resource_id: String
+      attr_reader intention_id: String
+      attr_reader fencing_token: Integer
+    end
+  end
+end

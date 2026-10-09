@@ -4,10 +4,16 @@ module Coordinator
       class ExecuteSubmitCandidate
         TOOL_NAME: String
 
-        def initialize: (event_store: _EventStore, ?preparer: PrepareSubmitCandidate, ?decider: Domain::Candidates::Submit, ?input_digest: CommandInputDigest, ?clock: Shared::_Clock, ?id_generator: Shared::_IdGenerator, ?head_identity_builder: Candidates::HeadIdentityBuilder, ?event_factory: EventFactory, ?schema_registry: EventSchemaRegistry, ?stream_factory: StreamFactory, ?completion_builder: CommandResultBuilder, ?repository_registration_loader: RepositoryRegistrationLoader, ?repository_marker_builder: RepositoryMarkerBuilder, ?natural_key_registry: NaturalKeys::Registry, ?event_plan_contract: Contracts::CandidateSubmissionEventPlan) -> void
+        def initialize: (event_store: _EventStore, ?preparer: PrepareSubmitCandidate, ?decider: Domain::Candidates::Submit, ?input_digest: CommandInputDigest, ?clock: Shared::_Clock, ?id_generator: Shared::_IdGenerator, ?head_identity_builder: Candidates::HeadIdentityBuilder, ?event_factory: EventFactory, ?schema_registry: EventSchemaRegistry, ?stream_factory: StreamFactory, ?completion_builder: CommandResultBuilder, ?repository_registration_loader: RepositoryRegistrationLoader, ?repository_marker_builder: RepositoryMarkerBuilder, ?natural_key_registry: NaturalKeys::Registry, ?work_intention_set_loader: WorkIntentionSetLoader, ?work_intention_loader: WorkIntentionLoader, ?work_intention_resource_loader: WorkIntentionResourceLoader, ?event_plan_contract: Contracts::CandidateSubmissionEventPlan) -> void
         %a{rbs:test:skip}
         def call: (command_input input) -> Dry::Monads::Result
         def call_command: (Commands::SubmitCandidate command, ?caused_by: PgEventstore::Event?) -> Dry::Monads::Result
+
+        private
+
+        def load_submission_state: (Commands::SubmitCandidate command, existing_head: EventReference?) -> Dry::Monads::Result
+        def load_work_intention_observations: (Domain::WorkIntentions::SetState? set_state) -> Dry::Monads::Result
+        def load_attempt_state: (String attempt_id) -> Domain::Attempts::State
       end
     end
   end

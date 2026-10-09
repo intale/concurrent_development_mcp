@@ -338,7 +338,7 @@ module Coordinator
         def input: () -> RecordAgentChoiceInputV1
       end
 
-      class CandidateLeaseObservationV1 < Shared::Value
+      class CandidateWorkIntentionObservationV1 < Shared::Value
         def resource_id: () -> String
         def intention_id: () -> String
         def fencing_token: () -> Integer
@@ -401,7 +401,7 @@ module Coordinator
         def head_commit_oid: () -> String
         def checkpoint_kind: () -> String
         def intention_set_id: () -> String
-        def intentions: () -> Array[CandidateLeaseObservationV1]
+        def intentions: () -> Array[CandidateWorkIntentionObservationV1]
         def change_manifest: () -> CandidateChangeManifestV1
         def build_context: () -> CandidateBuildContextV1?
         def actual_resources: () -> Array[CandidateActualResourceV2]

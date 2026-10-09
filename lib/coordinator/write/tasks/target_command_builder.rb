@@ -298,11 +298,11 @@ module Coordinator::Write
           base_commit_oid: input.base_commit_oid,
           head_commit_oid: input.head_commit_oid,
           checkpoint_kind: input.checkpoint_kind,
-          lease_set_id: input.intention_set_id,
-          leases: input.intentions.map do |intention|
-            Candidates::LeaseObservationV1.new(
+          intention_set_id: input.intention_set_id,
+          intentions: input.intentions.map do |intention|
+            WorkIntentionFencedReferenceV1.new(
               resource_id: intention.resource_id,
-              lease_id: intention.intention_id,
+              intention_id: intention.intention_id,
               fencing_token: intention.fencing_token
             )
           end,

@@ -67,7 +67,7 @@ module Coordinator::Write
           ),
           Events::CandidateWorkIntentionSetAssignedV1.new(
             candidate_id: command.candidate_id,
-            intention_set_id: command.lease_set_id
+            intention_set_id: command.intention_set_id
           ),
           Events::CandidateChangeManifestCapturedV2.new(
             candidate_id: command.candidate_id,

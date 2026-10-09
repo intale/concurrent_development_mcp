@@ -32,6 +32,14 @@ Feature: Attributed Candidate checkpoints
       Then the Candidate Task completes with conflict "work_intention_observations_mismatch"
       And denied Candidate "CAN-CUC-STALE" writes no target facts
 
+    Scenario: Withdrawn intentions deny a checkpoint despite an older available Attempt view
+      Given Candidate coordination "WITHDRAWN" gives agent "agent-a" an active work intention on "lib/withdrawn.rb"
+      When the agent withdraws its Candidate work intentions while read projections lag
+      And the agent submits Candidate "CAN-CUC-WITHDRAWN" with command "cmd-cuc-can-withdrawn" at head "b" without build context
+      Then the Candidate Task completes with conflict "work_intention_set_withdrawn"
+      And the withdrawal denial does not report an expiration deadline as withdrawal time
+      And denied Candidate "CAN-CUC-WITHDRAWN" writes no target facts
+
     Scenario: Malformed evidence is rejected before Task allocation
       Given Candidate coordination "INVALID" gives agent "agent-a" an active work intention on "lib/invalid.rb"
       When the agent attempts Candidate "CAN-CUC-INVALID" without work-intention observations

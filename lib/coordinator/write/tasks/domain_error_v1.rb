@@ -740,6 +740,12 @@ module Coordinator::Write
         attribute :details, WorkIntentionSetWithdrawnDetails
       end
 
+      class CandidateWorkIntentionSetWithdrawnError < Value
+        attribute :code, Types::String.enum("work_intention_set_withdrawn")
+        attribute :message, Types::String
+        attribute :details, AttemptDetails
+      end
+
       class LeaseSetSnapshotMismatchError < Value
         attribute :code, Types::String.enum("lease_set_snapshot_mismatch")
         attribute :message, Types::String

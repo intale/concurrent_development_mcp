@@ -41,14 +41,15 @@ module Coordinator::Read
       end
 
       rule(:event_type, :policy_version) do
+        # Assignment is decoded by its fact schema, not by the writer's diagnostic policy tag.
+        next if values[:event_type] == "CandidateWorkIntentionSetAssigned"
+
         expected = case values[:event_type]
-                   when "CandidateWorkIntentionSetAssigned"
-                     Coordinator::Write::LeaseResourceV2::POLICY_VERSION
-                   when "CandidateChangeManifestCaptured"
+        when "CandidateChangeManifestCaptured"
                      Coordinator::Write::Candidates::ChangeManifestDocumentV1::SCHEMA
-                   when "CandidateBuildContextCaptured"
+        when "CandidateBuildContextCaptured"
                      Coordinator::Write::Candidates::BuildContextDocumentV1::SCHEMA
-                   end
+        end
         unless values[:policy_version] == expected
           key(:policy_version).failure("must match the projected event policy")
         end

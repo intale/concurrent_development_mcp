@@ -215,6 +215,27 @@ When("the agent submits Candidate {string} with stale fencing evidence") do |can
   @candidate_task_state = candidate_task_state(@candidate_task_id)
 end
 
+When("the agent withdraws its Candidate work intentions while read projections lag") do
+  stop_read_model_subscriptions
+  arguments = candidate_arguments(
+    @candidate_coordination,
+    candidate_id: "CAN-CUC-WITHDRAWN",
+    command_id: "cmd-cuc-can-withdraw-intentions",
+    head_character: "b"
+  )
+  complete_candidate_setup_task(
+    "work_intention_set_withdraw",
+    **arguments.slice(:command_id, :actor, :change_set_id, :work_item_id, :attempt_id, :intention_set_id, :intentions)
+  )
+end
+
+Then("the withdrawal denial does not report an expiration deadline as withdrawal time") do
+  details = @candidate_task_state.dig("result", "result", "structuredContent", "data", "details")
+  assert_acceptance(details, "Withdrawal denial should expose its Attempt scope")
+  assert_acceptance_equal(@candidate_arguments.fetch(:attempt_id), details.fetch("attempt_id"), "Withdrawn Attempt scope")
+  assert_acceptance(!details.key?("withdrawn_at"), "An expiration deadline is not a withdrawal timestamp")
+end
+
 Then("the Candidate Task completes with conflict {string}") do |code|
   result = @candidate_task_state.dig("result", "result")
   content = result.fetch("structuredContent")

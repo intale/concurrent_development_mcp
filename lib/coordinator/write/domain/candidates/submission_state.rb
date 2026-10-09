@@ -4,13 +4,14 @@ module Coordinator::Write
   module Domain
     module Candidates
       class SubmissionState < Value
-        LeaseObservation = Types.Instance(CurrentLeaseObservationV2)
+        IntentionObservation = Types.Instance(WorkIntentionObservationV1)
 
         attribute :existing_candidate, EventReference.optional
         attribute :existing_head, EventReference.optional
         attribute :attempt, Types.Instance(Attempts::State)
-        attribute :current_leases,
-                  Types::Array.of(LeaseObservation).constrained(max_size: 32)
+        attribute :intention_set, Types.Instance(WorkIntentions::SetState).optional
+        attribute :current_intentions,
+                  Types::Array.of(IntentionObservation).constrained(max_size: WorkIntentionPolicyV1::MAXIMUM_SET_SIZE)
       end
     end
   end

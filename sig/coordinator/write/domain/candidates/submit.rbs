@@ -5,6 +5,15 @@ module Coordinator
         class Submit
           def initialize: (?stream_factory: Coordinator::Write::StreamFactory) -> void
           def call: (state: SubmissionState, command: Coordinator::Write::Commands::SubmitCandidate, submitted_at: String, head_identity: Coordinator::Write::Candidates::HeadIdentityV1) -> Dry::Monads::Result
+
+          private
+
+          def denied: (state: SubmissionState, command: Coordinator::Write::Commands::SubmitCandidate, submitted_at: String) -> Dry::Monads::Result?
+          def denied_attempt: (Coordinator::Write::Domain::Attempts::State attempt, Coordinator::Write::Commands::SubmitCandidate command) -> Dry::Monads::Result?
+          def denied_work_intentions: (SubmissionState state, Coordinator::Write::Commands::SubmitCandidate command, submitted_at: String) -> Dry::Monads::Result?
+          def current_intention?: (Coordinator::Write::WorkIntentionObservationV1 observation, Coordinator::Write::WorkIntentionFencedReferenceV1 reference, Coordinator::Write::Commands::SubmitCandidate command, submitted_at: String) -> bool
+          def denied_manifest_resources: (Array[Coordinator::Write::WorkIntentionObservationV1] intentions, Coordinator::Write::Commands::SubmitCandidate command) -> Dry::Monads::Result?
+          def covering_intention: (Array[Coordinator::Write::WorkIntentionResourceV1] intentions, Coordinator::Write::Candidates::ActualResourceV2 resource) -> Coordinator::Write::WorkIntentionResourceV1?
         end
       end
     end

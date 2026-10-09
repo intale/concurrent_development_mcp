@@ -48,11 +48,11 @@ module Coordinator::Write
           base_commit_oid: attributes.fetch(:base_commit_oid),
           head_commit_oid: attributes.fetch(:head_commit_oid),
           checkpoint_kind: attributes.fetch(:checkpoint_kind),
-          lease_set_id: attributes.fetch(:intention_set_id),
-          leases: attributes.fetch(:intentions).map do |intention|
-            Candidates::LeaseObservationV1.new(
+          intention_set_id: attributes.fetch(:intention_set_id),
+          intentions: attributes.fetch(:intentions).map do |intention|
+            WorkIntentionFencedReferenceV1.new(
               resource_id: intention.fetch(:resource_id),
-              lease_id: intention.fetch(:intention_id),
+              intention_id: intention.fetch(:intention_id),
               fencing_token: intention.fetch(:fencing_token)
             )
           end.sort_by { _1.resource_id.b },

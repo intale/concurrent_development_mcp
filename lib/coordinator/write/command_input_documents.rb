@@ -347,7 +347,7 @@ module Coordinator::Write
       attribute :input, RecordAgentChoiceInputV1
     end
 
-    class CandidateLeaseObservationV1 < Value
+    class CandidateWorkIntentionObservationV1 < Value
       attribute :resource_id, Types::ResourceId
       attribute :intention_id, Types::UuidV7
       attribute :fencing_token, Types::FencingToken
@@ -407,7 +407,7 @@ module Coordinator::Write
     end
 
     class SubmitCandidateInputV1 < Value
-      Lease = CandidateLeaseObservationV1
+      Intention = CandidateWorkIntentionObservationV1
       Resource = CandidateActualResourceV2
 
       attribute :actor, ActorV1
@@ -422,7 +422,7 @@ module Coordinator::Write
       attribute :head_commit_oid, Types::GitOid
       attribute :checkpoint_kind, Types::CandidateCheckpointKind
       attribute :intention_set_id, Types::UuidV7
-      attribute :intentions, Types::Array.of(Lease).constrained(min_size: 1, max_size: 32)
+      attribute :intentions, Types::Array.of(Intention).constrained(min_size: 1, max_size: 32)
       attribute :change_manifest, CandidateChangeManifestV1
       attribute :build_context, CandidateBuildContextV1.optional
       attribute :actual_resources,

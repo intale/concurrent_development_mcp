@@ -32,8 +32,10 @@ RSpec.describe Coordinator::Write::Operations::ExecuteSubmitCandidate, :event_st
     )
     expect(intention.metadata).to include(
       "schema_version" => 1,
-      "policy_version" => "coordinator-resource-lease/v2"
+      "policy_version" => Coordinator::Write::WorkIntentionPolicyV1::VERSION
     )
+    expect(intention.markers).to include("work-intention-set:#{reservation.receipt.intention_set_id}")
+    expect(intention.markers).not_to include("lease-set:#{reservation.receipt.intention_set_id}")
     manifest = events.fetch(7)
     expect(manifest.metadata).to include(
       "schema_version" => 2,
@@ -56,7 +58,7 @@ RSpec.describe Coordinator::Write::Operations::ExecuteSubmitCandidate, :event_st
     expect(candidate_events("CAN-REPLAY").count { _1.type == "CandidateSubmitted" }).to eq(1)
   end
 
-  it "rejects a manifest path that is not covered by the current UUID lease set" do
+  it "rejects a manifest path that is not covered by the current UUID intention set" do
     reservation = setup_reservation
     input = candidate_input(reservation, command_id: "cmd-candidate-escape", candidate_id: "CAN-ESCAPE")
     input[:change_manifest][:files].sole[:old_path] = "lib/unleased.rb"
@@ -69,7 +71,7 @@ RSpec.describe Coordinator::Write::Operations::ExecuteSubmitCandidate, :event_st
     expect(candidate_events("CAN-ESCAPE")).to be_empty
   end
 
-  it "serializes a release before submission so stale authority cannot produce a partial Candidate" do
+  it "serializes withdrawal before submission so stale intentions cannot produce a partial Candidate" do
     reservation = setup_reservation
     Coordinator::Write::Operations::ExecuteReleaseLeaseSet.new(event_store:).call(
       command_id: "cmd-release-before-candidate",
@@ -138,5 +140,4 @@ RSpec.describe Coordinator::Write::Operations::ExecuteSubmitCandidate, :event_st
       Coordinator::Write::EventQueries::CANDIDATE_FOR_MERGE_SNAPSHOT
     )
   end
-
 end
