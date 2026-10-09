@@ -16,6 +16,13 @@ Feature: Scoped AI Skill repository
 
   Rule: Available Skill views never gate on projection freshness
 
+    Scenario: Revision updates and semantic no-ops retain the canonical Skill identity
+      Given Skill "canonical-review" in scope "project:alpha" has projected revision 1
+      When the agent publishes revision 2 without projecting it
+      Then both Skill publication Tasks return the same canonical Skill ID
+      When the agent republishes identical revision 2 content under a new command ID
+      Then the repeated-content Task returns the same canonical publication without duplicate facts
+
     Scenario: An older revision stays available while a newer publication is projecting
       Given Skill "deploy" in scope "project:alpha" has projected revision 1
       When the agent publishes revision 2 without projecting it

@@ -69,6 +69,45 @@ When("the agent publishes revision 2 without projecting it") do
   )
 end
 
+Then("both Skill publication Tasks return the same canonical Skill ID") do
+  first = @first_skill_publication.fetch(:outcome).fetch("data")
+  second = @second_skill_publication.fetch(:outcome).fetch("data")
+  assert_acceptance_equal("ok", @second_skill_publication.fetch(:outcome).fetch("status"), "Second publication")
+  assert_acceptance_equal(first.fetch("skill_id"), second.fetch("skill_id"), "Canonical Skill identity")
+  publication = skill_events(name: @lagging_skill_name, scope: @lagging_skill_scope).last
+  assert_acceptance_equal(publication.stream.stream_id, second.fetch("skill_id"), "Publication stream identity")
+  assert_acceptance_equal(publication.id, second.dig("publication_event", "event_id"), "Exact publication source")
+end
+
+When("the agent republishes identical revision 2 content under a new command ID") do
+  @repeated_skill_publication = publish_skill_task(
+    **@second_skill_publication.fetch(:arguments).merge(
+      command_id: "cmd-cuc-skill-canonical-no-op",
+      expected_revision: 2
+    )
+  )
+end
+
+Then("the repeated-content Task returns the same canonical publication without duplicate facts") do
+  repeated = @repeated_skill_publication.fetch(:outcome)
+  second = @second_skill_publication.fetch(:outcome).fetch("data")
+  assert_acceptance_equal("ok", repeated.fetch("status"), "Repeated-content Task")
+  assert_acceptance_equal(second, repeated.fetch("data"), "Exact canonical no-op publication receipt")
+  assert_acceptance(
+    @repeated_skill_publication.fetch(:task_id) != @second_skill_publication.fetch(:task_id),
+    "A new command ID must allocate its own Task"
+  )
+  assert_acceptance_equal(
+    2, skill_events(name: @lagging_skill_name, scope: @lagging_skill_scope).length,
+    "No duplicate publication facts"
+  )
+  assert_acceptance_equal(
+    %w[CommandRegistered CommandSucceeded],
+    command_events(@repeated_skill_publication.fetch(:command_id)).map(&:type),
+    "No-op command lifecycle"
+  )
+end
+
 Then("Skill {string} remains available at projected revision 1") do |name|
   payload = skill_view(name:, scope: @lagging_skill_scope)
   assert_acceptance_equal("ok", payload.fetch("status"), "Lagging Skill availability")

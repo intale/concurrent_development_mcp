@@ -488,7 +488,7 @@ module Coordinator::Write
       )
     end
 
-    def skill_publish(command:, revision:, outcome:, publication_event:, input_digest:, persisted_events:, completed_at:)
+    def skill_publish(command:, skill_id:, revision:, outcome:, publication_event:, input_digest:, persisted_events:, completed_at:)
       build_completion(
         command:,
         tool_name: "skill_publish",
@@ -496,7 +496,7 @@ module Coordinator::Write
           "Skill revision published as cohesive immutable facts." :
           "The requested Skill revision content is already published.",
         data: CommandReceiptData::SkillPublication.new(
-          skill_id: command.skill_id,
+          skill_id:,
           name: command.name,
           scope: command.scope,
           revision:,

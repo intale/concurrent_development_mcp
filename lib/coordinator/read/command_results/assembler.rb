@@ -15,7 +15,8 @@ module Coordinator::Read
         repository_natural_key_marker: Coordinator::Write::Repositories::NaturalKeyMarker.new,
         development_artifact_marker_builder: Coordinator::Write::DevelopmentArtifacts::MarkerBuilder.new,
         release_set_preparation_loader: Coordinator::Read::ReleaseSets::PreparationLoader.new(event_store:),
-        work_intention_set_evidence_loader: WorkIntentionSetEvidenceLoader.new(event_store:)
+        work_intention_set_evidence_loader: WorkIntentionSetEvidenceLoader.new(event_store:),
+        skill_publication_source_loader: SkillPublicationSourceLoader.new(event_store:)
       )
         @event_store = event_store
         @completion_builder = completion_builder
@@ -27,6 +28,7 @@ module Coordinator::Read
         @development_artifact_marker_builder = development_artifact_marker_builder
         @release_set_preparation_loader = release_set_preparation_loader
         @work_intention_set_evidence_loader = work_intention_set_evidence_loader
+        @skill_publication_source_loader = skill_publication_source_loader
       end
 
       def call(source)
@@ -488,18 +490,13 @@ module Coordinator::Read
       end
 
       def skill_publication(source, args:)
-        publication_event = event_for_any_payload(
-          source,
-          Coordinator::Write::Events::SkillRevisionPublishedV3
-        ) || load_first_event(
-          @stream_factory.skill(source.command.skill_id),
-          Coordinator::Write::EventQueries::SKILL_LATEST_REVISION
-        )
+        publication_event = @skill_publication_source_loader.call(source)
         publication = load_payload(publication_event)
         revision = publication.revision
         outcome = source.persisted_events.any? { _1.type == "SkillRevisionPublished" } ? "published" : "existing"
         @completion_builder.skill_publish(
           **args,
+          skill_id: publication.skill_id,
           revision:,
           outcome:,
           publication_event:

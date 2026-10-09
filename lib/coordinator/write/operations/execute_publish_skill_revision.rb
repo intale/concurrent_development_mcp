@@ -110,6 +110,7 @@ module Coordinator::Write
         Success(
           @completion_builder.skill_publish(
             command:,
+            skill_id: command.skill_id,
             revision: decision.revision,
             outcome: decision.outcome,
             publication_event:,

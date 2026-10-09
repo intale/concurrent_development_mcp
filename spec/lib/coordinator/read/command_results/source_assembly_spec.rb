@@ -133,6 +133,118 @@ RSpec.describe Coordinator::Read::CommandResults::Assembler, :event_store do
     end
   end
 
+  context "when a Skill publication resolves an existing canonical identity" do
+    let(:canonical_skill_id) { SecureRandom.uuid_v7 }
+    let(:command) do
+      Coordinator::Write::Operations::PreparePublishSkillRevision.new.call(
+        command_id:,
+        actor: { kind: "agent", id: "assembly-spec" },
+        name: "canonical-review",
+        scope: "project:command-result",
+        expected_revision: 1,
+        description: "Canonical review instructions",
+        instructions: "Review the current facts.",
+        assets: []
+      ).value!
+    end
+
+    it "returns the canonical Skill UUID for a second publication" do
+      append_skill_registration
+      append_skill_publication(revision: 1, owner: "prior-skill-command")
+      register_command
+      append_task_submission
+      publication = append_skill_publication(revision: 2, owner: command_id)
+      terminal = append_terminal(Coordinator::Write::Events::CommandSucceededV1.new(command_id:))
+
+      result = assemble.call(terminal)
+
+      expect(command.skill_id).not_to eq(canonical_skill_id)
+      expect(result.data).to have_attributes(skill_id: canonical_skill_id, revision: 2)
+      expect(result.data.publication_event.event_id).to eq(publication.id)
+      expect(result.emitted_events.map(&:event_id)).to eq([ publication.id ])
+    end
+
+    it "reconstructs a semantic no-op from the exact canonical publication" do
+      append_skill_registration
+      publication = append_skill_publication(revision: 1, owner: "prior-skill-command")
+      register_command
+      append_task_submission
+      terminal = append_terminal(Coordinator::Write::Events::CommandSucceededV1.new(command_id:))
+
+      result = assemble.call(terminal)
+
+      expect(result.data).to have_attributes(
+        skill_id: canonical_skill_id, revision: 1,
+        published_at: publication.created_at.utc.iso8601(6)
+      )
+      expect(result.data.publication_event.event_id).to eq(publication.id)
+      expect(result.emitted_events).to be_empty
+    end
+
+    it "does not substitute a later publication when a no-op result is assembled late" do
+      append_skill_registration
+      publication = append_skill_publication(revision: 1, owner: "prior-skill-command")
+      register_command
+      append_task_submission
+      terminal = append_terminal(Coordinator::Write::Events::CommandSucceededV1.new(command_id:))
+      append_skill_publication(revision: 2, owner: "later-skill-command")
+
+      result = assemble.call(terminal)
+
+      expect(result.data).to have_attributes(skill_id: canonical_skill_id, revision: 1)
+      expect(result.data.publication_event.event_id).to eq(publication.id)
+    end
+
+    it "rejects a no-op source with no publication at the expected revision" do
+      append_skill_registration
+      register_command
+      append_task_submission
+      terminal = append_terminal(Coordinator::Write::Events::CommandSucceededV1.new(command_id:))
+
+      expect { assemble.call(terminal) }
+        .to raise_error(Coordinator::Read::InvalidProjectionSource, /Skill publication/)
+    end
+
+    it "rejects a publication whose content digest differs from the command" do
+      append_skill_registration
+      append_skill_publication(revision: 1, owner: "prior-skill-command", digest: "sha256:#{'b' * 64}")
+      register_command
+      append_task_submission
+      terminal = append_terminal(Coordinator::Write::Events::CommandSucceededV1.new(command_id:))
+
+      expect { assemble.call(terminal) }
+        .to raise_error(Coordinator::Read::InvalidProjectionSource, /Skill publication/)
+    end
+
+    def append_skill_registration
+      append(
+        streams.skill(canonical_skill_id),
+        Coordinator::Write::Events::SkillRegisteredV1.new(
+          skill_id: canonical_skill_id, name: command.name, scope: command.scope
+        ),
+        metadata: command_metadata(command_id: "prior-skill-command", policy_version: "skill-repository/v2"),
+        markers: [
+          "skill:#{canonical_skill_id}",
+          Coordinator::Write::Skills::MarkerBuilder.new.natural_key(name: command.name, scope: command.scope)
+        ]
+      )
+    end
+
+    def append_skill_publication(revision:, owner:, digest: command.content_digest)
+      append(
+        streams.skill(canonical_skill_id),
+        Coordinator::Write::Events::SkillRevisionPublishedV3.new(
+          skill_id: canonical_skill_id, skill_revision_id: SecureRandom.uuid_v7, revision:
+        ),
+        metadata: Coordinator::Write::Metadata::SkillPublicationV3.new(
+          **command_metadata(command_id: owner, policy_version: "skill-repository/v2").to_h,
+          content_digest: digest
+        ),
+        markers: [ "skill:#{canonical_skill_id}", "command:#{owner}" ]
+      )
+    end
+  end
+
   context "when another proposed Artifact UUID captured the canonical bytes" do
     let(:canonical_artifact_id) { SecureRandom.uuid_v7 }
     let(:proposed_artifact_id) { SecureRandom.uuid_v7 }
