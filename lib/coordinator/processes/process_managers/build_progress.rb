@@ -4,9 +4,7 @@ module Coordinator::Processes
   module ProcessManagers
     class BuildProgress
       SOURCE_DEPENDENCY_KINDS = {
-        Coordinator::Write::Events::WorkItemCandidateSelectedV1 => %w[requires_candidate],
         Coordinator::Write::Events::WorkItemCandidateSelectedV2 => %w[requires_candidate],
-        Coordinator::Write::Events::WorkItemCompletedV1 => %w[requires_completion requires_artifact requires_contract],
         Coordinator::Write::Events::WorkItemCompletedV2 => %w[requires_completion requires_artifact requires_contract],
         Coordinator::Write::Events::RepositoryIntegrationRecordedV2 => %w[must_integrate_after],
         Coordinator::Write::Events::ReleaseSetVerificationRecordedV2 => %w[requires_composite_verification],
@@ -72,7 +70,6 @@ module Coordinator::Processes
       private
 
       def completion_source?(source)
-        source.payload.is_a?(Coordinator::Write::Events::WorkItemCompletedV1) ||
           source.payload.is_a?(Coordinator::Write::Events::WorkItemCompletedV2) ||
           source.payload.is_a?(Coordinator::Write::Events::ReleaseSetCompletedV2)
       end

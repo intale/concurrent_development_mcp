@@ -12,7 +12,6 @@ module Coordinator
           def work_item_ids: () -> Array[String]
           def dependencies: () -> Array[Dependency]
           def dependency_satisfactions: () -> Array[DependencySatisfaction]
-          def completed_at: () -> String?
           def absent?: () -> bool
           def apply: (Events::Base event) -> State
           def dependency_satisfied?: (String dependency_id) -> bool

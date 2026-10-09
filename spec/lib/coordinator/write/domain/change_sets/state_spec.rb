@@ -1,131 +1,67 @@
 # frozen_string_literal: true
 
 RSpec.describe Coordinator::Write::Domain::ChangeSets::State do
-  it "folds membership and the typed dependency graph from authoritative facts" do
-    events = [
-      Coordinator::Write::Events::ChangeSetCreatedV1.new(
-        change_set_id: "CS-100",
-        goal: "Coordinate billing changes",
-        created_at: "2026-08-20T14:10:00.000000Z"
+  let(:definition) do
+    [
+      Coordinator::Write::Events::ChangeSetCreatedV2.new(change_set_id: "CS-100"),
+      Coordinator::Write::Events::ChangeSetGoalDefinedV1.new(
+        change_set_id: "CS-100", goal: "Coordinate billing changes"
       ),
-      Coordinator::Write::Events::WorkItemAddedToChangeSetV1.new(
-        change_set_id: "CS-100",
-        work_item_id: "W-100",
-        added_at: "2026-08-20T14:12:00.000000Z"
+      Coordinator::Write::Events::WorkItemAddedToChangeSetV2.new(
+        change_set_id: "CS-100", work_item_id: "W-100"
       ),
-      Coordinator::Write::Events::WorkItemAddedToChangeSetV1.new(
-        change_set_id: "CS-100",
-        work_item_id: "W-200",
-        added_at: "2026-08-20T14:13:00.000000Z"
-      ),
-      Coordinator::Write::Events::WorkItemDependencyDeclaredV1.new(
-        change_set_id: "CS-100",
-        dependency_id: "DEP-1",
-        producer_work_item_id: "W-100",
-        consumer_work_item_id: "W-200",
-        dependency_kind: "requires_candidate",
-        required_output: nil,
-        declared_at: "2026-08-20T14:14:00.000000Z"
-      ),
-      Coordinator::Write::Events::WorkItemDependencySatisfiedV1.new(
-        change_set_id: "CS-100",
-        dependency_id: "DEP-1",
-        producer_work_item_id: "W-100",
-        consumer_work_item_id: "W-200",
-        dependency_kind: "requires_candidate",
-        required_output: nil,
-        source_event: Coordinator::Write::EventReference.new(
-          event_id: "0198c000-0000-7000-8000-000000000001",
-          type: "WorkItemCandidateSelected",
-          stream_context: "DevelopmentExecution",
-          stream_name: "WorkItem",
-          stream_id: "W-100",
-          stream_revision: 3
-        ),
-        rule_version: "dependency-satisfaction/v1",
-        satisfied_at: "2026-08-20T14:20:00.000000Z"
+      Coordinator::Write::Events::WorkItemAddedToChangeSetV2.new(
+        change_set_id: "CS-100", work_item_id: "W-200"
       )
     ]
+  end
 
-    state = described_class.reduce(events)
+  it "folds membership and the typed dependency graph from authoritative facts" do
+    source = Coordinator::Write::EventReference.new(
+      event_id: SecureRandom.uuid_v7,
+      type: "WorkItemCandidateSelected",
+      stream_context: "DevelopmentExecution",
+      stream_name: "WorkItem",
+      stream_id: "W-100",
+      stream_revision: 3
+    )
+    dependency = {
+      change_set_id: "CS-100",
+      dependency_id: "DEP-1",
+      producer_work_item_id: "W-100",
+      consumer_work_item_id: "W-200",
+      dependency_kind: "requires_candidate",
+      required_output: nil
+    }
+    state = described_class.reduce([
+      *definition,
+      Coordinator::Write::Events::WorkItemDependencyDeclaredV2.new(dependency),
+      Coordinator::Write::Events::WorkItemDependencySatisfiedV2.new(dependency.merge(source:))
+    ])
 
-    expect(state.work_item_ids).to eq([ "W-100", "W-200" ])
+    expect(state).to have_attributes(goal: "Coordinate billing changes", work_item_ids: [ "W-100", "W-200" ])
     expect(state.dependencies).to contain_exactly(
-      Coordinator::Write::Domain::ChangeSets::Dependency.new(
-        dependency_id: "DEP-1",
-        producer_work_item_id: "W-100",
-        consumer_work_item_id: "W-200",
-        dependency_kind: "requires_candidate",
-        required_output: nil
-      )
+      Coordinator::Write::Domain::ChangeSets::Dependency.new(dependency.except(:change_set_id))
     )
     expect(state).to be_dependency_satisfied("DEP-1")
   end
 
   it "folds activation as the boundary that closes structural planning" do
-    state = described_class.reduce(
-      [
-        Coordinator::Write::Events::ChangeSetCreatedV1.new(
-          change_set_id: "CS-100",
-          goal: "Coordinate billing changes",
-          created_at: "2026-08-20T14:10:00.000000Z"
-        ),
-        Coordinator::Write::Events::ChangeSetActivatedV1.new(
-          change_set_id: "CS-100",
-          work_item_count: 1,
-          dependency_count: 0,
-          activated_at: "2026-08-20T14:15:00.000000Z"
-        )
-      ]
-    )
+    state = described_class.reduce([
+      *definition,
+      Coordinator::Write::Events::ChangeSetActivatedV2.new(change_set_id: "CS-100")
+    ])
 
     expect(state.status).to eq("active")
   end
 
-  it "folds terminal completion without discarding the frozen graph" do
-    reference = Coordinator::Write::EventReference.new(
-      event_id: "0198c000-0000-7000-8000-000000000009",
-      type: "WorkItemCompleted",
-      stream_context: "DevelopmentExecution",
-      stream_name: "WorkItem",
-      stream_id: "W-100",
-      stream_revision: 4
-    )
-    completion = Coordinator::Write::ChangeSetCompletions::WorkItemEvidenceV1.new(
-      change_set_id: "CS-100",
-      work_item_id: "W-100",
-      repository_id: RepositoryScenario::DEFAULT_REPOSITORY_ID,
-      attempt_id: "A-100",
-      candidate_id: "CAN-100",
-      candidate_event: reference,
-      selected_event: reference,
-      completed_event: reference,
-      completed_at: "2026-08-25T08:00:00.000000Z"
-    )
+  it "folds the lean terminal fact without discarding the frozen graph" do
     state = described_class.reduce([
-      Coordinator::Write::Events::ChangeSetCreatedV1.new(
-        change_set_id: "CS-100",
-        goal: "Coordinate billing changes",
-        created_at: "2026-08-20T14:10:00.000000Z"
-      ),
-      Coordinator::Write::Events::ChangeSetActivatedV1.new(
-        change_set_id: "CS-100",
-        work_item_count: 1,
-        dependency_count: 0,
-        activated_at: "2026-08-20T14:15:00.000000Z"
-      ),
-      Coordinator::Write::Events::ChangeSetCompletedV1.new(
-        change_set_id: "CS-100",
-        work_item_completions: [ completion ],
-        release_set_completion_event: nil,
-        rule_version: "change-set-completion/v1",
-        completed_at: "2026-08-25T08:00:00.000000Z"
-      )
+      *definition,
+      Coordinator::Write::Events::ChangeSetActivatedV2.new(change_set_id: "CS-100"),
+      Coordinator::Write::Events::ChangeSetCompletedV2.new(change_set_id: "CS-100")
     ])
 
-    expect(state).to have_attributes(
-      status: "completed",
-      completed_at: "2026-08-25T08:00:00.000000Z"
-    )
+    expect(state).to have_attributes(status: "completed", work_item_ids: [ "W-100", "W-200" ])
   end
 end

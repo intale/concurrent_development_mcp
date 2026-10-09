@@ -5,7 +5,7 @@ RSpec.describe Coordinator::Read::Projections::CoordContextReducer do
 
   it "evicts Candidate checkpoints with Attempt history that leaves the embedded bound" do
     state = bounded_state
-    event = Coordinator::Write::Events::AttemptAuthorizedV1.new(
+    event = Coordinator::Read::AttemptDefinitionViewV1.new(
       attempt_id: "A-current",
       change_set_id: "CS-bounded",
       work_item_id: "W-bounded",
@@ -17,7 +17,14 @@ RSpec.describe Coordinator::Read::Projections::CoordContextReducer do
           commit_oid: "a" * 40
         )
       ],
-      authorized_at: "2026-09-17T12:00:00.000000Z"
+      authorization_event: ProjectionEventFactory.build(
+        payload: Coordinator::Write::Events::AttemptAuthorizedV2.new(attempt_id: "A-current"),
+        stream: Coordinator::Write::StreamFactory.new.attempt("A-current"),
+        stream_revision: 0, global_position: 1001, policy_version: "work-item-acquisition/v1",
+        created_at: Time.utc(2026, 9, 17, 12)
+      ),
+      authorized_at: "2026-09-17T12:00:00.000000Z",
+      started_at: "2026-09-17T12:00:01.000000Z"
     )
 
     updated = reducer.apply(state, event)
@@ -26,6 +33,40 @@ RSpec.describe Coordinator::Read::Projections::CoordContextReducer do
     expect(updated.candidate_checkpoints.length).to eq(99)
     expect(updated.attempts.map(&:attempt_id)).to include("A-current")
     expect(updated.candidate_checkpoints.map(&:attempt_id)).not_to include("A-000")
+  end
+
+
+  it "retains an older nonterminal Attempt ahead of more recently authorized terminal history" do
+    event = Coordinator::Read::AttemptDefinitionViewV1.new(
+      attempt_id: "A-old-active", change_set_id: "CS-bounded", work_item_id: "W-bounded", agent_id: "agent-active",
+      base_snapshots: [ Coordinator::Write::RepositorySnapshotV1.new(
+        repository_id: SecureRandom.uuid_v7, object_format: "sha1", commit_oid: "a" * 40
+      ) ],
+      authorization_event: ProjectionEventFactory.build(
+        payload: Coordinator::Write::Events::AttemptAuthorizedV2.new(attempt_id: "A-old-active"),
+        stream: Coordinator::Write::StreamFactory.new.attempt("A-old-active"),
+        stream_revision: 0, global_position: 1, policy_version: "work-item-acquisition/v1",
+        created_at: Time.utc(2026, 9, 17, 9)
+      ),
+      authorized_at: "2026-09-17T09:00:00.000000Z", started_at: "2026-09-17T09:00:01.000000Z"
+    )
+
+    updated = reducer.apply(bounded_state, event)
+
+    expect(updated.attempts.length).to eq(100)
+    expect(updated.attempts.map(&:attempt_id)).to include("A-old-active")
+    expect(updated.attempts.map(&:attempt_id)).not_to include("A-000")
+    expect(updated.attempts.count { %w[abandoned completed].include?(_1.status) }).to eq(99)
+  end
+
+  it "requires the persisted occurrence time for a lean lifecycle fact" do
+    event = Coordinator::Write::Events::WorkItemMadeReadyV2.new(
+      change_set_id: "CS-bounded", work_item_id: "W-bounded",
+      readiness_decision_id: SecureRandom.uuid_v7, reason: "dependencies_satisfied"
+    )
+
+    expect { reducer.apply(bounded_state, event) }
+      .to raise_error(Coordinator::Read::ProjectionStateError, /persisted Event.created_at/)
   end
 
   def bounded_state

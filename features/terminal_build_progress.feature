@@ -17,6 +17,7 @@ Feature: Available terminal build progress
       And the older acquired context remains available before terminal projection
       When terminal facts and build progress reach the read side
       Then available context exposes the completed WorkItem, Attempt, and ChangeSet without a freshness gate
+      And completion context uses native event times and lean completion facts
 
     Scenario: Final completion survives repeated interrupted Attempts
       Given terminal Candidate coordination "RECOVERED" is ready for agent "agent-terminal"

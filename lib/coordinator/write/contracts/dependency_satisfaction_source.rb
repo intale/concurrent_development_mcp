@@ -4,9 +4,7 @@ module Coordinator::Write
   module Contracts
     class DependencySatisfactionSource < Dry::Validation::Contract
       WORK_ITEM_SOURCES = [
-        Events::WorkItemCandidateSelectedV1,
         Events::WorkItemCandidateSelectedV2,
-        Events::WorkItemCompletedV1,
         Events::WorkItemCompletedV2
       ].freeze
       RELEASE_SET_SOURCES = [

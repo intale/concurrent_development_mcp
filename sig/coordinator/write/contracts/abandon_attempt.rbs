@@ -4,10 +4,6 @@ module Coordinator
       class AbandonAttempt
         def call: (command_input) -> Dry::Validation::Result
       end
-
-      class AttemptAbandonmentEventPlan
-        def call: (command_input) -> Dry::Validation::Result
-      end
     end
   end
 end

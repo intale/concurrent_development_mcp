@@ -314,7 +314,6 @@ module Coordinator::Write
 
       def dependency_source(payload)
         case payload
-        when Events::WorkItemDependencySatisfiedV1 then payload.source_event
         when Events::WorkItemDependencySatisfiedV2 then payload.source
         end
       end

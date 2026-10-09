@@ -29,10 +29,6 @@ module Coordinator::Read
         case payload
         when Coordinator::Read::AttemptDefinitionViewV1
           store_attempt_definition(event:, payload:, projection_version:)
-        when Coordinator::Write::Events::AttemptAuthorizedV1
-          store_attempt_authorized(event:, payload:, projection_version:)
-        when Coordinator::Write::Events::AttemptStartedV1
-          update_attempt_started(event:, payload:)
         when Coordinator::Write::Events::WriteSetReservedV2
           store_write_set_reserved(event:, payload:)
         when Coordinator::Write::Events::WriteSetExpandedV2
@@ -43,12 +39,8 @@ module Coordinator::Read
           update_write_set_released(event:, payload:)
         when Coordinator::Read::WorkIntentionSetViewV1
           update_work_intention_set(event:, payload:)
-        when Coordinator::Write::Events::AttemptAbandonedV2
-          update_attempt_abandoned(event:, payload:)
         when Coordinator::Read::AttemptAbandonmentViewV1
           update_attempt_abandoned(event:, payload:)
-        when Coordinator::Write::Events::AttemptCompletedV1
-          update_attempt_completed(event:, payload:)
         when Coordinator::Read::AttemptCompletionViewV1
           update_attempt_completed(event:, payload:)
         end
@@ -75,29 +67,6 @@ module Coordinator::Read
 
       private
 
-      def store_attempt_authorized(event:, payload:, projection_version:)
-        record = Coordinator::Read::AttemptHistory.find_or_initialize_by(attempt_id: payload.attempt_id)
-        record = reset_for_projection(record, projection_version:)
-        if record.persisted?
-          verify_authorization!(record, event:, payload:)
-          return
-        end
-
-        record.assign_attributes(
-          change_set_id: payload.change_set_id,
-          work_item_id: payload.work_item_id,
-          agent_id: payload.agent_id,
-          base_snapshots: payload.base_snapshots.map(&:to_h),
-          status: "authorized",
-          authorization_event: event_reference(event).to_h,
-          authorized_global_position: event.global_position,
-          authorized_at_domain: payload.authorized_at,
-          projection_version:,
-          updated_at: projection_time(record, event)
-        )
-        record.save!(touch: false)
-      end
-
       def store_attempt_definition(event:, payload:, projection_version:)
         record = Coordinator::Read::AttemptHistory.find_or_initialize_by(attempt_id: payload.attempt_id)
         record = reset_for_projection(record, projection_version:)
@@ -121,16 +90,6 @@ module Coordinator::Read
           updated_at: projection_time(record, event)
         )
         record.save!(touch: false)
-      end
-
-      def update_attempt_started(event:, payload:)
-        record = attempt_history!(payload)
-        return if record.started_at_domain&.utc&.iso8601(6) == payload.started_at
-
-        update_record(record, event,
-          status: terminal_status?(record.status) ? record.status : "started",
-          started_at_domain: payload.started_at
-        )
       end
 
       def store_write_set_reserved(event:, payload:)
@@ -256,26 +215,6 @@ module Coordinator::Read
           terminal_event: event_reference(event).to_h,
           terminal_at_domain: payload.completed_at
         )
-      end
-
-      def verify_authorization!(record, event:, payload:)
-        expected = {
-          change_set_id: payload.change_set_id,
-          work_item_id: payload.work_item_id,
-          agent_id: payload.agent_id,
-          base_snapshots: payload.base_snapshots.map(&:to_h),
-          authorization_event: event_reference(event).to_h,
-          authorized_global_position: event.global_position,
-          authorized_at_domain: Time.iso8601(payload.authorized_at)
-        }
-        actual = expected.keys.to_h do |attribute|
-          value = record.public_send(attribute)
-          value = deep_symbolize(value) if value.is_a?(Hash) || value.is_a?(Array)
-          [ attribute, value ]
-        end
-        return if actual == expected
-
-        raise ProjectionStateError, "Attempt #{payload.attempt_id} authorization evidence changed"
       end
 
       def verify_attempt_definition!(record, payload:)

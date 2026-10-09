@@ -4,7 +4,7 @@ module Coordinator
       def initialize: (?contract: Contracts::ReadinessTargets) -> void
       def call: (
         source: ChangeSetActivationSource,
-        memberships: Array[Write::Events::WorkItemAddedToChangeSetV1 | Write::Events::WorkItemAddedToChangeSetV2]
+        memberships: Array[Write::Events::WorkItemAddedToChangeSetV2]
       ) -> ReadinessTargets
     end
   end

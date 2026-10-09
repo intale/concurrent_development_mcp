@@ -36,10 +36,6 @@ module Coordinator::Write
 
       def source_matches?(payload, command)
         case payload
-        when Events::WorkItemCompletedV1
-          command.release_set_id.nil? &&
-            payload.change_set_id == command.change_set_id &&
-            payload.work_item_id == command.source_event.stream_id
         when Events::WorkItemCompletedV2
           command.release_set_id.nil? &&
             payload.work_item_id == command.source_event.stream_id

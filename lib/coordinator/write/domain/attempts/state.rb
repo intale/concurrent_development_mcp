@@ -24,7 +24,6 @@ module Coordinator::Write
         attribute :selected_candidate_id, Types::Identifier.optional.default(nil)
         attribute :selected_candidate_event, EventReference.optional.default(nil)
         attribute :selected_candidate_checkpoint_kind, Types::CandidateCheckpointKind.optional.default(nil)
-        attribute :completed_at, Types::Timestamp.optional.default(nil)
 
         def self.initial
           new(
@@ -45,7 +44,6 @@ module Coordinator::Write
             selected_candidate_id: nil,
             selected_candidate_event: nil,
             selected_candidate_checkpoint_kind: nil,
-            completed_at: nil
           )
         end
 
@@ -78,48 +76,6 @@ module Coordinator::Write
             rebuild(status: "abandoned")
           when Events::AttemptCompletedV2
             rebuild(status: "completed")
-          when Events::AttemptAuthorizedV1
-            self.class.new(
-              attempt_id: event.attempt_id,
-              change_set_id: event.change_set_id,
-              work_item_id: event.work_item_id,
-              agent_id: event.agent_id,
-              base_snapshots: event.base_snapshots,
-              lease_set_id: nil,
-              lease_repository_id: nil,
-              lease_policy_version: nil,
-              lease_resources: [],
-              lease_reserved_at: nil,
-              lease_renewed_at: nil,
-              lease_expires_at: nil,
-              lease_released_at: nil,
-              status: "authorized",
-              selected_candidate_id: nil,
-              selected_candidate_event: nil,
-              selected_candidate_checkpoint_kind: nil,
-              completed_at: nil
-            )
-          when Events::AttemptStartedV1
-            self.class.new(
-              attempt_id:,
-              change_set_id:,
-              work_item_id:,
-              agent_id:,
-              base_snapshots:,
-              lease_set_id:,
-              lease_repository_id:,
-              lease_policy_version:,
-              lease_resources:,
-              lease_reserved_at:,
-              lease_renewed_at:,
-              lease_expires_at:,
-              lease_released_at:,
-              status: "active",
-              selected_candidate_id:,
-              selected_candidate_event:,
-              selected_candidate_checkpoint_kind:,
-              completed_at:
-            )
           when Events::WriteSetReservedV2
             self.class.new(
               attempt_id:,
@@ -139,7 +95,6 @@ module Coordinator::Write
               selected_candidate_id:,
               selected_candidate_event:,
               selected_candidate_checkpoint_kind:,
-              completed_at:
             )
           when Events::WriteSetExpandedV2
             self.class.new(
@@ -160,7 +115,6 @@ module Coordinator::Write
               selected_candidate_id:,
               selected_candidate_event:,
               selected_candidate_checkpoint_kind:,
-              completed_at:
             )
           when Events::WriteSetRenewedV2
             self.class.new(
@@ -181,7 +135,6 @@ module Coordinator::Write
               selected_candidate_id:,
               selected_candidate_event:,
               selected_candidate_checkpoint_kind:,
-              completed_at:
             )
           when Events::WriteSetReleasedV2
             self.class.new(
@@ -202,7 +155,6 @@ module Coordinator::Write
               selected_candidate_id:,
               selected_candidate_event:,
               selected_candidate_checkpoint_kind:,
-              completed_at:
             )
           when Events::CandidateAttachedToAttemptV1
             self.class.new(
@@ -223,49 +175,6 @@ module Coordinator::Write
               selected_candidate_id: event.candidate_id,
               selected_candidate_event: event.candidate_event,
               selected_candidate_checkpoint_kind: event.checkpoint_kind,
-              completed_at:
-            )
-          when Events::AttemptAbandonedV2
-            self.class.new(
-              attempt_id:,
-              change_set_id:,
-              work_item_id:,
-              agent_id:,
-              base_snapshots:,
-              lease_set_id:,
-              lease_repository_id:,
-              lease_policy_version:,
-              lease_resources:,
-              lease_reserved_at:,
-              lease_renewed_at:,
-              lease_expires_at:,
-              lease_released_at:,
-              status: "abandoned",
-              selected_candidate_id:,
-              selected_candidate_event:,
-              selected_candidate_checkpoint_kind:,
-              completed_at:
-            )
-          when Events::AttemptCompletedV1
-            self.class.new(
-              attempt_id:,
-              change_set_id:,
-              work_item_id:,
-              agent_id:,
-              base_snapshots:,
-              lease_set_id:,
-              lease_repository_id:,
-              lease_policy_version:,
-              lease_resources:,
-              lease_reserved_at:,
-              lease_renewed_at:,
-              lease_expires_at:,
-              lease_released_at:,
-              status: "completed",
-              selected_candidate_id: event.candidate_id,
-              selected_candidate_event: event.candidate_event,
-              selected_candidate_checkpoint_kind:,
-              completed_at: event.completed_at
             )
           else
             self

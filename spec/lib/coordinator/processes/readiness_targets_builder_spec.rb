@@ -15,20 +15,16 @@ RSpec.describe Coordinator::Processes::ReadinessTargetsBuilder do
     Coordinator::Processes::ChangeSetActivationSource.new(
       event: PgEventstore::Event.new(id: reference.event_id, type: "ChangeSetActivated"),
       reference:,
-      payload: Coordinator::Write::Events::ChangeSetActivatedV1.new(
-        change_set_id: "CS-100",
-        work_item_count: 2,
-        dependency_count: 0,
-        activated_at: "2026-08-20T14:15:00.000000Z"
+      payload: Coordinator::Write::Events::ChangeSetActivatedV2.new(
+        change_set_id: "CS-100"
       )
     )
   end
   let(:memberships) do
     %w[W-100 W-200].map do |work_item_id|
-      Coordinator::Write::Events::WorkItemAddedToChangeSetV1.new(
+      Coordinator::Write::Events::WorkItemAddedToChangeSetV2.new(
         change_set_id: "CS-100",
-        work_item_id:,
-        added_at: "2026-08-20T14:12:00.000000Z"
+        work_item_id:
       )
     end
   end
@@ -37,10 +33,29 @@ RSpec.describe Coordinator::Processes::ReadinessTargetsBuilder do
     expect(builder.call(source:, memberships:).work_item_ids).to eq(%w[W-100 W-200])
   end
 
-  it "rejects missing or duplicate membership facts through the dry contract" do
-    expect { builder.call(source:, memberships: memberships.first(1)) }
-      .to raise_error(Coordinator::Processes::InvalidReadinessTargets, /source activation work-item count/)
+  it "rejects empty or duplicate authoritative memberships through the dry contract" do
+    expect { builder.call(source:, memberships: []) }
+      .to raise_error(Coordinator::Processes::InvalidReadinessTargets, /work_item_ids/)
     expect { builder.call(source:, memberships: [ memberships.first, memberships.first ]) }
       .to raise_error(Coordinator::Processes::InvalidReadinessTargets, /unique authoritative memberships/)
+  end
+  it "rejects a membership from another ChangeSet" do
+    foreign = Coordinator::Write::Events::WorkItemAddedToChangeSetV2.new(
+      change_set_id: "CS-OTHER", work_item_id: "W-300"
+    )
+
+    expect { builder.call(source:, memberships: [ foreign ]) }
+      .to raise_error(Coordinator::Processes::InvalidReadinessTargets, /activated ChangeSet/)
+  end
+
+  it "rejects more than the bounded authoritative membership limit" do
+    oversized = Array.new(101) do |index|
+      Coordinator::Write::Events::WorkItemAddedToChangeSetV2.new(
+        change_set_id: "CS-100", work_item_id: "W-#{index}"
+      )
+    end
+
+    expect { builder.call(source:, memberships: oversized) }
+      .to raise_error(Coordinator::Processes::InvalidReadinessTargets, /work_item_ids/)
   end
 end

@@ -54,10 +54,15 @@ RSpec.describe Coordinator::Write::Domain::CommandLifecycles::State do
     events = [
       registered,
       Coordinator::Write::Events::CommandSucceededV1.new(command_id:),
-      Coordinator::Write::Events::CommandRejectedV1.new(
+      Coordinator::Write::Events::CommandRejectedV2.new(
         command_id:,
-        code: "conflict",
-        reason: "Contradiction",
+        error: Coordinator::Write::Tasks::DomainErrorV1::ChangeSetError.new(
+          code: "change_set_already_exists",
+          message: "Contradiction",
+          details: Coordinator::Write::Tasks::DomainErrorV1::ChangeSetDetails.new(
+            change_set_id: "CS-command-state"
+          )
+        ),
         retryable: false
       )
     ]

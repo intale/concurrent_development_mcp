@@ -21,19 +21,6 @@ module Coordinator::Read
         facts = events.to_h { |event| [ event.type, [ load_event(event), event ] ] }
         authorized, authorized_event = fetch_fact(facts, "AttemptAuthorized")
         started, started_event = fetch_fact(facts, "AttemptStarted")
-        if authorized.is_a?(Coordinator::Write::Events::AttemptAuthorizedV1)
-          return build_view(
-            attempt_id:,
-            change_set_id: authorized.change_set_id,
-            work_item_id: authorized.work_item_id,
-            agent_id: authorized.agent_id,
-            base_snapshots: authorized.base_snapshots,
-            authorization_event: authorized_event,
-            authorized_at: timestamp(authorized_event),
-            started_at: timestamp(started_event)
-          )
-        end
-
         membership, = fetch_fact(facts, "AttemptAssignedToWorkItem")
         agent, = fetch_fact(facts, "AttemptAssignedToAgent")
         snapshot, = fetch_fact(facts, "AttemptBaseSnapshotRecorded")

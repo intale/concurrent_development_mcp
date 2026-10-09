@@ -91,26 +91,15 @@ module ResourceLeaseExamples
   )
     state = Coordinator::Write::Domain::Attempts::State.reduce(
       [
-        Coordinator::Write::Events::AttemptAuthorizedV1.new(
-          attempt_id: "A-LSE-A",
-          change_set_id: "CS-LSE",
-          work_item_id: "W-LSE-A",
-          agent_id:,
-          base_snapshots: [
-            Coordinator::Write::RepositorySnapshotV1.new(
-              repository_id: REPOSITORY_ID,
-              object_format: "sha1",
-              commit_oid: "a" * 40
-            )
-          ],
-          authorized_at: ACQUIRED_AT
+        Coordinator::Write::Events::AttemptAuthorizedV2.new(attempt_id: "A-LSE-A"),
+        Coordinator::Write::Events::AttemptAssignedToWorkItemV1.new(
+          attempt_id: "A-LSE-A", change_set_id: "CS-LSE", work_item_id: "W-LSE-A"
         ),
-        Coordinator::Write::Events::AttemptStartedV1.new(
-          attempt_id: "A-LSE-A",
-          change_set_id: "CS-LSE",
-          work_item_id: "W-LSE-A",
-          started_at: ACQUIRED_AT
-        )
+        Coordinator::Write::Events::AttemptAssignedToAgentV1.new(attempt_id: "A-LSE-A", agent_id:),
+        Coordinator::Write::Events::AttemptBaseSnapshotRecordedV1.new(
+          attempt_id: "A-LSE-A", repository_id: REPOSITORY_ID, object_format: "sha1", commit_oid: "a" * 40
+        ),
+        Coordinator::Write::Events::AttemptStartedV2.new(attempt_id: "A-LSE-A")
       ]
     )
     return state unless lease_set_id

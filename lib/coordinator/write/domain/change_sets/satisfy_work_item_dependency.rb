@@ -94,18 +94,13 @@ module Coordinator::Write
         end
 
         def candidate_source?(payload, dependency:, change_set_id:, producer:)
-          (payload.is_a?(Events::WorkItemCandidateSelectedV1) ||
-            payload.is_a?(Events::WorkItemCandidateSelectedV2)) &&
+          payload.is_a?(Events::WorkItemCandidateSelectedV2) &&
             payload.change_set_id == change_set_id &&
             payload.work_item_id == dependency.producer_work_item_id &&
             payload.candidate_id == producer.selected_candidate_id
         end
 
         def completion_source?(payload, dependency:, change_set_id:, producer:)
-          return payload.change_set_id == change_set_id &&
-                 payload.work_item_id == dependency.producer_work_item_id &&
-                 payload.candidate_id == producer.selected_candidate_id if payload.is_a?(Events::WorkItemCompletedV1)
-
           payload.is_a?(Events::WorkItemCompletedV2) &&
             payload.work_item_id == dependency.producer_work_item_id &&
             producer.change_set_id == change_set_id &&
@@ -120,7 +115,7 @@ module Coordinator::Write
                    payload.output_key == dependency.required_output&.key
           end
 
-          (payload.is_a?(Events::WorkItemCompletedV1) || payload.is_a?(Events::WorkItemCompletedV2)) &&
+          payload.is_a?(Events::WorkItemCompletedV2) &&
             completion_source?(payload, dependency:, change_set_id:, producer:) &&
             producer.produced_outputs.any? do |output|
               output.kind == dependency.required_output&.kind && output.key == dependency.required_output&.key

@@ -80,11 +80,14 @@ RSpec.describe Coordinator::Write::Contracts::AcquisitionEventPlan do
     )
     inconsistent_plan = Coordinator::Write::Domain::EventPlan.new(
       writes: plan.writes.map do |write|
-        if write.event.is_a?(Coordinator::Write::Events::AttemptAuthorizedV1)
+        if write.event.is_a?(Coordinator::Write::Events::AttemptBaseSnapshotRecordedV1)
           Coordinator::Write::Domain::EventWrite.new(
             stream: write.stream,
-            event: Coordinator::Write::Events::AttemptAuthorizedV1.new(
-              write.event.to_h.merge(base_snapshots: [ inconsistent_snapshot ])
+            event: Coordinator::Write::Events::AttemptBaseSnapshotRecordedV1.new(
+              write.event.to_h.merge(
+                object_format: inconsistent_snapshot.object_format,
+                commit_oid: inconsistent_snapshot.commit_oid
+              )
             )
           )
         else
@@ -100,6 +103,6 @@ RSpec.describe Coordinator::Write::Contracts::AcquisitionEventPlan do
       attempt_stream: streams.attempt("A-300")
     )
 
-    expect(result.errors.to_h).to include(:plan)
+    expect(result.errors.to_h.fetch(:plan)).to include(/derive each Git object format/)
   end
 end

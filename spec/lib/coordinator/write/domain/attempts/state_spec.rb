@@ -8,27 +8,20 @@ RSpec.describe Coordinator::Write::Domain::Attempts::State do
       commit_oid: "0123456789abcdef0123456789abcdef01234567"
     )
   end
-  let(:authorized) do
-    Coordinator::Write::Events::AttemptAuthorizedV1.new(
-      attempt_id: "A-300",
-      change_set_id: "CS-100",
-      work_item_id: "W-200",
-      agent_id: "agent-a",
-      base_snapshots: [ snapshot ],
-      authorized_at: "2026-08-20T14:20:00.000000Z"
-    )
-  end
-  let(:started) do
-    Coordinator::Write::Events::AttemptStartedV1.new(
-      attempt_id: "A-300",
-      change_set_id: "CS-100",
-      work_item_id: "W-200",
-      started_at: "2026-08-20T14:20:00.000000Z"
-    )
+  let(:definition) do
+    [
+      Coordinator::Write::Events::AttemptAuthorizedV2.new(attempt_id: "A-300"),
+      Coordinator::Write::Events::AttemptAssignedToWorkItemV1.new(
+        attempt_id: "A-300", change_set_id: "CS-100", work_item_id: "W-200"
+      ),
+      Coordinator::Write::Events::AttemptAssignedToAgentV1.new(attempt_id: "A-300", agent_id: "agent-a"),
+      Coordinator::Write::Events::AttemptBaseSnapshotRecordedV1.new(snapshot.to_h.merge(attempt_id: "A-300")),
+      Coordinator::Write::Events::AttemptStartedV2.new(attempt_id: "A-300")
+    ]
   end
 
-  it "folds authorization and start into immutable active Attempt state" do
-    state = described_class.reduce([ authorized, started ])
+  it "folds authorization, assignments, repository base and start into immutable active state" do
+    state = described_class.reduce(definition)
 
     expect(state.to_h).to eq(
       attempt_id: "A-300",
@@ -47,37 +40,31 @@ RSpec.describe Coordinator::Write::Domain::Attempts::State do
       status: "active",
       selected_candidate_id: nil,
       selected_candidate_event: nil,
-      selected_candidate_checkpoint_kind: nil,
-      completed_at: nil
+      selected_candidate_checkpoint_kind: nil
     )
     expect(state).to be_frozen
   end
 
-  it "folds AttemptCompleted into terminal Candidate attribution" do
+  it "retains separate Candidate attribution after the lean terminal fact" do
     candidate_event = Coordinator::Write::EventReference.new(
-      event_id: "01919191-9191-7191-8191-919191919191",
-      type: "CandidateSubmitted",
-      stream_context: "DevelopmentIntegration",
-      stream_name: "Candidate",
-      stream_id: "CAN-400",
-      stream_revision: 0
+      event_id: SecureRandom.uuid_v7, type: "CandidateSubmitted",
+      stream_context: "DevelopmentIntegration", stream_name: "Candidate",
+      stream_id: "CAN-400", stream_revision: 0
     )
-    completed = Coordinator::Write::Events::AttemptCompletedV1.new(
-      attempt_id: "A-300",
-      change_set_id: "CS-100",
-      work_item_id: "W-200",
-      candidate_id: "CAN-400",
-      candidate_event:,
-      completed_at: "2026-08-20T14:30:00.000000Z"
+    attachment = Coordinator::Write::Events::CandidateAttachedToAttemptV1.new(
+      attempt_id: "A-300", change_set_id: "CS-100", work_item_id: "W-200",
+      candidate_id: "CAN-400", candidate_event:, repository_id: snapshot.repository_id,
+      target_branch: "main", object_format: snapshot.object_format, base_commit_oid: snapshot.commit_oid,
+      head_commit_oid: "a" * 40, checkpoint_kind: "final", manifest_digest: "sha256:#{'a' * 64}", build_context_digest: nil,
+      attached_at: "2026-08-20T14:30:00.000000Z"
     )
-
-    state = described_class.reduce([ authorized, started, completed ])
+    state = described_class.reduce([
+      *definition, attachment, Coordinator::Write::Events::AttemptCompletedV2.new(attempt_id: "A-300")
+    ])
 
     expect(state).to have_attributes(
-      status: "completed",
-      selected_candidate_id: "CAN-400",
-      selected_candidate_event: candidate_event,
-      completed_at: "2026-08-20T14:30:00.000000Z"
+      status: "completed", selected_candidate_id: "CAN-400",
+      selected_candidate_event: candidate_event, selected_candidate_checkpoint_kind: "final"
     )
   end
 end

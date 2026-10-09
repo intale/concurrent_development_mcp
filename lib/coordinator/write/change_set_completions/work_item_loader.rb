@@ -50,7 +50,7 @@ module Coordinator::Write
           change_set_id:
         )
 
-        repository_id = assignment_payload&.repository_id || created_payload.repository_id
+        repository_id = assignment_payload.repository_id
 
         Success(
           WorkItemEvidenceV1.new(
@@ -68,8 +68,6 @@ module Coordinator::Write
       end
 
       def coherent?(created, membership, assignment, selected, completed, change_set_id:)
-        return legacy_coherent?(created, selected, completed, change_set_id:) if created.is_a?(Events::WorkItemCreatedV1)
-
         created.is_a?(Events::WorkItemCreatedV2) &&
           membership.is_a?(Events::WorkItemAddedToChangeSetV2) &&
           assignment.is_a?(Events::WorkItemAssignedToRepositoryV1) &&
@@ -79,19 +77,6 @@ module Coordinator::Write
           selected.change_set_id == change_set_id &&
           [ created.work_item_id, membership.work_item_id, assignment.work_item_id,
             selected.work_item_id, completed.work_item_id ].uniq == [ created.work_item_id ]
-      end
-
-      def legacy_coherent?(created, selected, completed, change_set_id:)
-        selected.is_a?(Events::WorkItemCandidateSelectedV1) &&
-          completed.is_a?(Events::WorkItemCompletedV1) &&
-          created.change_set_id == change_set_id &&
-          selected.change_set_id == change_set_id &&
-          completed.change_set_id == change_set_id &&
-          created.work_item_id == selected.work_item_id &&
-          selected.work_item_id == completed.work_item_id &&
-          selected.attempt_id == completed.attempt_id &&
-          selected.candidate_id == completed.candidate_id &&
-          selected.candidate_event == completed.candidate_event
       end
 
       def load_event(event)

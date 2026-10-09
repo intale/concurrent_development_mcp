@@ -24,18 +24,6 @@ module Coordinator::Read
         raise InvalidProjectionSource, "WorkItem is missing its exact completion fact" unless terminal_event
 
         terminal = load_event(terminal_event)
-        if terminal.is_a?(Coordinator::Write::Events::WorkItemCompletedV1)
-          return WorkItemCompletionViewV1.new(
-            work_item_id:,
-            change_set_id: terminal.change_set_id,
-            attempt_id: terminal.attempt_id,
-            candidate_id: terminal.candidate_id,
-            candidate_event: terminal.candidate_event,
-            produced_outputs: terminal.produced_outputs,
-            completed_at: timestamp(terminal_event)
-          )
-        end
-
         selection_event = events.reverse.find { _1.type == "WorkItemCandidateSelected" }
         raise InvalidProjectionSource, "WorkItem completion is missing Candidate selection" unless selection_event
 

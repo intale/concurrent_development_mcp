@@ -648,15 +648,13 @@ RSpec.describe Coordinator::Read::CommandResults::Assembler, :event_store do
 
   def append_change_set_facts
     [
-      Coordinator::Write::Events::ChangeSetCreatedV1.new(
-        change_set_id: "CS-command-result",
-        goal: command.goal,
-        created_at: occurred_at
+      Coordinator::Write::Events::ChangeSetCreatedV2.new(change_set_id: "CS-command-result"),
+      Coordinator::Write::Events::ChangeSetGoalDefinedV1.new(
+        change_set_id: "CS-command-result", goal: command.goal
       ),
-      Coordinator::Write::Events::ChangeSetAcceptanceCriteriaDefinedV1.new(
+      Coordinator::Write::Events::ChangeSetAcceptanceCriteriaDefinedV2.new(
         change_set_id: "CS-command-result",
-        acceptance_criteria: command.acceptance_criteria,
-        defined_at: occurred_at
+        acceptance_criteria: command.acceptance_criteria
       )
     ].map do |payload|
       append(

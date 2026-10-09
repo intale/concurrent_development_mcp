@@ -14,7 +14,6 @@ module Coordinator::Write
                   Types::Array.of(DependencySatisfaction)
                     .constrained(max_size: 500)
                     .default([].freeze)
-        attribute :completed_at, Types::Timestamp.optional.default(nil)
         attribute :release_set_id, Types::Identifier.optional.default(nil)
 
         def self.initial
@@ -26,7 +25,6 @@ module Coordinator::Write
             work_item_ids: [],
             dependencies: [],
             dependency_satisfactions: [],
-            completed_at: nil,
             release_set_id: nil
           )
         end
@@ -45,39 +43,24 @@ module Coordinator::Write
 
         def apply(event)
           case event
-          when Events::ChangeSetCreatedV1
-            rebuild(change_set_id: event.change_set_id, goal: event.goal, status: "draft")
           when Events::ChangeSetCreatedV2
             rebuild(change_set_id: event.change_set_id, status: "draft")
           when Events::ChangeSetGoalDefinedV1
             rebuild(goal: event.goal)
-          when Events::ChangeSetAcceptanceCriteriaDefinedV1,
-               Events::ChangeSetAcceptanceCriteriaDefinedV2
+          when Events::ChangeSetAcceptanceCriteriaDefinedV2
             rebuild(acceptance_criteria: event.acceptance_criteria)
-          when Events::WorkItemAddedToChangeSetV1,
-               Events::WorkItemAddedToChangeSetV2
+          when Events::WorkItemAddedToChangeSetV2
             rebuild(work_item_ids: (work_item_ids + [ event.work_item_id ]).uniq)
-          when Events::WorkItemDependencyDeclaredV1,
-               Events::WorkItemDependencyDeclaredV2
+          when Events::WorkItemDependencyDeclaredV2
             rebuild(dependencies: dependencies + [ dependency_from(event) ])
-          when Events::WorkItemDependencySatisfiedV1
-            rebuild(dependency_satisfactions: dependency_satisfactions + [
-              DependencySatisfaction.new(
-                dependency_id: event.dependency_id,
-                source_event: event.source_event,
-                satisfied_at: event.satisfied_at
-              )
-            ])
           when Events::WorkItemDependencySatisfiedV2
             rebuild(dependency_satisfactions: dependency_satisfactions + [
               DependencySatisfaction.new(dependency_id: event.dependency_id, source_event: event.source)
             ])
-          when Events::ChangeSetActivatedV1, Events::ChangeSetActivatedV2
+          when Events::ChangeSetActivatedV2
             rebuild(status: "active")
           when Events::ChangeSetReleaseSetLinkedV1
             rebuild(release_set_id: event.release_set_id)
-          when Events::ChangeSetCompletedV1
-            rebuild(status: "completed", completed_at: event.completed_at)
           when Events::ChangeSetCompletedV2
             rebuild(status: "completed")
           else
@@ -100,7 +83,6 @@ module Coordinator::Write
             required_output: event.required_output
           )
         end
-
       end
     end
   end

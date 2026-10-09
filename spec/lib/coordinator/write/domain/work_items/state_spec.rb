@@ -1,20 +1,42 @@
 # frozen_string_literal: true
 
 RSpec.describe Coordinator::Write::Domain::WorkItems::State do
-  let(:work_item_created) do
-    Coordinator::Write::Events::WorkItemCreatedV1.new(
-      work_item_id: "W-200",
+  let(:definition) do
+    [
+      Coordinator::Write::Events::WorkItemCreatedV2.new(work_item_id: "W-200"),
+      Coordinator::Write::Events::WorkItemAddedToChangeSetV2.new(
+        work_item_id: "W-200", change_set_id: "CS-100"
+      ),
+      Coordinator::Write::Events::WorkItemAssignedToRepositoryV1.new(
+        work_item_id: "W-200", repository_id: RepositoryScenario::DEFAULT_REPOSITORY_ID
+      ),
+      Coordinator::Write::Events::WorkItemGoalDefinedV1.new(
+        work_item_id: "W-200", goal: "Implement capture validation"
+      ),
+      Coordinator::Write::Events::WorkItemAcceptanceCriteriaDefinedV1.new(
+        work_item_id: "W-200", acceptance_criteria: [ "Reject duplicate ownership" ]
+      ),
+      Coordinator::Write::Events::WorkItemCompetitiveModeSelectedV1.new(
+        work_item_id: "W-200", competitive_mode: false
+      )
+    ]
+  end
+  let(:made_ready) do
+    Coordinator::Write::Events::WorkItemMadeReadyV2.new(
       change_set_id: "CS-100",
-      repository_id: RepositoryScenario::DEFAULT_REPOSITORY_ID,
-      goal: "Implement capture validation",
-      acceptance_criteria: [ "Reject duplicate ownership" ],
-      competitive_mode: false,
-      created_at: "2026-08-20T14:12:00.000000Z"
+      work_item_id: "W-200",
+      readiness_decision_id: SecureRandom.uuid_v7,
+      reason: "change_set_activated"
+    )
+  end
+  let(:acquired) do
+    Coordinator::Write::Events::WorkItemAcquiredV2.new(
+      change_set_id: "CS-100", work_item_id: "W-200", attempt_id: "A-300", agent_id: "agent-a"
     )
   end
 
-  it "folds WorkItemCreated into the authoritative planned state" do
-    state = described_class.reduce([ work_item_created ])
+  it "folds separate definition facts into the authoritative planned state" do
+    state = described_class.reduce(definition)
 
     expect(state.to_h).to eq(
       work_item_id: "W-200",
@@ -28,110 +50,50 @@ RSpec.describe Coordinator::Write::Domain::WorkItems::State do
       active_agent_id: nil,
       selected_candidate_id: nil,
       selected_candidate_event: nil,
-      produced_outputs: [],
-      completed_at: nil
+      produced_outputs: []
     )
     expect(state).to be_frozen
   end
 
   it "applies WorkItemMadeReady to the authoritative lifecycle state" do
-    planned = described_class.reduce([ work_item_created ])
-    made_ready = Coordinator::Write::Events::WorkItemMadeReadyV1.new(
-      change_set_id: "CS-100",
-      work_item_id: "W-200",
-      readiness_decision_id: "readiness-v1:#{"a" * 64}",
-      reason: "change_set_activated",
-      made_ready_at: "2026-08-20T14:15:01.000000Z"
+    ready = described_class.reduce([ *definition, made_ready ])
+
+    expect(ready).to have_attributes(
+      status: "ready", work_item_id: "W-200", repository_id: RepositoryScenario::DEFAULT_REPOSITORY_ID
     )
-
-    ready = planned.apply(made_ready)
-
-    expect(ready.status).to eq("ready")
-    expect(ready.work_item_id).to eq("W-200")
-    expect(ready.repository_id).to eq(RepositoryScenario::DEFAULT_REPOSITORY_ID)
   end
 
   it "applies WorkItemAcquired as authoritative active ownership" do
-    ready = described_class.reduce([ work_item_created ]).apply(
-      Coordinator::Write::Events::WorkItemMadeReadyV1.new(
-        change_set_id: "CS-100",
-        work_item_id: "W-200",
-        readiness_decision_id: "readiness-v1:#{"a" * 64}",
-        reason: "change_set_activated",
-        made_ready_at: "2026-08-20T14:15:01.000000Z"
-      )
-    )
-    acquired = ready.apply(
-      Coordinator::Write::Events::WorkItemAcquiredV1.new(
-        change_set_id: "CS-100",
-        work_item_id: "W-200",
-        attempt_id: "A-300",
-        agent_id: "agent-a",
-        acquired_at: "2026-08-20T14:20:00.000000Z"
-      )
-    )
+    state = described_class.reduce([ *definition, made_ready, acquired ])
 
-    expect(acquired.status).to eq("active")
-    expect(acquired.active_attempt_id).to eq("A-300")
-    expect(acquired.active_agent_id).to eq("agent-a")
+    expect(state).to have_attributes(status: "active", active_attempt_id: "A-300", active_agent_id: "agent-a")
   end
 
-  it "folds Candidate selection and completion into terminal state" do
+  it "retains separate Candidate selection and output facts after lean completion" do
     candidate_event = Coordinator::Write::EventReference.new(
-      event_id: "01919191-9191-7191-8191-919191919191",
+      event_id: SecureRandom.uuid_v7,
       type: "CandidateSubmitted",
       stream_context: "DevelopmentIntegration",
       stream_name: "Candidate",
       stream_id: "CAN-400",
       stream_revision: 0
     )
-    outputs = [
-      Coordinator::Write::WorkItemOutputV1.new(kind: "artifact", key: "billing-gem")
-    ]
-    events = [
-      work_item_created,
-      Coordinator::Write::Events::WorkItemMadeReadyV1.new(
-        change_set_id: "CS-100",
-        work_item_id: "W-200",
-        readiness_decision_id: "readiness-v1:#{"a" * 64}",
-        reason: "change_set_activated",
-        made_ready_at: "2026-08-20T14:15:01.000000Z"
+    output = Coordinator::Write::WorkItemOutputV1.new(kind: "artifact", key: "billing-gem")
+    state = described_class.reduce([
+      *definition, made_ready, acquired,
+      Coordinator::Write::Events::WorkItemCandidateSelectedV2.new(
+        change_set_id: "CS-100", work_item_id: "W-200", attempt_id: "A-300",
+        candidate_id: "CAN-400", candidate_event:
       ),
-      Coordinator::Write::Events::WorkItemAcquiredV1.new(
-        change_set_id: "CS-100",
-        work_item_id: "W-200",
-        attempt_id: "A-300",
-        agent_id: "agent-a",
-        acquired_at: "2026-08-20T14:20:00.000000Z"
+      Coordinator::Write::Events::WorkItemOutputRecordedV1.new(
+        work_item_id: "W-200", output_kind: output.kind, output_key: output.key
       ),
-      Coordinator::Write::Events::WorkItemCandidateSelectedV1.new(
-        change_set_id: "CS-100",
-        work_item_id: "W-200",
-        attempt_id: "A-300",
-        candidate_id: "CAN-400",
-        candidate_event:,
-        selected_at: "2026-08-20T14:30:00.000000Z"
-      ),
-      Coordinator::Write::Events::WorkItemCompletedV1.new(
-        change_set_id: "CS-100",
-        work_item_id: "W-200",
-        attempt_id: "A-300",
-        candidate_id: "CAN-400",
-        candidate_event:,
-        produced_outputs: outputs,
-        rule_version: "work-item-completion/v1",
-        completed_at: "2026-08-20T14:30:00.000000Z"
-      )
-    ]
-
-    state = described_class.reduce(events)
+      Coordinator::Write::Events::WorkItemCompletedV2.new(work_item_id: "W-200")
+    ])
 
     expect(state).to have_attributes(
-      status: "completed",
-      selected_candidate_id: "CAN-400",
-      selected_candidate_event: candidate_event,
-      produced_outputs: outputs,
-      completed_at: "2026-08-20T14:30:00.000000Z"
+      status: "completed", selected_candidate_id: "CAN-400",
+      selected_candidate_event: candidate_event, produced_outputs: [ output ]
     )
   end
 end

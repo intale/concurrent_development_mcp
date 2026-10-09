@@ -22,7 +22,6 @@ module Coordinator
           def selected_candidate_id: () -> String?
           def selected_candidate_event: () -> EventReference?
           def selected_candidate_checkpoint_kind: () -> String?
-          def completed_at: () -> String?
           def absent?: () -> bool
           def apply: (Events::Base event) -> State
         end

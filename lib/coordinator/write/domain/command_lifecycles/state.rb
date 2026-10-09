@@ -53,7 +53,7 @@ module Coordinator::Write
 
         def apply(event, canonical_input_digest: nil)
           attributes = case event
-                       when Events::CommandRegisteredV1
+          when Events::CommandRegisteredV1
                          {
                            command_id: event.command_id,
                            request_id: event.request_id,
@@ -61,23 +61,16 @@ module Coordinator::Write
                            canonical_input_digest:,
                            status: "registered"
                          }
-                       when Events::CommandSucceededV1
+          when Events::CommandSucceededV1
                          { status: "succeeded" }
-                       when Events::CommandRejectedV1
-                         {
-                           status: "rejected",
-                           rejection_code: event.code,
-                           rejection_reason: event.reason,
-                           rejection_retryable: event.retryable
-                         }
-                       when Events::CommandRejectedV2
+          when Events::CommandRejectedV2
                          {
                            status: "rejected",
                            rejection_code: event.error.code,
                            rejection_reason: event.error.message,
                            rejection_retryable: event.retryable
                          }
-                       end
+          end
 
           self.class.new(to_h.merge(attributes))
         end

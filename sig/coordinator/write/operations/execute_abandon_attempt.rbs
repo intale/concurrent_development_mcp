@@ -10,10 +10,7 @@ module Coordinator
           def work_item_event_id: () -> String
         end
 
-        class InvalidEventPlan < StandardError
-        end
-
-        def initialize: (event_store: _EventStore, ?contract: Contracts::AbandonAttempt, ?decider: Domain::Attempts::Abandon, ?input_digest: CommandInputDigest, ?clock: Shared::_Clock, ?id_generator: Shared::_IdGenerator, ?event_factory: EventFactory, ?schema_registry: EventSchemaRegistry, ?stream_factory: StreamFactory, ?event_plan_contract: Contracts::AttemptAbandonmentEventPlan) -> void
+        def initialize: (event_store: _EventStore, ?contract: Contracts::AbandonAttempt, ?decider: Domain::Attempts::Abandon, ?input_digest: CommandInputDigest, ?clock: Shared::_Clock, ?id_generator: Shared::_IdGenerator, ?event_factory: EventFactory, ?schema_registry: EventSchemaRegistry, ?stream_factory: StreamFactory, ?set_loader: WorkIntentionSetLoader, ?intention_loader: WorkIntentionLoader, ?resource_loader: WorkIntentionResourceLoader, ?candidate_loader: Candidates::SubmissionByAttemptLoader, ?repository_registration_loader: RepositoryRegistrationLoader, ?repository_marker_builder: RepositoryMarkerBuilder) -> void
         %a{rbs:test:skip}
         def call: (command_input input) -> Dry::Monads::Result
         def prepare: (command_input input) -> Dry::Monads::Result

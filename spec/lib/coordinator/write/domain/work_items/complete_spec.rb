@@ -106,8 +106,7 @@ RSpec.describe Coordinator::Write::Domain::WorkItems::Complete do
         active_agent_id: "agent-7",
         selected_candidate_id: nil,
         selected_candidate_event: nil,
-        produced_outputs: [],
-        completed_at: nil
+        produced_outputs: []
       }.merge(overrides)
     )
   end
@@ -130,8 +129,7 @@ RSpec.describe Coordinator::Write::Domain::WorkItems::Complete do
         lease_released_at: "2026-08-25T07:59:00.000000Z",
         status: "active",
         selected_candidate_id: nil,
-        selected_candidate_event: nil,
-        completed_at: nil
+        selected_candidate_event: nil
       }.merge(overrides)
     )
   end

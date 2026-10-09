@@ -21,16 +21,6 @@ module Coordinator::Read
         facts = events.to_h { |event| [ event.type, [ load_event(event), event ] ] }
         created, created_event = fetch_fact(facts, "ChangeSetCreated")
 
-        if created.is_a?(Coordinator::Write::Events::ChangeSetCreatedV1)
-          criteria, = fetch_fact(facts, "ChangeSetAcceptanceCriteriaDefined")
-          return build_view(
-            change_set_id:,
-            goal: created.goal,
-            acceptance_criteria: criteria.acceptance_criteria,
-            created_at: timestamp(created_event)
-          )
-        end
-
         goal, = fetch_fact(facts, "ChangeSetGoalDefined")
         criteria, = fetch_fact(facts, "ChangeSetAcceptanceCriteriaDefined")
         identities = [ created.change_set_id, goal.change_set_id, criteria.change_set_id ]

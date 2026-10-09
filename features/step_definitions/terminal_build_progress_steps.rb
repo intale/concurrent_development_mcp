@@ -131,6 +131,26 @@ Given("terminal coordination {string} has a consumer blocked on producer complet
   @dependency_blocked_context = terminal_context(work_item_id: ids.fetch(:consumer_work_item_id))
 end
 
+Then("completion context uses native event times and lean completion facts") do
+  ids = @terminal_coordination.fetch(:ids)
+  context = @terminal_converged_context.dig("data", "context")
+  facts = [
+    [ terminal_change_set_events(ids.fetch(:change_set_id)).sole,
+      "change_set_id", ids.fetch(:change_set_id), context.fetch("change_set") ],
+    [ terminal_work_item_events(ids.fetch(:work_item_id)).find { _1.type == "WorkItemCompleted" },
+      "work_item_id", ids.fetch(:work_item_id), context.fetch("work_items").sole ],
+    [ terminal_attempt_events(ids.fetch(:attempt_id)).find { _1.type == "AttemptCompleted" },
+      "attempt_id", ids.fetch(:attempt_id), context.fetch("attempts").sole ]
+  ]
+  facts.each do |event, identity_key, identity, observed|
+    assert_acceptance_equal(2, event.metadata.fetch("schema_version"), "Current #{event.type} schema")
+    assert_acceptance_equal({ identity_key => identity }, event.data, "Lean #{event.type} fact")
+    assert_acceptance_equal(
+      event.created_at.utc.iso8601(6), observed.fetch("completed_at"), "Native #{event.type} occurrence"
+    )
+  end
+end
+
 When("the producer completes through an MCP Task and build progress handles its completion") do
   coordination = @dependency_terminal.fetch(:candidate_coordination)
   @dependency_candidate = submit_terminal_candidate(coordination, prefix: @dependency_prefix)

@@ -16,11 +16,10 @@ module Coordinator::Read
         registration = payloads.first
         terminal = payloads.last
         status = case terminal
-                 when Coordinator::Write::Events::CommandSucceededV1 then "succeeded"
-                 when Coordinator::Write::Events::CommandRejectedV1,
-                      Coordinator::Write::Events::CommandRejectedV2 then "rejected"
-                 else "registered"
-                 end
+        when Coordinator::Write::Events::CommandSucceededV1 then "succeeded"
+        when Coordinator::Write::Events::CommandRejectedV2 then "rejected"
+        else "registered"
+        end
         new(
           command_id: registration.command_id,
           request_id: registration.request_id,

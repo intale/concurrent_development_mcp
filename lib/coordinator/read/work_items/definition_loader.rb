@@ -20,18 +20,6 @@ module Coordinator::Read
         )
         facts = events.to_h { |event| [ event.type, [ load_event(event), event ] ] }
         created, created_event = fetch_fact(facts, "WorkItemCreated")
-        if created.is_a?(Coordinator::Write::Events::WorkItemCreatedV1)
-          return build_view(
-            work_item_id:,
-            change_set_id: created.change_set_id,
-            repository_id: created.repository_id,
-            goal: created.goal,
-            acceptance_criteria: created.acceptance_criteria,
-            competitive_mode: created.competitive_mode,
-            created_at: timestamp(created_event)
-          )
-        end
-
         membership, = fetch_fact(facts, "WorkItemAddedToChangeSet")
         repository, = fetch_fact(facts, "WorkItemAssignedToRepository")
         goal, = fetch_fact(facts, "WorkItemGoalDefined")

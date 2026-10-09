@@ -19,7 +19,7 @@ module Coordinator::Read
       end
 
       rule(:event_type, :schema_version) do
-        supported = values[:event_type] == "CommandSucceeded" ? values[:schema_version] == 1 : true
+        supported = values[:event_type] == "CommandSucceeded" ? values[:schema_version] == 1 : values[:schema_version] == 2
         key(:schema_version).failure("is not supported for the terminal event type") unless supported
       end
     end

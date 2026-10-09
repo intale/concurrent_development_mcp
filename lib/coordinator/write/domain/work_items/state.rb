@@ -19,7 +19,6 @@ module Coordinator::Write
                   Types::Array.of(Types.Instance(WorkItemOutputV1))
                     .constrained(max_size: Types::WORK_ITEM_OUTPUT_MAXIMUM_COUNT)
                     .default([].freeze)
-        attribute :completed_at, Types::Timestamp.optional.default(nil)
 
         def self.initial
           new(
@@ -35,7 +34,6 @@ module Coordinator::Write
             selected_candidate_id: nil,
             selected_candidate_event: nil,
             produced_outputs: [],
-            completed_at: nil
           )
         end
 
@@ -49,22 +47,6 @@ module Coordinator::Write
 
         def apply(event)
           case event
-          when Events::WorkItemCreatedV1
-            rebuild(
-              work_item_id: event.work_item_id,
-              change_set_id: event.change_set_id,
-              repository_id: event.repository_id,
-              goal: event.goal,
-              acceptance_criteria: event.acceptance_criteria,
-              competitive_mode: event.competitive_mode,
-              status: "planned",
-              active_attempt_id: nil,
-              active_agent_id: nil,
-              selected_candidate_id: nil,
-              selected_candidate_event: nil,
-              produced_outputs: [],
-              completed_at: nil
-            )
           when Events::WorkItemCreatedV2
             rebuild(work_item_id: event.work_item_id, status: "planned")
           when Events::WorkItemAddedToChangeSetV2
@@ -77,11 +59,11 @@ module Coordinator::Write
             rebuild(acceptance_criteria: event.acceptance_criteria)
           when Events::WorkItemCompetitiveModeSelectedV1
             rebuild(competitive_mode: event.competitive_mode)
-          when Events::WorkItemMadeReadyV1, Events::WorkItemMadeReadyV2
+          when Events::WorkItemMadeReadyV2
             rebuild(status: "ready")
-          when Events::WorkItemAcquiredV1, Events::WorkItemAcquiredV2
+          when Events::WorkItemAcquiredV2
             rebuild(status: "active", active_attempt_id: event.attempt_id, active_agent_id: event.agent_id)
-          when Events::WorkItemRequeuedV1, Events::WorkItemRequeuedV2
+          when Events::WorkItemRequeuedV2
             rebuild(
               status: "ready",
               active_attempt_id: nil,
@@ -89,22 +71,12 @@ module Coordinator::Write
               selected_candidate_id: nil,
               selected_candidate_event: nil,
               produced_outputs: [],
-              completed_at: nil
             )
-          when Events::WorkItemCandidateSelectedV1, Events::WorkItemCandidateSelectedV2
+          when Events::WorkItemCandidateSelectedV2
             rebuild(selected_candidate_id: event.candidate_id, selected_candidate_event: event.candidate_event)
           when Events::WorkItemOutputRecordedV1
             output = WorkItemOutputV1.new(kind: event.output_kind, key: event.output_key)
             rebuild(produced_outputs: produced_outputs + [ output ])
-          when Events::WorkItemCompletedV1
-            rebuild(
-              status: "completed",
-              active_attempt_id: event.attempt_id,
-              selected_candidate_id: event.candidate_id,
-              selected_candidate_event: event.candidate_event,
-              produced_outputs: event.produced_outputs,
-              completed_at: event.completed_at
-            )
           when Events::WorkItemCompletedV2
             rebuild(status: "completed")
           else

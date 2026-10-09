@@ -14,11 +14,8 @@ RSpec.describe Coordinator::Processes::ReadinessCommandBuilder do
     )
   end
   let(:source_payload) do
-    Coordinator::Write::Events::ChangeSetActivatedV1.new(
-      change_set_id: "CS-100",
-      work_item_count: 1,
-      dependency_count: 0,
-      activated_at: "2026-08-20T14:15:00.000000Z"
+    Coordinator::Write::Events::ChangeSetActivatedV2.new(
+      change_set_id: "CS-100"
     )
   end
   let(:source) do

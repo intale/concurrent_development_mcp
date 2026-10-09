@@ -4,10 +4,8 @@ RSpec.describe Coordinator::Write::EventFactory do
   subject(:factory) { described_class.new }
 
   let(:domain_event) do
-    Coordinator::Write::Events::ChangeSetCreatedV1.new(
-      change_set_id: "CS-100",
-      goal: "Coordinate an API change",
-      created_at: "2026-08-20T14:10:00.000000Z"
+    Coordinator::Write::Events::ChangeSetCreatedV2.new(
+      change_set_id: "CS-100"
     )
   end
   let(:metadata) do
@@ -33,9 +31,7 @@ RSpec.describe Coordinator::Write::EventFactory do
     expect(event.id).to eq(event_id)
     expect(event.type).to eq("ChangeSetCreated")
     expect(event.data).to eq(
-      "change_set_id" => "CS-100",
-      "goal" => "Coordinate an API change",
-      "created_at" => "2026-08-20T14:10:00.000000Z"
+      "change_set_id" => "CS-100"
     )
     expect(event.metadata).to eq(
       "command_id" => "cmd-100",
@@ -43,7 +39,7 @@ RSpec.describe Coordinator::Write::EventFactory do
       "actor_id" => "planner-1",
       "actor_authenticated" => false,
       "recorded_by" => "coordinator",
-      "schema_version" => 1
+      "schema_version" => 2
     )
     expect(event.markers).to eq([ "change-set:CS-100", "command:cmd-100" ])
     expect(event.markers).not_to be_frozen
@@ -98,31 +94,29 @@ RSpec.describe Coordinator::Write::EventFactory do
     end.to raise_error(Dry::Types::ConstraintError)
   end
 
-  it "loads historical string-key payloads through the versioned registry" do
+  it "loads persisted current string-key payloads through the versioned registry" do
     loaded = Coordinator::Write::EventSchemaRegistry.new.load(
       type: "ChangeSetCreated",
-      schema_version: 1,
+      schema_version: 2,
       data: {
-        "change_set_id" => "CS-100",
-        "goal" => "Coordinate an API change",
-        "created_at" => "2026-08-20T14:10:00.000000Z"
+        "change_set_id" => "CS-100"
       }
     )
 
     expect(loaded).to eq(domain_event)
   end
 
-  it "rejects unknown fields when loading a historical payload" do
+  it "rejects unknown fields when loading a persisted current payload" do
     expect do
       Coordinator::Write::EventSchemaRegistry.new.load(
         type: "ChangeSetCreated",
-        schema_version: 1,
+        schema_version: 2,
         data: domain_event.to_h.merge("unknown" => true)
       )
     end.to raise_error(Dry::Struct::Error, /unexpected keys/)
   end
 
-  it "rejects superseded Task and content-encoding event schemas" do
+  it "rejects superseded event schemas" do
     superseded = [
       [ "CoordinationTaskSubmitted", 1 ],
       [ "CoordinationTaskCompleted", 1 ],
@@ -136,7 +130,25 @@ RSpec.describe Coordinator::Write::EventFactory do
       [ "RepositoryRegistered", 1 ],
       [ "ResourceRegistered", 1 ],
       [ "ResourceBound", 1 ],
-      [ "ResourceUnbound", 1 ]
+      [ "ResourceUnbound", 1 ],
+      [ "ChangeSetCreated", 1 ],
+      [ "ChangeSetAcceptanceCriteriaDefined", 1 ],
+      [ "CommandRejected", 1 ],
+      [ "WorkItemCreated", 1 ],
+      [ "WorkItemAddedToChangeSet", 1 ],
+      [ "WorkItemDependencyDeclared", 1 ],
+      [ "WorkItemDependencySatisfied", 1 ],
+      [ "ChangeSetActivated", 1 ],
+      [ "ChangeSetCompleted", 1 ],
+      [ "WorkItemMadeReady", 1 ],
+      [ "WorkItemAcquired", 1 ],
+      [ "WorkItemRequeued", 1 ],
+      [ "WorkItemCandidateSelected", 1 ],
+      [ "WorkItemCompleted", 1 ],
+      [ "AttemptAuthorized", 1 ],
+      [ "AttemptStarted", 1 ],
+      [ "AttemptAbandoned", 2 ],
+      [ "AttemptCompleted", 1 ]
     ]
 
     superseded.each do |type, schema_version|
@@ -146,18 +158,17 @@ RSpec.describe Coordinator::Write::EventFactory do
     end
   end
 
-  it "reconstructs nested dry values from historical event hashes" do
+  it "reconstructs nested dry values from persisted current event hashes" do
     loaded = Coordinator::Write::EventSchemaRegistry.new.load(
       type: "WorkItemDependencyDeclared",
-      schema_version: 1,
+      schema_version: 2,
       data: {
         "change_set_id" => "CS-100",
         "dependency_id" => "DEP-1",
         "producer_work_item_id" => "W-100",
         "consumer_work_item_id" => "W-200",
         "dependency_kind" => "requires_artifact",
-        "required_output" => { "kind" => "artifact", "key" => "openapi-v1" },
-        "declared_at" => "2026-08-20T14:14:00.000000Z"
+        "required_output" => { "kind" => "artifact", "key" => "openapi-v1" }
       }
     )
 
