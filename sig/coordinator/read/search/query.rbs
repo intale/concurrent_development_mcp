@@ -1,0 +1,7 @@
+class Coordinator::Read::Search::Query < Coordinator::Shared::Value
+  def fields: () -> Array[Coordinator::Read::Search::Branch]
+  def filters: () -> Coordinator::Read::Search::Filters
+  def limit: () -> Integer
+  def fingerprint: () -> String
+  def boundary: () -> Coordinator::Read::Search::CursorBoundary?
+end

@@ -1,0 +1,4 @@
+class Coordinator::Read::Search::SqlFragment < Coordinator::Shared::Value
+  def sql: () -> String
+  def binds: () -> Array[String]
+end

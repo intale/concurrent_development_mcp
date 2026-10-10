@@ -1,0 +1,4 @@
+class Coordinator::Read::Search::PageMerger
+  def initialize: (cursor_codec: Coordinator::Read::Search::CursorCodec) -> void
+  def call: (Array[Hash[String, untyped]] rows, query: Coordinator::Read::Search::Query) -> Coordinator::Read::Search::Page
+end

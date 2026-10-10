@@ -1,0 +1,4 @@
+class Coordinator::Read::Search::Branch < Coordinator::Shared::Value
+  def field: () -> Coordinator::Read::Search::Field
+  def expression: () -> Coordinator::Read::Search::Node
+end

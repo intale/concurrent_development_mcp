@@ -1,0 +1,8 @@
+class Coordinator::Read::Search::ArtifactSources
+  def call: (Coordinator::Read::Search::Field field) -> Array[Coordinator::Read::Search::Source]
+  private
+  def head: (Coordinator::Read::Search::Field field) -> Coordinator::Read::Search::Source
+  def observation: (Coordinator::Read::Search::Field field) -> Coordinator::Read::Search::Source
+  def equality: (String left, String right) -> String
+  def source: (Coordinator::Read::Search::Field field, table: String, from: String, row_id: String, identity: String, entity_id: String, scope: String, updated_at: String, owner: String, observation_id: String) -> Coordinator::Read::Search::Source
+end

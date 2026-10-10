@@ -1,0 +1,6 @@
+class Coordinator::Read::Search::QueryBuilder
+  def initialize: (cursor_codec: Coordinator::Read::Search::CursorCodec, ?contract: Coordinator::Read::Contracts::DevelopmentSearch) -> void
+  def call: (Coordinator::Read::Search::input input) -> Dry::Monads::Result
+  private
+  def build_node: (Hash[Symbol, untyped] input) -> Coordinator::Read::Search::Node
+end

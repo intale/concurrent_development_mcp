@@ -1,0 +1,5 @@
+class Coordinator::Read::Search::Problem < Coordinator::Shared::Value
+  def code: () -> String
+  def message: () -> String
+  def details: () -> Hash[untyped, untyped]
+end

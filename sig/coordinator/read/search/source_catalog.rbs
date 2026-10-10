@@ -1,0 +1,14 @@
+class Coordinator::Read::Search::SourceCatalog
+  def initialize: (?artifact_sources: Coordinator::Read::Search::ArtifactSources) -> void
+  def call: (Coordinator::Read::Search::Field field) -> Array[Coordinator::Read::Search::Source]
+  def skill: (Coordinator::Read::Search::Field field) -> Coordinator::Read::Search::Source
+  def skill_asset: (Coordinator::Read::Search::Field field) -> Coordinator::Read::Search::Source
+  def resource: (Coordinator::Read::Search::Field field) -> Coordinator::Read::Search::Source
+  def guidance: (Coordinator::Read::Search::Field field) -> Coordinator::Read::Search::Source
+  def agent_choice: (Coordinator::Read::Search::Field field) -> Coordinator::Read::Search::Source
+  def decision: (Coordinator::Read::Search::Field field) -> Coordinator::Read::Search::Source
+  def work_item: (Coordinator::Read::Search::Field field) -> Coordinator::Read::Search::Source
+  private
+  def build: (Coordinator::Read::Search::Field field, table: String, from: String, row_id: String, owner: String, identity: String, entity_id: String, updated_at: String, membership: String, retrieval: String, ?scope: String, ?repository_id: String, ?direct_scope: bool, ?condition: String) -> Coordinator::Read::Search::Source
+  def guidance_membership: () -> String
+end

@@ -1,0 +1,9 @@
+class Coordinator::Read::Search::ExecutionBudget
+  class Exceeded < StandardError
+  end
+  def initialize: () -> void
+  def statement_milliseconds: () -> Integer
+  def check!: () -> nil
+  private
+  def now: () -> Float
+end

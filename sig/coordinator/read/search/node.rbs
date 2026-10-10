@@ -1,0 +1,7 @@
+class Coordinator::Read::Search::Node < Coordinator::Shared::Value
+  def operator: () -> String?
+  def operands: () -> Array[Coordinator::Read::Search::Node]
+  def match: () -> String?
+  def value: () -> String?
+  def case_sensitive: () -> bool
+end

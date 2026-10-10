@@ -1,0 +1,11 @@
+class Coordinator::Read::Search::FieldQueryCompiler
+  def initialize: (?sources: Coordinator::Read::Search::SourceCatalog, ?expressions: Coordinator::Read::Search::ExpressionCompiler) -> void
+  def call: (Coordinator::Read::Search::Branch branch, query: Coordinator::Read::Search::Query) -> Coordinator::Read::Search::SqlFragment
+  private
+  def source_query: (Coordinator::Read::Search::Source source, branch: Coordinator::Read::Search::Branch, query: Coordinator::Read::Search::Query, binds: Array[String]) -> String
+  def filter_conditions: (Coordinator::Read::Search::Source source, Coordinator::Read::Search::Filters filters, Array[String] binds) -> Array[String]
+  def cursor_condition: (Coordinator::Read::Search::Source source, String entity_type, Coordinator::Read::Search::CursorBoundary boundary, Array[String] binds) -> String
+  def bind: (Array[String] binds, String value) -> String
+  def result_scope: (Coordinator::Read::Search::Source source, Coordinator::Read::Search::Filters filters, Array[String] binds) -> String
+  def result_repository: (Coordinator::Read::Search::Source source, Coordinator::Read::Search::Filters filters, Array[String] binds) -> String
+end

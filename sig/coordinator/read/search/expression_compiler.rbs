@@ -1,0 +1,7 @@
+class Coordinator::Read::Search::ExpressionCompiler
+  def call: (Coordinator::Read::Search::Node node, column: String, ?offset: Integer) -> Coordinator::Read::Search::SqlFragment
+  def excerpt_position: (Coordinator::Read::Search::Node node, column: String, ?offset: Integer) -> Coordinator::Read::Search::SqlFragment
+  private
+  def predicate: (Coordinator::Read::Search::Node node, String column, Array[String] binds, Integer offset) -> String
+  def positive_literals: (Coordinator::Read::Search::Node node, ?bool negated) -> Array[Coordinator::Read::Search::Node]
+end

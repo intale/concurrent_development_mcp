@@ -1,0 +1,13 @@
+class Coordinator::Read::Search::CursorCodec
+  class InvalidCursor < ArgumentError
+  end
+  class PayloadContract < Dry::Validation::Contract
+    def call: (Hash[String | Symbol, untyped]) -> Dry::Validation::Result
+  end
+  def initialize: (secret: String, ?contract: PayloadContract, ?canonical_json: Coordinator::Shared::CanonicalJson) -> void
+  def fingerprint: (fields: Array[Coordinator::Read::Search::Branch], filters: Coordinator::Read::Search::Filters) -> String
+  def encode: (boundary: Coordinator::Read::Search::CursorBoundary, fingerprint: String) -> String
+  def decode: (String cursor, fingerprint: String) -> Coordinator::Read::Search::CursorBoundary
+  private
+  def signature: (String payload) -> String
+end

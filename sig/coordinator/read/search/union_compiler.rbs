@@ -1,0 +1,3 @@
+class Coordinator::Read::Search::UnionCompiler
+  def call: (Array[Hash[String, untyped]] rows, limit: Integer) -> Coordinator::Read::Search::SqlFragment
+end

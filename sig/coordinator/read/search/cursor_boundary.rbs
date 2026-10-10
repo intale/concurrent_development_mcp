@@ -1,0 +1,5 @@
+class Coordinator::Read::Search::CursorBoundary < Coordinator::Shared::Value
+  def updated_at: () -> String
+  def entity_type: () -> String
+  def document_id: () -> String
+end

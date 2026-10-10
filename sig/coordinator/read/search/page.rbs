@@ -1,0 +1,5 @@
+class Coordinator::Read::Search::Page < Coordinator::Shared::Value
+  def items: () -> Array[Coordinator::Read::Search::Document]
+  def has_more: () -> bool
+  def cursor: () -> String?
+end

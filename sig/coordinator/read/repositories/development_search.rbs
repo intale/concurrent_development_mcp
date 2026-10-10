@@ -1,0 +1,4 @@
+class Coordinator::Read::Repositories::DevelopmentSearch
+  def initialize: (cursor_codec: Coordinator::Read::Search::CursorCodec, ?compiler: Coordinator::Read::Search::FieldQueryCompiler, ?union: Coordinator::Read::Search::UnionCompiler, ?merger: Coordinator::Read::Search::PageMerger) -> void
+  def page: (Coordinator::Read::Search::Query query) -> Dry::Monads::Result
+end

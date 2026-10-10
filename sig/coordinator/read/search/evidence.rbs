@@ -1,0 +1,6 @@
+class Coordinator::Read::Search::Evidence < Coordinator::Shared::Value
+  def field: () -> String
+  def path: () -> Array[String]
+  def excerpt: () -> String
+  def excerpt_offset: () -> Integer
+end

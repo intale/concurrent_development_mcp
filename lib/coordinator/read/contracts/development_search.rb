@@ -35,10 +35,19 @@ module Coordinator::Read
       end
 
       rule(:filters) do
-        next unless value && value[:entity_types]
+        next unless value
+
+        if value[:scope] && (!value[:scope].valid_encoding? || value[:scope].include?("\0"))
+          key.failure("scope must be valid UTF-8 text without NUL characters")
+        end
+        next unless value[:entity_types]
 
         types = value[:entity_types]
         key.failure("entity types must be distinct") unless types.uniq == types
+      end
+
+      rule(:cursor) do
+        key.failure("cursor exceeds the byte limit") if value && value.bytesize > Search::Limits::CURSOR_BYTES
       end
 
       rule do

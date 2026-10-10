@@ -1,0 +1,11 @@
+class Coordinator::Read::Search::Document < Coordinator::Shared::Value
+  def entity_type: () -> String
+  def document_id: () -> String
+  def entity_id: () -> String?
+  def updated_at: () -> String
+  def scope: () -> String?
+  def repository_id: () -> String?
+  def retrieval: () -> Hash[String, untyped]?
+  def provenance: () -> Hash[String, untyped]
+  def matches: () -> Array[Coordinator::Read::Search::Evidence]
+end

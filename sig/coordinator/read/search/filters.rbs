@@ -1,0 +1,5 @@
+class Coordinator::Read::Search::Filters < Coordinator::Shared::Value
+  def scope: () -> String?
+  def repository_id: () -> String?
+  def entity_types: () -> Array[String]
+end

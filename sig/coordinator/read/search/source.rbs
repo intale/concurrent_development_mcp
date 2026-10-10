@@ -1,0 +1,18 @@
+class Coordinator::Read::Search::Source < Coordinator::Shared::Value
+  def table: () -> String
+  def from: () -> String
+  def row_id: () -> String
+  def identity: () -> String
+  def entity_id: () -> String
+  def updated_at: () -> String
+  def scope: () -> String
+  def repository_id: () -> String
+  def membership: () -> String
+  def value: () -> String
+  def path: () -> String
+  def condition: () -> String
+  def retrieval: () -> String
+  def provenance: () -> String
+  def direct_scope: () -> bool
+  def multiple_values: () -> bool
+end
