@@ -49,6 +49,25 @@ Solid Queue worker. There is no Node.js server in production.
    file or Compose project, set `PRODUCTION_ENV_FILE` and
    `PRODUCTION_COMPOSE_PROJECT` when running the executable.
 
+For MCP requests using a non-loopback hostname, set `MCP_ALLOWED_HOSTS` in the
+server process environment, for example:
+
+```dotenv
+MCP_ALLOWED_HOSTS=mcp.example.com,api.example.com:8088
+```
+
+Entries are comma-separated additional allowed `Host` values. A bare hostname
+allows any port; `hostname:port` allows that exact value. Do not include a URL
+scheme or path. Matching is case-insensitive, and the default loopback hosts
+(`localhost`, `127.0.0.1`, and `::1`) remain allowed. An unset or blank value keeps
+the loopback-only default. Restart the MCP process after changing this setting.
+
+Compose's `--env-file` supplies interpolation values; it does not automatically
+forward every variable into containers. The current production Compose file
+does not forward `MCP_ALLOWED_HOSTS`, so explicitly pass it to the `web` service
+environment in your deployment configuration. Setting it in `.env.production`
+alone is not sufficient.
+
 The script builds the image and assets, starts healthy PostgreSQL/PgBouncer,
 stops existing consumers, creates missing databases and applies pending
 migrations, then recreates consumers from the same image. Run it again after
