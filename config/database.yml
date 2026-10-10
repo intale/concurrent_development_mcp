@@ -12,16 +12,17 @@
 # Configure Using Gemfile
 # gem "pg"
 #
+<% production = ENV.fetch("RAILS_ENV", ENV.fetch("RACK_ENV", "development")) == "production" %>
 default: &default
   adapter: postgresql
   encoding: unicode
   # For details on connection pooling, see Rails configuration guide
   # https://guides.rubyonrails.org/configuring.html#database-pooling
-  max_connections: <%= ENV.fetch("RAILS_MAX_THREADS") { 20 } %>
-  host: <%= ENV.fetch("DATABASE_HOST") { "localhost" } %>
-  port: <%= ENV.fetch("DATABASE_PORT") { "6432" } %>
-  username: <%= ENV.fetch("DATABASE_USERNAME") { "postgres" } %>
-  password: <%= ENV.fetch("DATABASE_PASSWORD") { "postgres" } %>
+  max_connections: <%= ENV.fetch("DATABASE_POOL", ENV.fetch("RAILS_MAX_THREADS", "20")) %>
+  host: <%= (production ? ENV.fetch("DATABASE_HOST") : ENV.fetch("DATABASE_HOST", "localhost")).to_json %>
+  port: <%= ENV.fetch("DATABASE_PORT", production ? "5432" : "6432") %>
+  username: <%= (production ? ENV.fetch("DATABASE_USERNAME") : ENV.fetch("DATABASE_USERNAME", "postgres")).to_json %>
+  password: <%= (production ? ENV.fetch("DATABASE_PASSWORD") : ENV.fetch("DATABASE_PASSWORD", "postgres")).to_json %>
   prepared_statements: false
   advisory_locks: false
 
@@ -93,16 +94,14 @@ test:
 production:
   primary: &primary_production
     <<: *default
-    database: concurrent_development_mcp_production
+    database: <%= ENV.fetch("DATABASE_NAME", "concurrent_development_mcp_production").to_json %>
   cache:
     <<: *primary_production
-    database: concurrent_development_mcp_production_cache
+    database: <%= ENV.fetch("CACHE_DATABASE_NAME", "concurrent_development_mcp_production_cache").to_json %>
     migrations_paths: db/cache_migrate
+    schema_format: ruby
   queue:
     <<: *primary_production
-    database: concurrent_development_mcp_production_queue
+    database: <%= ENV.fetch("QUEUE_DATABASE_NAME", "concurrent_development_mcp_production_queue").to_json %>
     migrations_paths: db/queue_migrate
-  cable:
-    <<: *primary_production
-    database: concurrent_development_mcp_production_cable
-    migrations_paths: db/cable_migrate
+    schema_format: ruby
