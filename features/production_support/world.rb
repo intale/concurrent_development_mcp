@@ -4,6 +4,7 @@ require "json"
 require "net/http"
 require "open3"
 require "securerandom"
+require "tempfile"
 require "tmpdir"
 require "time"
 
@@ -17,9 +18,12 @@ module ProductionDeploymentWorld
   def production_setup
     @production_data = Dir.mktmpdir("production-acceptance-", File.join(ROOT, "tmp"))
     File.chmod(0o755, @production_data)
+    @production_environment_file = Tempfile.new([ "production-acceptance-", ".env" ], File.join(ROOT, "tmp"))
+    production_write_settings("MCP_ALLOWED_HOSTS" => "mcp-initial.example", "MCP_MAX_REQUEST_BYTES" => "65536",
+                              "COORDINATOR_DEPLOYMENT_SAMPLE" => "initial")
     @production_project = "coordinator-acceptance-#{SecureRandom.hex(6)}"
     @production_environment = {
-      "PRODUCTION_ENV_FILE" => "/dev/null", "PRODUCTION_COMPOSE_PROJECT" => @production_project,
+      "PRODUCTION_ENV_FILE" => @production_environment_file.path, "PRODUCTION_COMPOSE_PROJECT" => @production_project,
       "PG_HOST_DATA_DIR" => @production_data, "POSTGRES_USER" => "coordinator",
       "POSTGRES_PASSWORD" => SecureRandom.hex(32), "SECRET_KEY_BASE" => SecureRandom.hex(64),
       "DATABASE_NAME" => "concurrent_development_mcp_production",
@@ -42,12 +46,19 @@ module ProductionDeploymentWorld
   end
 
   def production_compose(*arguments)
-    production_run("docker", "compose", "--env-file", "/dev/null", "--project-name", @production_project,
+    production_run("docker", "compose", "--env-file", @production_environment_file.path, "--project-name", @production_project,
                    "-f", "docker-compose.production.yml", *arguments).first
   end
 
   def production_deploy(environment: {}, allow_failure: false)
     production_run(File.join(ROOT, "bin/deploy-production"), environment:, allow_failure:)
+  end
+
+  def production_write_settings(settings)
+    @production_environment_file.rewind
+    @production_environment_file.truncate(0)
+    @production_environment_file.write(settings.map { |key, value| "#{key}=#{value}\n" }.join)
+    @production_environment_file.flush
   end
 
   def production_cleanup
@@ -63,6 +74,7 @@ module ProductionDeploymentWorld
                    "type=bind,source=#{@production_data},target=/verification-data", POSTGRES_IMAGE,
                    "-ec", "find /verification-data -mindepth 1 -delete")
     Dir.rmdir(@production_data)
+    @production_environment_file.close!
   end
 
   def production_eventually(label, timeout: 60)
@@ -80,7 +92,7 @@ module ProductionDeploymentWorld
     Net::HTTP.start("127.0.0.1", 18088, open_timeout: 5, read_timeout: 15) { _1.get(path) }
   end
 
-  def production_rpc(method, params, name: nil)
+  def production_rpc_response(method, params, name: nil, host: nil)
     @production_request_sequence += 1
     request = Net::HTTP::Post.new("/mcp")
     request["Content-Type"] = "application/json"
@@ -88,6 +100,7 @@ module ProductionDeploymentWorld
     request["MCP-Protocol-Version"] = "2026-07-28"
     request["Mcp-Method"] = method
     request["Mcp-Name"] = name if name
+    request["Host"] = host if host
     request.body = JSON.generate(jsonrpc: "2.0", id: @production_request_sequence, method:, params: params.merge(
       _meta: {
         "io.modelcontextprotocol/protocolVersion" => "2026-07-28",
@@ -95,7 +108,11 @@ module ProductionDeploymentWorld
         "io.modelcontextprotocol/clientInfo" => { name: "production-cucumber", version: "1.0" }
       }
     ))
-    response = Net::HTTP.start("127.0.0.1", 18088, open_timeout: 5, read_timeout: 15) { _1.request(request) }
+    Net::HTTP.start("127.0.0.1", 18088, open_timeout: 5, read_timeout: 15) { _1.request(request) }
+  end
+
+  def production_rpc(method, params, name: nil, host: nil)
+    response = production_rpc_response(method, params, name:, host:)
     raise "MCP HTTP #{response.code}: #{response.body}" unless response.code == "200"
 
     parsed = JSON.parse(response.body)

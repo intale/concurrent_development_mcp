@@ -5,6 +5,9 @@ x-application: &application
   init: true
   restart: unless-stopped
   stop_grace_period: 60s
+  # Share runtime settings as well as Compose interpolation values. The
+  # explicit environment below keeps production and pooled database routing.
+  env_file: ${PRODUCTION_ENV_FILE:-.env.production}
   environment: &application-environment
     RAILS_ENV: production
     RAILS_LOG_TO_STDOUT: "true"

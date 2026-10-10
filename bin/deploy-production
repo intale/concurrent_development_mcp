@@ -14,6 +14,8 @@ if ! [[ "$production_project" =~ ^[a-z0-9][a-z0-9_-]*$ ]]; then
   exit 64
 fi
 
+# Use the same selected file for interpolation and application runtime settings.
+export PRODUCTION_ENV_FILE="$production_env_file"
 production_compose=(docker compose --env-file "$production_env_file" --project-name "$production_project" -f docker-compose.production.yml)
 production_compose_services=(web subscription-process-managers subscription-task-results subscription-read-models jobs)
 "${production_compose[@]}" config --quiet

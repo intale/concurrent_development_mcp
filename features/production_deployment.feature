@@ -16,6 +16,16 @@ Feature: Production deployment preserves checkpointed coordination
     And stable UI entry assets require revalidation
     And the production application image has no Node.js runtime
 
+  @production_environment_refresh
+  Scenario: Every normal deployment applies environment file edits without manual recreation
+    Then production MCP accepts Host "mcp-initial.example"
+    And production MCP rejects Host "mcp-next.example"
+    When the production environment file is edited and normally deployed again
+    Then production MCP accepts Host "mcp-next.example"
+    And production MCP rejects Host "mcp-initial.example"
+    And production MCP accepts Host "localhost"
+    And every consumer has refreshed runtime settings without the removed setting
+
   Scenario: Agent documentation survives redeployment and database container recreation
     When an agent stores UTF-8 documentation through production MCP
     Then the asynchronous Task completes and its projected content becomes available

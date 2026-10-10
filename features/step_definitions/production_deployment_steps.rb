@@ -47,6 +47,33 @@ Then("the production application image has no Node.js runtime") do
   production_compose("exec", "-T", "web", "/bin/sh", "-ec", 'test "$(id -u)" = 1000; ! command -v node; ! command -v npm')
 end
 
+Then("production MCP accepts Host {string}") do |host|
+  result = production_rpc("tools/list", {}, host:)
+  raise "MCP discovery unavailable for #{host}" unless result.fetch("tools").any?
+end
+
+Then("production MCP rejects Host {string}") do |host|
+  response = production_rpc_response("tools/list", {}, host:)
+  raise "Unexpected Host rejection: #{response.code} #{response.body}" unless response.code == "403" &&
+    JSON.parse(response.body).dig("error", "message") == "Forbidden: Invalid Host header"
+end
+
+When("the production environment file is edited and normally deployed again") do
+  production_write_settings("MCP_ALLOWED_HOSTS" => "mcp-next.example", "MCP_MAX_REQUEST_BYTES" => "131072")
+  production_deploy
+end
+
+Then("every consumer has refreshed runtime settings without the removed setting") do
+  ProductionDeploymentWorld::CONSUMERS.each do |name|
+    # Inspect only test settings, never dump container credentials.
+    script = 'require "json"; puts JSON.generate(ENV.to_h.slice("MCP_ALLOWED_HOSTS", "MCP_MAX_REQUEST_BYTES", "COORDINATOR_DEPLOYMENT_SAMPLE"))'
+    settings = JSON.parse(production_compose("exec", "-T", name, "ruby", "-e", script))
+    raise "Runtime settings not refreshed for #{name}: #{settings}" unless settings == {
+      "MCP_ALLOWED_HOSTS" => "mcp-next.example", "MCP_MAX_REQUEST_BYTES" => "131072"
+    }
+  end
+end
+
 When("an agent stores UTF-8 documentation through production MCP") { production_capture_document }
 Then("the asynchronous Task completes and its projected content becomes available") { production_document_available }
 

@@ -50,7 +50,7 @@ Solid Queue worker. There is no Node.js server in production.
    `PRODUCTION_COMPOSE_PROJECT` when running the executable.
 
 For MCP requests using a non-loopback hostname, set `MCP_ALLOWED_HOSTS` in the
-server process environment, for example:
+production environment file, for example:
 
 ```dotenv
 MCP_ALLOWED_HOSTS=mcp.example.com,api.example.com:8088
@@ -60,13 +60,18 @@ Entries are comma-separated additional allowed `Host` values. A bare hostname
 allows any port; `hostname:port` allows that exact value. Do not include a URL
 scheme or path. Matching is case-insensitive, and the default loopback hosts
 (`localhost`, `127.0.0.1`, and `::1`) remain allowed. An unset or blank value keeps
-the loopback-only default. Restart the MCP process after changing this setting.
+the loopback-only default.
 
-Compose's `--env-file` supplies interpolation values; it does not automatically
-forward every variable into containers. The current production Compose file
-does not forward `MCP_ALLOWED_HOSTS`, so explicitly pass it to the `web` service
-environment in your deployment configuration. Setting it in `.env.production`
-alone is not sufficient.
+Every application service, including preparation and subscription workers, loads
+the selected environment file through Compose's `env_file`. Run
+`bin/deploy-production` after changing `.env.production`: it rereads that file
+and recreates the consumers, applying added, changed, and removed runtime settings
+without another manual step. `docker compose restart` alone does not reload
+container environments. Explicit Compose settings enforce production mode and
+internal PgBouncer routing; shell overrides still take precedence for interpolated
+settings such as database names and published ports. For direct Compose commands
+using a custom file, set `PRODUCTION_ENV_FILE` to that same file as well as
+passing `--env-file`.
 
 The script builds the image and assets, starts healthy PostgreSQL/PgBouncer,
 stops existing consumers, creates missing databases and applies pending
@@ -126,8 +131,8 @@ bundle exec cucumber --profile production_deployment
 Each scenario uses independent disposable host data, a separate Compose project,
 and loopback ports `16435`, `16436`, and `18088`; production/development data are
 not used. It checks preparation, pooled connections, assets, asynchronous MCP
-execution/projection, delayed expiry, failed deploy recovery, and data survival
-across redeployment/container recreation. This topology test runs serially;
+execution/projection, environment refresh, delayed expiry, failed deploy recovery,
+and data survival across redeployment/container recreation. This topology test runs serially;
 the ordinary application test suites retain their fifteen parallel workers.
 
 ### Import your development environment

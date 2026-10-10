@@ -1,18 +1,60 @@
 # frozen_string_literal: true
 
 RSpec.describe "production Compose configuration" do
-  def compose_configuration(overrides = {})
+  def compose_configuration(overrides = {}, environment_file: "/dev/null")
     environment = {
       "POSTGRES_PASSWORD" => "compose-configuration-spec", "SECRET_KEY_BASE" => "compose-configuration-spec",
-      "POSTGRES_USER" => nil, "PG_HOST_DATA_DIR" => nil,
+      "POSTGRES_USER" => nil, "PG_HOST_DATA_DIR" => nil, "PRODUCTION_ENV_FILE" => environment_file,
       "POSTGRES_HOST_PORT" => nil, "PGBOUNCER_HOST_PORT" => nil, "MCP_HOST_PORT" => nil
     }.merge(overrides)
     output, error, status = Open3.capture3(
-      environment, "docker", "compose", "--env-file", "/dev/null",
+      environment, "docker", "compose", "--env-file", environment_file,
       "-f", Rails.root.join("docker-compose.production.yml").to_s,
       "config", "--format", "json"
     )
     [ status, output, error ]
+  end
+
+  it "loads arbitrary settings from the selected file into every application service while preserving pooled production routing" do
+    Tempfile.create([ "production-compose-", ".env" ], Rails.root.join("tmp")) do |file|
+      file.write("MCP_ALLOWED_HOSTS=mcp.example.com\nMCP_MAX_REQUEST_BYTES=65536\nCOORDINATOR_DEPLOYMENT_SAMPLE=first\nRAILS_ENV=development\nDATABASE_HOST=localhost\nDATABASE_PORT=6435\n")
+      file.flush
+      status, output, error = compose_configuration({}, environment_file: file.path)
+      expect(status).to be_success, error
+      services = JSON.parse(output).fetch("services")
+      %w[prepare web subscription-process-managers subscription-task-results subscription-read-models jobs].each do |name|
+        expect(services.dig(name, "environment")).to include(
+          "MCP_ALLOWED_HOSTS" => "mcp.example.com", "MCP_MAX_REQUEST_BYTES" => "65536",
+          "COORDINATOR_DEPLOYMENT_SAMPLE" => "first", "RAILS_ENV" => "production",
+          "DATABASE_HOST" => "pgbouncer", "DATABASE_PORT" => "5432"
+        )
+      end
+      %w[postgres pgbouncer].each do |name|
+        expect(services.dig(name, "environment")).not_to have_key("MCP_ALLOWED_HOSTS")
+      end
+    end
+  end
+
+  it "rereads edited file settings and removes settings omitted from the next configuration" do
+    Tempfile.create([ "production-compose-", ".env" ], Rails.root.join("tmp")) do |file|
+      file.write("MCP_ALLOWED_HOSTS=first.example.com\nCOORDINATOR_DEPLOYMENT_SAMPLE=first\n")
+      file.flush
+      status, output, error = compose_configuration({}, environment_file: file.path)
+      expect(status).to be_success, error
+      expect(JSON.parse(output).dig("services", "web", "environment", "MCP_ALLOWED_HOSTS")).to eq("first.example.com")
+
+      file.rewind
+      file.truncate(0)
+      file.write("MCP_ALLOWED_HOSTS=second.example.com\n")
+      file.flush
+      status, output, error = compose_configuration({}, environment_file: file.path)
+      expect(status).to be_success, error
+      %w[prepare web subscription-process-managers subscription-task-results subscription-read-models jobs].each do |name|
+        environment = JSON.parse(output).dig("services", name, "environment")
+        expect(environment.fetch("MCP_ALLOWED_HOSTS")).to eq("second.example.com")
+        expect(environment).not_to have_key("COORDINATOR_DEPLOYMENT_SAMPLE")
+      end
+    end
   end
 
   it "publishes database ports only on loopback and preserves PostgreSQL 18 host data" do
@@ -28,7 +70,7 @@ RSpec.describe "production Compose configuration" do
   end
 
   it "allows an explicitly selected external data directory" do
-    status, output, error = compose_configuration("PG_HOST_DATA_DIR" => "/srv/coordinator-postgres")
+    status, output, error = compose_configuration({ "PG_HOST_DATA_DIR" => "/srv/coordinator-postgres" })
     expect(status).to be_success, error
     volume = JSON.parse(output).dig("services", "postgres", "volumes").first
     expect(volume).to include("type" => "bind", "source" => "/srv/coordinator-postgres")
@@ -48,7 +90,7 @@ RSpec.describe "production Compose configuration" do
 
   %w[POSTGRES_PASSWORD SECRET_KEY_BASE].each do |variable|
     it "rejects deployment configuration without #{variable}" do
-      status, _, error = compose_configuration(variable => nil)
+      status, _, error = compose_configuration({ variable => nil })
       expect(status).not_to be_success
       expect(error).to include(variable)
     end
