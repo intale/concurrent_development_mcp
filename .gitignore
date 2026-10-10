@@ -41,3 +41,6 @@ tmp/
 .build/
 .mcp-fallback/
 /public/ui/
+
+# Default production PostgreSQL bind mount (not application source).
+/data/

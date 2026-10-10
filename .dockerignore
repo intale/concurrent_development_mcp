@@ -10,9 +10,33 @@
 # Ignore all environment files.
 /.env*
 
+# Persistent database data and development-memory recovery material.
+/data/
+/db/postgresql/
+/.mcp-fallback/
+/.build/
+/.to_review/
+/.agents/
+/.codex/
+/dev_scripts/
+
+# Build the frontend from its lockfile, never from local generated artifacts.
+**/node_modules/
+**/.yarn/cache/
+/ui/.test-dist/
+/ui/src/gql/
+/public/ui/
+
+# Tests and local tooling are not production runtime sources.
+/spec/
+/features/
+/sig/
+/.gem_rbs_collection/
+
 # Ignore all default key files.
 /config/master.key
 /config/credentials/*.key
+**/*.tar.gz
 
 # Ignore all logfiles and tempfiles.
 /log/*
