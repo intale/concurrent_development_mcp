@@ -98,6 +98,53 @@ RSpec.describe Coordinator::Read::Projectors::OperationBatchesV2, :read_model do
     )
   end
 
+  it "projects a canonical assignment onto a factory-created item without changing its submitted request" do
+    batch = create(:coordinator_read_operation_batch, batch_id:, status: "running", terminal_kind: nil, total: 1)
+    item = create(
+      :coordinator_read_operation_batch_item, operation_batch: batch, item_index: 0,
+      target_command_id: nil, updated_at: Time.utc(2026, 8, 29)
+    )
+    command_id = SecureRandom.uuid_v7
+    assigned = batch_event(
+      Coordinator::Write::Events::OperationBatchItemCommandAssignedV1.new(batch_id:, index: 0, command_id:),
+      revision: 3, position: 200
+    )
+
+    2.times { projector.call(assigned) }
+
+    expect(item.reload).to have_attributes(target_command_id: command_id, command_id: item.arguments.fetch("command_id"))
+    expect(item.updated_at).to eq(assigned.created_at)
+    expect(fetch(limit: 1).items.sole).to have_attributes(command_id: item.command_id, status: "pending")
+  end
+
+  it "serves a durable registration denial without inventing a canonical command or receipt" do
+    batch = create(
+      :coordinator_read_operation_batch, batch_id:, status: "running", terminal_kind: nil,
+      total: 1, succeeded_count: 0, rejected_count: 0
+    )
+    item = create(:coordinator_read_operation_batch_item, operation_batch: batch, item_index: 0, target_command_id: nil)
+    error = Coordinator::Write::Tasks::DomainErrorV1::CommandIdReusedError.new(
+      code: "command_id_reused", message: "Request is already bound to another input",
+      details: Coordinator::Write::Tasks::DomainErrorV1::CommandIdReusedDetails.new(
+        command_id: item.command_id, existing_tool_name: "skill_publish", requested_tool_name: "skill_publish",
+        existing_input_digest: "sha256:#{'a' * 64}", requested_input_digest: "sha256:#{'b' * 64}"
+      )
+    )
+    rejected = batch_event(
+      Coordinator::Write::Events::OperationBatchItemRegistrationRejectedV1.new(batch_id:, index: 0, error:),
+      revision: 3, position: 200
+    )
+    2.times { projector.call(rejected) }
+
+    outcome = Coordinator::Read::OperationBatchOutcome.find_by!(batch_id:, item_index: 0)
+    expect(outcome.target_command_id).to be_nil
+    expect(fetch(limit: 1).items.sole.result).to have_attributes(
+      status: "command_id_reused", command_id: item.command_id, receipt: nil, data: error
+    )
+    expect(fetch(limit: 1)).to have_attributes(rejected: 1, pending: 0)
+    expect(processed_events.count).to eq(1)
+  end
+
   def completed_events
     items = skill_items
     events = manifest_events(items)
@@ -285,6 +332,10 @@ RSpec.describe Coordinator::Read::Projectors::OperationBatchesV2, :read_model do
         **common,
         canonical_input_digest: "sha256:#{payload.index.zero? ? 'a' * 64 : 'b' * 64}",
         encoded_byte_size: 500
+      )
+    when Coordinator::Write::Events::OperationBatchItemCommandAssignedV1
+      Coordinator::Write::Metadata::OperationBatchItemAssignmentV1.new(
+        **common, canonical_input_digest: "sha256:#{'b' * 64}"
       )
     else
       Coordinator::Write::EventMetadata.new(common)

@@ -1,0 +1,11 @@
+module Coordinator
+  module Write
+    module OperationBatches
+      class AssignmentV1 < Shared::Value
+        def item: () -> ItemV2
+        def event: () -> PgEventstore::Event
+        def assigned?: () -> bool
+      end
+    end
+  end
+end

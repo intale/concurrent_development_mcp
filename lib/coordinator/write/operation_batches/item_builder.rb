@@ -3,10 +3,10 @@
 module Coordinator::Write
   module OperationBatches
     class ItemBuilder
-      def call(event:, payload:)
+      def call(event:, payload:, command_id: payload.command_id)
         submitted_input = payload.input
         command_input = submitted_input.class.new(
-          submitted_input.attributes.merge(command_id: payload.command_id)
+          submitted_input.attributes.merge(command_id:)
         )
 
         ItemV2.new(

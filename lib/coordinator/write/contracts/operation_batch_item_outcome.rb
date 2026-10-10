@@ -5,7 +5,7 @@ module Coordinator::Write
     class OperationBatchItemOutcome < Dry::Validation::Contract
       params do
         required(:command).value(Types.Instance(Commands::RecordOperationBatchItemOutcome))
-        required(:item).value(Types.Instance(OperationBatches::ItemV2))
+        required(:item).value(Types.Instance(OperationBatches::ItemV2) | Types.Instance(OperationBatches::ItemIdentityV1))
         required(:command_state).value(Types.Instance(Domain::CommandLifecycles::State))
         required(:physical_target_event).value(:any)
       end
@@ -21,7 +21,7 @@ module Coordinator::Write
         item = values[:item]
         state = values[:command_state]
         matches = state.command_id == item.command_id &&
-                  state.tool_name == item.command_input.tool_name &&
+                  state.tool_name == item.tool_name &&
                   state.canonical_input_digest == item.canonical_input_digest &&
                   state.status == command.outcome
         base.failure("target Command terminal state must match the Batch item outcome") unless matches

@@ -8,6 +8,9 @@ module Coordinator::Mcp::Tools
       Import pass 1: inventory content using capabilities available to the client, then capture
       all selected exact bytes as 1..1,000 ordinary commands within the 3-MiB canonical-input
       limit. Poll the returned Task, then operation_batch_get for per-item Saga outcomes and
+      request-binding denials. Acceptance stores the manifest; each child request is bound
+      independently as the Saga reaches it. Identical requests reuse their canonical result.
+      Then
       build an exact scope/source-kind/locator/revision to Artifact-ID map. The server assumes
       no project path layout, runtime, filesystem, Git, URL fetching, or shared container. If
       the Task result is unknown, replay the exact payload and command_id; a new intent after

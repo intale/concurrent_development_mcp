@@ -16,6 +16,10 @@ module Coordinator::Write
         command_input.command_id
       end
 
+      def tool_name
+        command_input.tool_name
+      end
+
       def submitted_input
         command_input.class.new(command_input.attributes.merge(command_id: request_id))
       end

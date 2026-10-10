@@ -63,9 +63,13 @@ module Coordinator::Read
           store_target_selection(record, event, payload)
         when Coordinator::Write::Events::OperationBatchItemEnqueuedV1
           store_item(record, payload, event:)
+        when Coordinator::Write::Events::OperationBatchItemCommandAssignedV1
+          store_assignment(record, event, payload)
         when Coordinator::Write::Events::OperationBatchItemSucceededV2
           store_outcome(record, event, payload, status: "succeeded")
         when Coordinator::Write::Events::OperationBatchItemRejectedV2
+          store_outcome(record, event, payload, status: "rejected")
+        when Coordinator::Write::Events::OperationBatchItemRegistrationRejectedV1
           store_outcome(record, event, payload, status: "rejected")
         when Coordinator::Write::Events::OperationBatchItemCompletionLinkedV1
           store_completion_link(record, event, payload)
@@ -138,7 +142,7 @@ module Coordinator::Read
         attributes = {
           target_tool: input.tool_name,
           command_id: input.command_id,
-          target_command_id: payload.command_id,
+          target_command_id: nil,
           canonical_input_digest: event.metadata.fetch("canonical_input_digest"),
           encoded_byte_size: event.metadata.fetch("encoded_byte_size"),
           arguments: @arguments_builder.call(input)
@@ -146,7 +150,6 @@ module Coordinator::Read
         if record.persisted?
           matches = record.target_tool == attributes.fetch(:target_tool) &&
                     record.command_id == attributes.fetch(:command_id) &&
-                    record.target_command_id == attributes.fetch(:target_command_id) &&
                     record.canonical_input_digest == attributes.fetch(:canonical_input_digest) &&
                     record.encoded_byte_size == attributes.fetch(:encoded_byte_size) &&
                     record.arguments == attributes.fetch(:arguments).deep_stringify_keys
@@ -178,7 +181,7 @@ module Coordinator::Read
 
         outcome.assign_attributes(
           command_id: item&.command_id,
-          target_command_id: payload.command_id,
+          target_command_id: outcome_command_id(payload),
           canonical_input_digest: item&.canonical_input_digest,
           status:,
           result: outcome_result(payload),
@@ -196,7 +199,7 @@ module Coordinator::Read
       end
 
       def verify_outcome!(outcome, payload, status:)
-        matches = outcome.target_command_id == payload.command_id &&
+        matches = outcome.target_command_id == outcome_command_id(payload) &&
                   outcome.status == status &&
                   outcome.result == outcome_result(payload).deep_stringify_keys
         return if matches
@@ -225,9 +228,27 @@ module Coordinator::Read
       end
 
       def outcome_result(payload)
+        if payload.is_a?(Coordinator::Write::Events::OperationBatchItemRegistrationRejectedV1)
+          return { error: payload.error.to_h }
+        end
         return {} unless payload.is_a?(Coordinator::Write::Events::OperationBatchItemRejectedV2)
 
         { code: payload.code, reason: payload.reason, retryable: payload.retryable }
+      end
+
+      def outcome_command_id(payload)
+        payload.command_id unless payload.is_a?(Coordinator::Write::Events::OperationBatchItemRegistrationRejectedV1)
+      end
+
+      def store_assignment(batch, event, payload)
+        item = Coordinator::Read::OperationBatchItem.find_by!(batch_id: batch.batch_id, item_index: payload.index)
+        digest = event.metadata.fetch("canonical_input_digest")
+        unless item.canonical_input_digest == digest &&
+               (item.target_command_id.nil? || item.target_command_id == payload.command_id)
+          raise ProjectionStateError, "Operation Batch assignment does not match its immutable item"
+        end
+
+        save_from_event(item, event:, attributes: { target_command_id: payload.command_id })
       end
 
       def refresh_manifest(record, event:)
@@ -250,7 +271,7 @@ module Coordinator::Read
           item_index: item.item_index
         )
         return unless outcome
-        unless outcome.target_command_id == item.target_command_id
+        if outcome.target_command_id && item.target_command_id && outcome.target_command_id != item.target_command_id
           raise ProjectionStateError, "Operation Batch outcome targets another Command"
         end
 
@@ -314,7 +335,7 @@ module Coordinator::Read
           canonical_input_digest: item.canonical_input_digest,
           arguments: symbolize(item.arguments),
           status: item_status(outcome, terminal_kind:),
-          result: receipt && structured_content(receipt),
+          result: receipt ? structured_content(receipt) : registration_rejection(item, outcome),
           finished_at: outcome&.finished_at_domain&.utc&.iso8601(6),
           source: outcome && outcome_source_evidence(outcome)
         )
@@ -330,6 +351,16 @@ module Coordinator::Read
           data: receipt.data,
           warnings: receipt.warnings,
           next_actions: receipt.next_actions
+        )
+      end
+
+      def registration_rejection(item, outcome)
+        return unless outcome && outcome.result.key?("error")
+
+        error = Coordinator::Write::Tasks::DomainErrorV1::Type[symbolize(outcome.result.fetch("error"))]
+        Coordinator::Write::Tasks::StructuredContentV1.new(
+          status: "command_id_reused", summary: error.message, command_id: item.command_id,
+          receipt: nil, context_token: nil, data: error, warnings: [], next_actions: []
         )
       end
 

@@ -16,6 +16,9 @@ module Coordinator::Write
           unless state.cancellation
             return Failure(error(:operation_batch_cancellation_not_requested, "Batch cancellation was not requested", command))
           end
+          unless state.started_pending_indexes.empty?
+            return Failure(error(:operation_batch_items_in_flight, "Started Batch items must be reconciled before cancellation", command))
+          end
 
           event = Events::OperationBatchCancelledV2.new(batch_id: command.batch_id)
           Success(

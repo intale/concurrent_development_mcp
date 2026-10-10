@@ -1725,7 +1725,6 @@ module Coordinator
         input_digest: self["command_input_digest"],
         id_generator: self["id_generator"],
         event_factory: self["event_factory"],
-        schema_registry: self["event_schema_registry"],
         stream_factory: self["stream_factory"],
         completion_builder: self["command_result_builder"]
       )

@@ -1,0 +1,13 @@
+module Coordinator
+  module Write
+    module OperationBatches
+      class PreparationV1 < Shared::Value
+        def input_digest: () -> String
+        def domain_event_ids: () -> Array[String]
+        def correlation_id: () -> String
+        def items: () -> Array[ItemV2]
+        def item_encoded_byte_sizes: () -> Array[Integer]
+      end
+    end
+  end
+end

@@ -7,6 +7,9 @@ module Coordinator::Read
         "OperationBatchCreated" => 2,
         "OperationBatchTargetSelected" => 1,
         "OperationBatchItemEnqueued" => 1,
+        "OperationBatchItemCommandAssigned" => 1,
+        "OperationBatchItemExecutionStarted" => 1,
+        "OperationBatchItemRegistrationRejected" => 1,
         "OperationBatchItemSucceeded" => 2,
         "OperationBatchItemRejected" => 2,
         "OperationBatchItemCompletionLinked" => 1,
@@ -52,12 +55,12 @@ module Coordinator::Read
       end
 
       rule(:event_type, :canonical_input_digest, :encoded_byte_size) do
-        next unless values[:event_type] == "OperationBatchItemEnqueued"
+        next unless %w[OperationBatchItemEnqueued OperationBatchItemCommandAssigned].include?(values[:event_type])
 
         unless values[:canonical_input_digest]
-          key(:canonical_input_digest).failure("must be present for OperationBatchItemEnqueued")
+          key(:canonical_input_digest).failure("must be present for #{values[:event_type]}")
         end
-        unless values[:encoded_byte_size]&.positive?
+        if values[:event_type] == "OperationBatchItemEnqueued" && !values[:encoded_byte_size]&.positive?
           key(:encoded_byte_size).failure("must be positive for OperationBatchItemEnqueued")
         end
       end

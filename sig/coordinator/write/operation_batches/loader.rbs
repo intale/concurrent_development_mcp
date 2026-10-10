@@ -4,6 +4,9 @@ module Coordinator
       class Loader
         def initialize: (event_store: _EventStore, ?schema_registry: EventSchemaRegistry, ?stream_factory: StreamFactory, ?item_builder: ItemBuilder) -> void
         def call: (String batch_id) -> SnapshotV1
+        def control: (String batch_id) -> SnapshotV1
+        def item: (String batch_id, Integer index) -> SnapshotV1
+        def item_identity: (String batch_id, Integer index) -> SnapshotV1
       end
     end
   end

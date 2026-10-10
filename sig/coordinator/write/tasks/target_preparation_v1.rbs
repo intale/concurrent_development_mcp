@@ -1,0 +1,11 @@
+module Coordinator
+  module Write
+    module Tasks
+      class TargetPreparationV1 < Shared::Value
+        def requested_digest: () -> String
+        def terminal_event_id: () -> String
+        def handler_preparation: () -> (DevelopmentArtifactCapturePreparationV1 | DevelopmentArtifactRelationPreparationV1 | OperationBatches::PreparationV1)?
+      end
+    end
+  end
+end

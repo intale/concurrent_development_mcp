@@ -1,22 +1,29 @@
 module Coordinator
   module Write
     module OperationBatches
-      type outcome = Events::OperationBatchItemSucceededV2 | Events::OperationBatchItemRejectedV2
+      type outcome = Events::OperationBatchItemSucceededV2 | Events::OperationBatchItemRejectedV2 | Events::OperationBatchItemRegistrationRejectedV1
+      type item = ItemV2 | ItemIdentityV1
       type completion_link = Events::OperationBatchItemCompletionLinkedV1
       type terminal = Events::OperationBatchCompletedV2 | Events::OperationBatchCancelledV2
 
       class State < Shared::Value
         def self.initial: () -> State
-        def self.reduce: (Array[Events::Base] events, ?items: Array[ItemV2], ?page_size: Integer?) -> State
+        def self.reduce: (Array[Events::Base] events, ?items: Array[item], ?page_size: Integer?, ?item_count: Integer?) -> State
         def creation: () -> Events::OperationBatchCreatedV2?
         def target_selection: () -> Events::OperationBatchTargetSelectedV1?
-        def items: () -> Array[ItemV2]
+        def items: () -> Array[item]
+        def item_count: () -> Integer?
+        def assignments: () -> Array[Events::OperationBatchItemCommandAssignedV1]
+        def starts: () -> Array[Events::OperationBatchItemExecutionStartedV1]
         def page_size: () -> Integer?
         def outcomes: () -> Array[outcome]
         def completion_links: () -> Array[completion_link]
         def cancellation: () -> Events::OperationBatchCancellationRequestedV2?
         def terminal: () -> terminal?
-        def item: (Integer index) -> ItemV2?
+        def item: (Integer index) -> item?
+        def assignment: (Integer index) -> Events::OperationBatchItemCommandAssignedV1?
+        def started?: (Integer index) -> bool
+        def started_pending_indexes: () -> Array[Integer]
         def outcome: (Integer index) -> outcome?
         def pending_indexes: () -> Array[Integer]
         def succeeded_count: () -> Integer

@@ -314,6 +314,21 @@ RSpec.describe Coordinator::Read::CommandResults::Assembler, :event_store do
       )
       expect(result.emitted_events.map(&:event_id)).to eq(observation.map(&:id))
     end
+
+    it "uses the committed Observation UUID when a resumed instruction carries another proposal" do
+      append_canonical_artifact
+      register_command
+      append_task_submission
+      persisted_observation_id = SecureRandom.uuid_v7
+      observations = append_canonical_artifact_observation(observation_id: persisted_observation_id)
+      terminal = append_terminal(Coordinator::Write::Events::CommandSucceededV1.new(command_id:))
+
+      result = assemble.call(terminal)
+
+      expect(persisted_observation_id).not_to eq(command.observation.observation_id)
+      expect(result.data).to have_attributes(artifact_id: canonical_artifact_id, observation_id: persisted_observation_id)
+      expect(result.emitted_events.map(&:event_id)).to eq(observations.map(&:id))
+    end
   end
 
   context "when another proposed Relation UUID declared the same natural relation" do
@@ -961,7 +976,7 @@ RSpec.describe Coordinator::Read::CommandResults::Assembler, :event_store do
     )
   end
 
-  def append_canonical_artifact_observation
+  def append_canonical_artifact_observation(observation_id: self.observation_id)
     recorded = append(
       streams.development_artifact_observation(observation_id),
       Coordinator::Write::Events::DevelopmentArtifactObservationRecordedV1.new(observation_id:),

@@ -29,8 +29,12 @@ RSpec.describe Coordinator::Processes::ProcessManagers::OperationBatchRunner, :e
       "OperationBatchTargetSelected",
       "OperationBatchItemEnqueued",
       "OperationBatchItemEnqueued",
+      "OperationBatchItemCommandAssigned",
+      "OperationBatchItemExecutionStarted",
       "OperationBatchItemSucceeded",
       "OperationBatchItemCompletionLinked",
+      "OperationBatchItemCommandAssigned",
+      "OperationBatchItemExecutionStarted",
       "OperationBatchItemRejected",
       "OperationBatchItemCompletionLinked",
       "OperationBatchCompleted"
@@ -81,7 +85,12 @@ RSpec.describe Coordinator::Processes::ProcessManagers::OperationBatchRunner, :e
     ).value!
     expect(batch_executor.call_command(unrelated_command)).to be_success
     unrelated_created = batch_events(unrelated_command.batch_id).find { _1.type == "OperationBatchCreated" }
-    item = Coordinator::Write::OperationBatches::Loader.new(event_store:).call(command.batch_id).state.items.sole
+    source = Coordinator::Processes::OperationBatches::SourceBuilder.new.call(created)
+    assignment = Coordinator::Write::Operations::ExecuteAssignOperationBatchItemCommand.new(event_store:).call_command(
+      Coordinator::Processes::OperationBatches::CommandBuilder.new.assign_item(source:, index: 0, command_id: SecureRandom.uuid_v7),
+      caused_by: created
+    ).value!
+    item = assignment.item
     target = Coordinator::Write::Tasks::TargetCommandBuilder.new.call(item.command_input)
     target_executor = Coordinator::Write::Tasks::TargetExecutor.new(event_store:)
 
@@ -98,6 +107,8 @@ RSpec.describe Coordinator::Processes::ProcessManagers::OperationBatchRunner, :e
       "OperationBatchCreated",
       "OperationBatchTargetSelected",
       "OperationBatchItemEnqueued",
+      "OperationBatchItemCommandAssigned",
+      "OperationBatchItemExecutionStarted",
       "OperationBatchItemSucceeded",
       "OperationBatchItemCompletionLinked",
       "OperationBatchCompleted"

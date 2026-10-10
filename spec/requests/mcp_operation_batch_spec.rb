@@ -49,11 +49,12 @@ RSpec.describe "BAT-01 MCP Operation Batches" do
       OperationBatchItemEnqueued
       OperationBatchItemEnqueued
     ])
-    items = Coordinator::Write::OperationBatches::Loader.new(event_store:).call(batch_id).state.items
+    loader = Coordinator::Write::OperationBatches::Loader.new(event_store:)
+    items = (0...2).map { loader.item(batch_id, _1).state.items.sole }
     expect(items.map(&:request_id)).to eq(%w[item-1 item-2])
     expect(items.map(&:command_id)).to all(match(Coordinator::Write::Types::UUID_V7_PATTERN))
     items.each do |item|
-      expect(command_events(item.command_id).map(&:type)).to eq([ "CommandRegistered" ])
+      expect(command_events(item.command_id)).to be_empty
     end
 
     Coordinator::Container["process_managers.operation_batch_runner"].call(created_event)
@@ -63,8 +64,12 @@ RSpec.describe "BAT-01 MCP Operation Batches" do
       OperationBatchTargetSelected
       OperationBatchItemEnqueued
       OperationBatchItemEnqueued
+      OperationBatchItemCommandAssigned
+      OperationBatchItemExecutionStarted
       OperationBatchItemSucceeded
       OperationBatchItemCompletionLinked
+      OperationBatchItemCommandAssigned
+      OperationBatchItemExecutionStarted
       OperationBatchItemRejected
       OperationBatchItemCompletionLinked
       OperationBatchCompleted

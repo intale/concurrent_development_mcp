@@ -115,9 +115,9 @@ module OperationBatchAcceptanceWorld
     project_operation_batch(operation_batch_events)
   end
 
-  def await_operation_batch_terminal
-    eventually("Operation Batch #{@operation_batch_id} to become terminal") do
-      events = operation_batch_events
+  def await_operation_batch_terminal(batch_id: @operation_batch_id)
+    eventually("Operation Batch #{batch_id} to become terminal") do
+      events = operation_batch_events(batch_id:)
       terminal = events.any? { %w[OperationBatchCompleted OperationBatchCancelled].include?(_1.type) }
       [ terminal, events.map(&:type) ]
     end
@@ -161,7 +161,9 @@ module OperationBatchAcceptanceWorld
   def operation_batch_outcome_counts(events)
     total = events.count { _1.type == "OperationBatchItemEnqueued" }
     succeeded = events.count { _1.type == "OperationBatchItemSucceeded" }
-    rejected = events.count { _1.type == "OperationBatchItemRejected" }
+    rejected = events.count do |event|
+      %w[OperationBatchItemRejected OperationBatchItemRegistrationRejected].include?(event.type)
+    end
 
     {
       total:,

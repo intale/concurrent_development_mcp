@@ -6,7 +6,8 @@ module Coordinator::Write
       Creation = Types.Instance(Events::OperationBatchCreatedV2)
       TargetSelection = Types.Instance(Events::OperationBatchTargetSelectedV1)
       Outcome = Types.Instance(Events::OperationBatchItemSucceededV2) |
-                Types.Instance(Events::OperationBatchItemRejectedV2)
+                Types.Instance(Events::OperationBatchItemRejectedV2) |
+                Types.Instance(Events::OperationBatchItemRegistrationRejectedV1)
       CompletionLink = Types.Instance(Events::OperationBatchItemCompletionLinkedV1)
       Cancellation = Types.Instance(Events::OperationBatchCancellationRequestedV2)
       Terminal = Types.Instance(Events::OperationBatchCompletedV2) |
@@ -14,7 +15,10 @@ module Coordinator::Write
 
       attribute :creation, Creation.optional
       attribute :target_selection, TargetSelection.optional
-      attribute :items, Types::Array.of(ItemV2)
+      attribute :items, Types::Array.of(ItemV2 | ItemIdentityV1)
+      attribute :item_count, Types::Integer.constrained(gteq: 0, lteq: Types::OPERATION_BATCH_MAXIMUM_ITEMS).optional
+      attribute :assignments, Types::Array.of(Events::OperationBatchItemCommandAssignedV1)
+      attribute :starts, Types::Array.of(Events::OperationBatchItemExecutionStartedV1)
       attribute :page_size, Types::OperationBatchPageSize.optional
       attribute :outcomes, Types::Array.of(Outcome)
       attribute :completion_links, Types::Array.of(CompletionLink)
@@ -26,6 +30,9 @@ module Coordinator::Write
           creation: nil,
           target_selection: nil,
           items: [],
+          item_count: 0,
+          assignments: [],
+          starts: [],
           page_size: nil,
           outcomes: [],
           completion_links: [],
@@ -34,10 +41,12 @@ module Coordinator::Write
         )
       end
 
-      def self.reduce(events, items: [], page_size: nil)
+      def self.reduce(events, items: [], page_size: nil, item_count: items.length)
         creation = nil
         target_selection = nil
         outcomes = []
+        assignments = []
+        starts = []
         completion_links = []
         cancellation = nil
         terminal = nil
@@ -46,7 +55,10 @@ module Coordinator::Write
           case event
           when Events::OperationBatchCreatedV2 then creation = event
           when Events::OperationBatchTargetSelectedV1 then target_selection = event
-          when Events::OperationBatchItemSucceededV2, Events::OperationBatchItemRejectedV2
+          when Events::OperationBatchItemCommandAssignedV1 then assignments << event
+          when Events::OperationBatchItemExecutionStartedV1 then starts << event
+          when Events::OperationBatchItemSucceededV2, Events::OperationBatchItemRejectedV2,
+               Events::OperationBatchItemRegistrationRejectedV1
             outcomes << event
           when Events::OperationBatchItemCompletionLinkedV1 then completion_links << event
           when Events::OperationBatchCancellationRequestedV2 then cancellation = event
@@ -59,6 +71,9 @@ module Coordinator::Write
           creation:,
           target_selection:,
           items: items.sort_by(&:index),
+          item_count:,
+          assignments:,
+          starts:,
           page_size:,
           outcomes:,
           completion_links:,
@@ -75,11 +90,25 @@ module Coordinator::Write
         outcomes.find { _1.index == index }
       end
 
+      def assignment(index)
+        assignments.find { _1.index == index }
+      end
+
+      def started?(index)
+        starts.any? { _1.index == index }
+      end
+
+      def started_pending_indexes
+        completed = outcomes.to_h { [ _1.index, true ] }
+        starts.map(&:index).reject { completed.key?(_1) }
+      end
+
       def pending_indexes
         return [] unless creation
 
-        completed = outcomes.map(&:index)
-        items.map(&:index).reject { completed.include?(_1) }
+        count = item_count || raise(InvalidOperationBatchHistory, "Manifest count was not loaded for progress")
+        completed = outcomes.to_h { [ _1.index, true ] }
+        (0...count).reject { completed.key?(_1) }
       end
 
       def succeeded_count
@@ -87,7 +116,10 @@ module Coordinator::Write
       end
 
       def rejected_count
-        outcomes.count { _1.is_a?(Events::OperationBatchItemRejectedV2) }
+        outcomes.count do |event|
+          event.is_a?(Events::OperationBatchItemRejectedV2) ||
+            event.is_a?(Events::OperationBatchItemRegistrationRejectedV1)
+        end
       end
 
       def running?

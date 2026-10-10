@@ -8,6 +8,20 @@ module Coordinator::Processes
         id: "operation-batch-runner"
       )
 
+      def assign_item(source:, index:, command_id:)
+        Coordinator::Write::Commands::AssignOperationBatchItemCommand.new(
+          command_id:, actor: SYSTEM_ACTOR, batch_id: source.payload.batch_id, index:
+        )
+      end
+
+      def start_item(source:, item:, command_id:)
+        Coordinator::Write::Commands::StartOperationBatchItem.new(
+          command_id:, actor: SYSTEM_ACTOR, batch_id: source.payload.batch_id, index: item.index,
+          item_command_id: item.command_id, tool_name: item.tool_name,
+          canonical_input_digest: item.canonical_input_digest
+        )
+      end
+
       def record_outcome(source:, item:, execution:, command_id:)
         rejection = if execution.command_state.rejected?
                       Coordinator::Write::OperationBatches::RejectionV1.new(

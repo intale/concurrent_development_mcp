@@ -987,8 +987,14 @@ RSpec.describe "ART-01 MCP Development Artifacts" do
   end
 
   def batch_item_command_id(batch_id, request_id:)
-    snapshot = Coordinator::Write::OperationBatches::Loader.new(event_store:).call(batch_id)
-    snapshot.state.items.find { _1.request_id == request_id }.command_id
+    enqueued = event_store.read(
+      streams.operation_batch(batch_id),
+      Coordinator::Write::EventReadCriteria.new(
+        event_types: [ "OperationBatchItemEnqueued" ], maximum_count: 1_000, direction: :asc
+      )
+    ).find { _1.data.fetch("input").fetch("command_id") == request_id }
+    index = enqueued.data.fetch("index")
+    Coordinator::Write::OperationBatches::Loader.new(event_store:).item(batch_id, index).state.item(index).command_id
   end
 
   def load_result(command_id)

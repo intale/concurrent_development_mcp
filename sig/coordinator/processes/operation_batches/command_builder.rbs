@@ -3,6 +3,8 @@ module Coordinator
     module OperationBatches
       class CommandBuilder
         SYSTEM_ACTOR: Write::Commands::Actor
+        def assign_item: (source: SourceV1, index: Integer, command_id: String) -> Write::Commands::AssignOperationBatchItemCommand
+        def start_item: (source: SourceV1, item: Write::OperationBatches::ItemV2, command_id: String) -> Write::Commands::StartOperationBatchItem
 
         def record_outcome: (source: SourceV1, item: Write::OperationBatches::ItemV2, execution: Write::Tasks::TargetExecution, command_id: String) -> Write::Commands::RecordOperationBatchItemOutcome
         def continuation: (source: SourceV1, page_start: Integer, page_end: Integer, command_id: String) -> Write::Commands::RequestOperationBatchContinuation

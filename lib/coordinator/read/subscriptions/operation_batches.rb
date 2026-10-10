@@ -16,6 +16,9 @@ module Coordinator::Read
           OperationBatchCreated
           OperationBatchTargetSelected
           OperationBatchItemEnqueued
+          OperationBatchItemCommandAssigned
+          OperationBatchItemExecutionStarted
+          OperationBatchItemRegistrationRejected
           OperationBatchItemSucceeded
           OperationBatchItemRejected
           OperationBatchItemCompletionLinked

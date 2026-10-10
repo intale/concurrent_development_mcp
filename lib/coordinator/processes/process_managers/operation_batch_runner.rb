@@ -15,14 +15,16 @@ module Coordinator::Processes
         loader: Coordinator::Write::OperationBatches::Loader.new(event_store:),
         target_builder: Coordinator::Write::Tasks::TargetCommandBuilder.new,
         target_executor: Coordinator::Write::Tasks::TargetExecutor.new(event_store:),
+        item_executor: Coordinator::Write::OperationBatches::ItemExecutor.new(event_store:, target_builder:, target_executor:),
+        item_registrar: Coordinator::Write::Operations::ExecuteAssignOperationBatchItemCommand.new(event_store:),
         command_builder: OperationBatches::CommandBuilder.new,
         process_step_planner: Coordinator::Processes::ProcessStepPlanner.new(event_store:),
         batch_executor: Coordinator::Write::Operations::ExecuteOperationBatchCommand.new(event_store:)
       )
         @source_builder = source_builder
         @loader = loader
-        @target_builder = target_builder
-        @target_executor = target_executor
+        @item_executor = item_executor
+        @item_registrar = item_registrar
         @command_builder = command_builder
         @process_step_planner = process_step_planner
         @batch_executor = batch_executor
@@ -45,25 +47,58 @@ module Coordinator::Processes
       def process_page(source)
         instrument_page_boundary("operation_batch_page_start", source)
         initial_snapshot = @loader.call(source.payload.batch_id)
+        return if initial_snapshot.state.terminal
+        return complete_observed_cancellation(initial_snapshot) if initial_snapshot.state.cancellation
         bounds(source, initial_snapshot.state).each do |index|
-          snapshot = @loader.call(source.payload.batch_id)
-          return if snapshot.state.terminal
-          return complete_observed_cancellation(snapshot) if snapshot.state.cancellation
-          next if snapshot.state.outcome(index)
+          next if initial_snapshot.state.outcome(index)
 
-          item = snapshot.state.item(index)
-          next unless item
+          result = assign_item(source:, index:)
+          if result.failure?
+            return progress_after_page(source) if HANDLED_CODES.include?(result.failure.code)
+            raise OperationBatchProcessRejected, result.failure.message
+          end
+          assignment = result.value!
+          next unless assignment.assigned?
 
-          execute_item(source:, item:)
+          instrument_page_boundary("operation_batch_item_assigned", source)
+          execute_item(source:, item: assignment.item, assignment_event: assignment.event)
         end
 
         progress_after_page(source)
         instrument_page_boundary("operation_batch_page", source)
       end
 
-      def execute_item(source:, item:)
-        command = @target_builder.call(item.command_input)
-        target_result = @target_executor.call(command, caused_by: source.event)
+      def assign_item(source:, index:)
+        process_step = plan(
+          source_event: source.event, step_name: "assign-item-command",
+          subject_kind: "operation-batch-item", subject_id: "#{source.payload.batch_id}:#{index}",
+          rule_version: "operation-batch-item-assignment/v1"
+        )
+        result = @item_registrar.call_command(
+          @command_builder.assign_item(source:, index:, command_id: process_step.target_command_id),
+          caused_by: process_step.event
+        )
+        if result.failure? && !HANDLED_CODES.include?(result.failure.code)
+          @process_step_planner.record_dispatch_failure(process_step:, failure: result.failure)
+        end
+        result
+      end
+
+      def execute_item(source:, item:, assignment_event:)
+        start_step = plan(
+          source_event: assignment_event, step_name: "start-item-execution",
+          subject_kind: "operation-batch-item", subject_id: "#{source.payload.batch_id}:#{item.index}",
+          rule_version: "operation-batch-item-start/v1"
+        )
+        target_result = @item_executor.call(
+          command: @command_builder.start_item(source:, item:, command_id: start_step.target_command_id),
+          item:, caused_by: start_step.event
+        )
+        return if target_result.failure? && HANDLED_CODES.include?(target_result.failure.code)
+
+        if target_result.failure?
+          @process_step_planner.record_dispatch_failure(process_step: start_step, failure: target_result.failure)
+        end
         execution = target_result.value!
         parent = outcome_parent(source, execution)
         process_step = plan(
@@ -119,7 +154,7 @@ module Coordinator::Processes
         page_start = pending.min
         page_end = [
           page_start + snapshot.state.processing_page_size - 1,
-          snapshot.state.items.length - 1
+          snapshot.state.item_count - 1
         ].min
         process_step = plan(
           source_event: source.event,
@@ -157,6 +192,17 @@ module Coordinator::Processes
       end
 
       def complete_cancellation(source)
+        snapshot = @loader.call(source.payload.batch_id)
+        return if snapshot.state.terminal
+
+        snapshot.state.started_pending_indexes.each do |index|
+          item_snapshot = @loader.item(source.payload.batch_id, index)
+          next if item_snapshot.state.outcome(index)
+
+          assignment_event = item_snapshot.physical_events.find { _1.type == "OperationBatchItemCommandAssigned" }
+          execute_item(source:, item: item_snapshot.state.item(index), assignment_event:)
+        end
+
         process_step = plan(
           source_event: source.event,
           step_name: "complete-cancellation",
@@ -179,7 +225,7 @@ module Coordinator::Processes
       def bounds(source, state)
         payload = source.payload
         if payload.is_a?(Coordinator::Write::Events::OperationBatchCreatedV2)
-          0..([ state.processing_page_size - 1, state.items.length - 1 ].min)
+          0..([ state.processing_page_size - 1, state.item_count - 1 ].min)
         else
           payload.page_start..payload.page_end
         end

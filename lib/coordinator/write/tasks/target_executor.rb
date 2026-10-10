@@ -126,20 +126,31 @@ module Coordinator::Write
       end
 
       def call(command, caused_by:)
+        call_prepared(command, preparation: prepare(command, caused_by:), caused_by:)
+      end
+
+      def prepare(command, caused_by: nil)
         contract = TargetContractRegistry.fetch_for(command)
         contract.command_type[command]
-        requested_digest = @input_digest.request(command)
-        terminal_event_id = @id_generator.uuid_v7
         handler = instance_variable_get(contract.executor_variable)
-        preparation = prepare_target(handler, command)
+        TargetPreparationV1.new(
+          requested_digest: @input_digest.request(command),
+          terminal_event_id: @id_generator.uuid_v7,
+          handler_preparation: prepare_target(handler, command, caused_by:)
+        )
+      end
+
+      def call_prepared(command, preparation:, caused_by:)
+        contract = TargetContractRegistry.fetch_for(command)
+        handler = instance_variable_get(contract.executor_variable)
 
         @event_store.multiple do
           snapshot = @command_loader.call(command.command_id)
-          validate_registration!(snapshot.state, command:, contract:, requested_digest:)
+          validate_registration!(snapshot.state, command:, contract:, requested_digest: preparation.requested_digest)
           next Success(target_execution(snapshot)) if snapshot.state.terminal?
 
-          result = if preparation
-            handler.call_prepared_command(command, preparation:, caused_by:)
+          result = if preparation.handler_preparation
+            handler.call_prepared_command(command, preparation: preparation.handler_preparation, caused_by:)
           else
             handler.call_command(command, caused_by:)
           end
@@ -151,7 +162,7 @@ module Coordinator::Write
               actor: command.actor,
               tool_name: contract.tool_name,
               snapshot:,
-              event_id: terminal_event_id,
+              event_id: preparation.terminal_event_id,
               caused_by: terminal_parent(result.value!, fallback: caused_by)
             )
           else
@@ -161,7 +172,7 @@ module Coordinator::Write
               actor: command.actor,
               tool_name: contract.tool_name,
               snapshot:,
-              event_id: terminal_event_id,
+              event_id: preparation.terminal_event_id,
               caused_by:
             )
           end
@@ -178,10 +189,12 @@ module Coordinator::Write
 
       private
 
-      def prepare_target(handler, command)
+      def prepare_target(handler, command, caused_by:)
         case command
         when Commands::CaptureDevelopmentArtifact, Commands::DeclareDevelopmentArtifactRelation
           handler.prepare(command)
+        when Commands::CreateOperationBatch, Commands::CancelOperationBatch
+          handler.prepare(command, caused_by:)
         end
       end
 

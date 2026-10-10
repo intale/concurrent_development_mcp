@@ -52,3 +52,35 @@ Feature: Bounded command batches for checkpointed agent imports
       When the agent publishes equivalent Unicode Skill assets through single and Batch tools
       Then both Skill commands succeed with semantic version 3 facts
       And the Batch manifest returns the original text-first ordinary command arguments
+
+  Rule: Request identities bind per item and converge across independently accepted work
+
+    @PERF-BATCH-SHARED-01 @event-contract @concurrency
+    Scenario: Two accepted batches and an ordinary command share one canonical publication
+      When the agent submits two independent batches and one ordinary publication sharing an identical request
+      Then all three Tasks succeed and both batches complete
+      And the shared request has one canonical publication and a success in each Batch
+
+    @PERF-BATCH-REUSE-02 @event-contract
+    Scenario: Reusing a request with changed input rejects only that item after manifest acceptance
+      When the agent completes an original Batch request and accepts another Batch with changed input under that request
+      Then the second Batch completes with a durable request-reuse denial and an independent success
+      And the denied item has no fabricated canonical receipt
+
+  Rule: Cancellation distinguishes an assignment from a committed execution
+
+    @PERF-BATCH-CANCEL-03 @event-contract
+    Scenario: Cancellation after assignment prevents execution and permits later resubmission
+      When a one-item Batch pauses after its canonical assignment before target execution
+      And the agent requests cooperative Batch cancellation
+      And the Batch decision boundary is released and terminal facts reach the read side
+      Then the assigned item is not run and its canonical command has no terminal effect
+      When the agent resubmits only the not-run manifest items
+      Then the unexecuted canonical binding is reused successfully
+
+    @PERF-BATCH-RECOVER-04 @event-contract
+    Scenario: A worker restart and cancellation reconcile a committed item without its Batch outcome
+      When a one-item Batch pauses after its target commits before recording its outcome
+      And the agent requests cooperative Batch cancellation
+      And the process workers restart after the committed target boundary
+      Then cancellation retains one committed success and no item not run

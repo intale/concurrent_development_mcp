@@ -25,6 +25,141 @@ Then("the Batch Task durably accepts all {int} items") do |count|
   assert_acceptance_equal(1, operation_batch_events.count { _1.type == "OperationBatchCreated" }, "Creation facts")
 end
 
+When("the agent submits two independent batches and one ordinary publication sharing an identical request") do
+  stop_process_subscriptions
+  shared = batch_skill_item(index: 0, name: "shared-request-skill").merge(command_id: "cmd-cuc-shared-publication")
+  ordinary = call_tool("skill_publish", shared, client_id: "import-agent")
+  @shared_publication_task_id = ordinary.dig("result", "taskId")
+  @shared_publication_command_id = task_command_id(@shared_publication_task_id)
+  @shared_batch_submissions = 2.times.map do |index|
+    batch_id = SecureRandom.uuid_v7
+    independent = batch_skill_item(index: index + 1, name: "independent-#{index}")
+    response = call_tool("skill_publish_batch", {
+      command_id: "cmd-cuc-shared-batch-#{index}", actor: { kind: "agent", id: "import-agent" },
+      batch_id:, items: [ shared, independent ]
+    }, client_id: "import-agent")
+    { batch_id:, task_id: response.dig("result", "taskId") }
+  end
+  start_process_subscriptions
+end
+
+Then("all three Tasks succeed and both batches complete") do
+  [ @shared_publication_task_id, *@shared_batch_submissions.map { _1.fetch(:task_id) } ].each do |task_id|
+    result = await_task_terminal(task_id, client_id: "import-agent")
+    assert_acceptance_equal(false, result.dig("result", "result", "isError"), "Submitted Task result")
+  end
+  @shared_batch_submissions.each do |submission|
+    batch_id = submission.fetch(:batch_id)
+    await_operation_batch_terminal(batch_id:)
+    project_operation_batch(operation_batch_events(batch_id:), batch_id:)
+    view = operation_batch_view(batch_id:)
+    assert_acceptance_equal("completed", view.fetch("status"), "Independent Batch status")
+    assert_acceptance_equal(2, view.fetch("succeeded"), "Independent Batch successes")
+  end
+end
+
+Then("the shared request has one canonical publication and a success in each Batch") do
+  command_events = event_store.read(
+    streams.command(@shared_publication_command_id), Coordinator::Write::EventQueries::COMMAND_HISTORY
+  )
+  assert_acceptance_equal(%w[CommandRegistered CommandSucceeded], command_events.map(&:type), "Canonical command history")
+  @shared_batch_submissions.each do |submission|
+    batch_id = submission.fetch(:batch_id)
+    events = operation_batch_events(batch_id:)
+    assignment = events.find { _1.type == "OperationBatchItemCommandAssigned" && _1.data.fetch("index").zero? }
+    assert_acceptance_equal(@shared_publication_command_id, assignment.data.fetch("command_id"), "Shared canonical binding")
+    items = eventually("shared Batch item receipt") do
+      observed = operation_batch_view(batch_id:).fetch("items")
+      [ observed.first.dig("result", "status") == "ok", observed ]
+    end
+    assert_acceptance_equal("cmd-cuc-shared-publication", items.first.dig("result", "command_id"), "Shared client receipt")
+  end
+end
+
+When("the agent completes an original Batch request and accepts another Batch with changed input under that request") do
+  @operation_batch_id = SecureRandom.uuid_v7
+  original = batch_skill_item(index: 0, name: "original-shared-request")
+  submit_skill_batch([ original ])
+  await_operation_batch_terminal
+  @original_request_command_id = operation_batch_events.find { _1.type == "OperationBatchItemCommandAssigned" }.data.fetch("command_id")
+  @operation_batch_id = SecureRandom.uuid_v7
+  submit_skill_batch([
+    original.merge(instructions: "Changed instructions under an existing request."),
+    batch_skill_item(index: 1, name: "unrelated-success")
+  ])
+  await_operation_batch_terminal
+  project_operation_batch(operation_batch_events)
+end
+
+Then("the second Batch completes with a durable request-reuse denial and an independent success") do
+  view = operation_batch_view
+  assert_acceptance_equal("completed_with_errors", view.fetch("status"), "Request reuse Batch status")
+  assert_acceptance_equal(1, view.fetch("succeeded"), "Independent item success")
+  assert_acceptance_equal(1, view.fetch("rejected"), "Request reuse denial")
+  events = operation_batch_events
+  rejection = events.select { _1.type == "OperationBatchItemRegistrationRejected" }.sole
+  assert_acceptance_equal("command_id_reused", rejection.data.dig("error", "code"), "Durable binding denial")
+  assert_acceptance_equal(1, events.count { _1.type == "OperationBatchItemCommandAssigned" }, "Only independent item bound")
+end
+
+Then("the denied item has no fabricated canonical receipt") do
+  item = operation_batch_view.fetch("items").first
+  assert_acceptance_equal("rejected", item.fetch("status"), "Denied item status")
+  assert_acceptance_equal("command_id_reused", item.dig("result", "status"), "Denied item result")
+  assert_acceptance_equal(nil, item.dig("result", "receipt"), "Unregistered item receipt")
+  events = event_store.read(streams.command(@original_request_command_id), Coordinator::Write::EventQueries::COMMAND_HISTORY)
+  assert_acceptance_equal(%w[CommandRegistered CommandSucceeded], events.map(&:type), "Original request remains successful")
+end
+
+When("a one-item Batch pauses after its canonical assignment before target execution") do
+  @operation_batch_id = SecureRandom.uuid_v7
+  submit_skill_batch([ batch_skill_item(index: 0, name: "cancelled-after-assignment") ], pause_at: "operation_batch_item_assigned")
+  await_contention_evidence
+  @unexecuted_batch_command_id = operation_batch_events.find { _1.type == "OperationBatchItemCommandAssigned" }.data.fetch("command_id")
+end
+
+Then("the assigned item is not run and its canonical command has no terminal effect") do
+  events = operation_batch_events
+  assert_acceptance_equal(0, events.count { _1.type == "OperationBatchItemExecutionStarted" }, "No item started")
+  assert_acceptance_equal(1, operation_batch_view.fetch("not_run"), "Assigned but unexecuted item")
+  history = event_store.read(streams.command(@unexecuted_batch_command_id), Coordinator::Write::EventQueries::COMMAND_HISTORY)
+  assert_acceptance_equal([ "CommandRegistered" ], history.map(&:type), "Unexecuted canonical history")
+end
+
+Then("the unexecuted canonical binding is reused successfully") do
+  events = operation_batch_events
+  assignment = events.select { _1.type == "OperationBatchItemCommandAssigned" }.sole
+  assert_acceptance_equal(@unexecuted_batch_command_id, assignment.data.fetch("command_id"), "Resumed canonical binding")
+  assert_acceptance_equal(1, operation_batch_view.fetch("succeeded"), "Resumed success")
+  history = event_store.read(streams.command(@unexecuted_batch_command_id), Coordinator::Write::EventQueries::COMMAND_HISTORY)
+  assert_acceptance_equal(%w[CommandRegistered CommandSucceeded], history.map(&:type), "Executed once after resubmission")
+end
+
+When("a one-item Batch pauses after its target commits before recording its outcome") do
+  @operation_batch_id = SecureRandom.uuid_v7
+  submit_skill_batch([ batch_skill_item(index: 0, name: "committed-before-outcome") ], pause_at: "operation_batch_item_outcome")
+  await_contention_evidence
+  events = operation_batch_events
+  assert_acceptance_equal(1, events.count { _1.type == "OperationBatchItemExecutionStarted" }, "Committed item start")
+  assert_acceptance_equal(0, events.count { _1.type == "OperationBatchItemSucceeded" }, "Outcome gap")
+end
+
+When("the process workers restart after the committed target boundary") do
+  restart_operation_batch_after_page
+  project_operation_batch(operation_batch_events)
+end
+
+Then("cancellation retains one committed success and no item not run") do
+  view = operation_batch_view
+  assert_acceptance_equal("cancelled", view.fetch("status"), "Cancelled Batch status")
+  assert_acceptance_equal(1, view.fetch("succeeded"), "Retained committed success")
+  assert_acceptance_equal(0, view.fetch("not_run"), "Committed item is not an unexecuted remainder")
+  events = operation_batch_events
+  assert_acceptance_equal(1, events.count { _1.type == "OperationBatchItemExecutionStarted" }, "One committed execution")
+  assert_acceptance_equal(1, events.count { _1.type == "OperationBatchItemSucceeded" }, "One outcome")
+  assert_acceptance_equal(1, events.count { _1.type == "OperationBatchCancelled" }, "One terminal cancellation")
+end
+
 Then("the Batch Task durably accepts both items") do
   step("the Batch Task durably accepts all 2 items")
 end

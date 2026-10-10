@@ -7,7 +7,7 @@ RSpec.describe Coordinator::Write::Operations::ExecuteOperationBatchCommand, :ev
   let(:streams) { Coordinator::Write::StreamFactory.new }
   let(:preparer) { Coordinator::Write::Operations::PrepareCreateSkillPublishBatch.new }
 
-  it "atomically creates a bounded Batch and registers its UUIDv7 item Commands" do
+  it "atomically accepts the manifest without reserving child command identities" do
     command = preparer.call(input).value!
 
     first = operation.call_command(command)
@@ -34,13 +34,12 @@ RSpec.describe Coordinator::Write::Operations::ExecuteOperationBatchCommand, :ev
     expect(load(target)).to have_attributes(batch_id: command.batch_id, target_tool: "skill_publish")
     enqueued = events.select { _1.type == "OperationBatchItemEnqueued" }
     expect(enqueued.map { _1.metadata.keys }).to all(include("canonical_input_digest", "encoded_byte_size"))
-    items = Coordinator::Write::OperationBatches::Loader.new(event_store:).call(command.batch_id).state.items
+    loader = Coordinator::Write::OperationBatches::Loader.new(event_store:)
+    items = (0...2).map { loader.item(command.batch_id, _1).state.items.sole }
     expect(items.map(&:request_id)).to eq(%w[item-1 item-2])
     expect(items.map(&:command_id)).to all(match(Coordinator::Shared::Types::UUID_V7_PATTERN))
-    expect(items.map { command_events(_1.command_id).map(&:type) }).to eq([
-      [ "CommandRegistered" ],
-      [ "CommandRegistered" ]
-    ])
+    expect(items.map { command_events(_1.command_id) }).to all(be_empty)
+    expect(loader.call(command.batch_id).state).to have_attributes(item_count: 2, items: [])
   end
 
   it "leaves public replay to the Command lifecycle and rejects direct Batch ID reuse" do
@@ -65,7 +64,12 @@ RSpec.describe Coordinator::Write::Operations::ExecuteOperationBatchCommand, :ev
     events = batch_events(batch_command.batch_id)
     created = events.find { _1.type == "OperationBatchCreated" }
     enqueued = events.find { _1.type == "OperationBatchItemEnqueued" }
-    batch_item = Coordinator::Write::OperationBatches::Loader.new(event_store:).call(batch_command.batch_id).state.items.sole
+    source = Coordinator::Processes::OperationBatches::SourceBuilder.new.call(created)
+    builder = Coordinator::Processes::OperationBatches::CommandBuilder.new
+    assignment = Coordinator::Write::Operations::ExecuteAssignOperationBatchItemCommand.new(event_store:).call_command(
+      builder.assign_item(source:, index: 0, command_id: SecureRandom.uuid_v7), caused_by: enqueued
+    ).value!
+    batch_item = assignment.item
     target = Coordinator::Write::Tasks::TargetCommandBuilder.new.call(batch_item.command_input)
     execution = Coordinator::Write::Tasks::TargetExecutor.new(event_store:).call(
       target,

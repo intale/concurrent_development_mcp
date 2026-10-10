@@ -1,0 +1,11 @@
+module Coordinator
+  module Write
+    module Events
+      class OperationBatchItemRegistrationRejectedV1 < Base
+        def batch_id: () -> String
+        def index: () -> Integer
+        def error: () -> Tasks::DomainErrorV1::domain_error
+      end
+    end
+  end
+end

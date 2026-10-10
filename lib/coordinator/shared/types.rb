@@ -128,7 +128,7 @@ module Coordinator::Shared
     OPERATION_BATCH_MAXIMUM_HISTORY_EVENTS =
       2 + # creation and target selection
       OPERATION_BATCH_MAXIMUM_ITEMS + # enqueued items
-      (OPERATION_BATCH_MAXIMUM_ITEMS * 2) + # outcome and terminal-command link per item
+      (OPERATION_BATCH_MAXIMUM_ITEMS * 4) + # assignment, start, outcome and terminal-command link per item
       OPERATION_BATCH_MAXIMUM_CONTINUATIONS +
       2 # cancellation request plus either cancellation or completion
     WORK_INTENTION_SET_MAXIMUM_RESOURCE_COUNT = 32

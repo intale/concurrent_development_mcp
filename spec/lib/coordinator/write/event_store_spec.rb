@@ -149,6 +149,25 @@ RSpec.describe Coordinator::Write::EventStore, :event_store do
     expect(event_store.read_latest_marked(stream, criteria).map(&:id)).to eq([ newest.id ])
   end
 
+  it "unions exact event types under the same item marker without including other items or types" do
+    first = build_event(type: "EnqueuedProbe", markers: [ "batch-item:batch:0" ])
+    second = build_event(type: "AssignedProbe", markers: [ "batch-item:batch:0" ])
+    event_store.append(stream, [
+      first,
+      build_event(type: "AssignedProbe", markers: [ "batch-item:batch:1" ]),
+      build_event(type: "IgnoredProbe", markers: [ "batch-item:batch:0" ]),
+      second
+    ])
+    criteria = Coordinator::Write::MarkedTypesEventReadCriteria.new(
+      event_types: %w[EnqueuedProbe AssignedProbe], marker: "batch-item:batch:0", maximum_count: 2, direction: :asc
+    )
+
+    expect(event_store.read_marked_types(stream, criteria).map(&:id)).to eq([ first.id, second.id ])
+    smaller = criteria.class.new(criteria.attributes.merge(maximum_count: 1))
+    expect { event_store.read_marked_types(stream, smaller) }
+      .to raise_error(Coordinator::Write::EventHistoryLimitExceeded, /exceeded 1 relevant events/)
+  end
+
   it "reads one globally marked fact only within the declared context, stream name, and types" do
     target = build_event(type: "UserUtteranceRecorded", markers: [ "message:M-real-store" ])
     event_store.append(

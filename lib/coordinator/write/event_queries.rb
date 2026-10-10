@@ -171,6 +171,9 @@ module Coordinator::Write
         "OperationBatchCreated",
         "OperationBatchTargetSelected",
         "OperationBatchItemEnqueued",
+        "OperationBatchItemCommandAssigned",
+        "OperationBatchItemExecutionStarted",
+        "OperationBatchItemRegistrationRejected",
         "OperationBatchItemSucceeded",
         "OperationBatchItemRejected",
         "OperationBatchItemCompletionLinked",
@@ -187,6 +190,27 @@ module Coordinator::Write
       event_types: [ "OperationBatchCreated" ],
       maximum_count: 1,
       direction: :asc
+    )
+
+    OPERATION_BATCH_CONTROL = GroupedEventReadCriteria.new(
+      event_types: %w[
+        OperationBatchCreated OperationBatchTargetSelected OperationBatchContinuationRequested
+        OperationBatchCancellationRequested OperationBatchCancelled OperationBatchCompleted
+      ],
+      direction: :asc
+    )
+
+    OPERATION_BATCH_PROGRESS = EventReadCriteria.new(
+      event_types: %w[
+        OperationBatchItemExecutionStarted OperationBatchItemSucceeded OperationBatchItemRejected
+        OperationBatchItemRegistrationRejected OperationBatchItemCompletionLinked
+      ],
+      maximum_count: Types::OPERATION_BATCH_MAXIMUM_ITEMS * 3,
+      direction: :asc
+    )
+
+    OPERATION_BATCH_LAST_ENQUEUED = LatestEventReadCriteria.new(
+      event_types: [ "OperationBatchItemEnqueued" ]
     )
 
     DECISION_EXISTENCE = EventReadCriteria.new(

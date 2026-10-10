@@ -521,7 +521,7 @@ module Coordinator::Read
           }.fetch(outcome),
           data: Coordinator::Write::CommandReceiptData::DevelopmentArtifactCapture.new(
             artifact_id:,
-            observation_id: observed.observation_id,
+            observation_id: recorded_event&.stream&.stream_id || observed.observation_id,
             classification_revision: 1,
             scope: observed.scope,
             kind: observed.kind,
