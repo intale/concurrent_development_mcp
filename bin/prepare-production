@@ -1,0 +1,43 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+if [ "${RAILS_ENV:-}" != "production" ]; then
+  echo "bin/prepare-production requires RAILS_ENV=production" >&2
+  exit 64
+fi
+
+# The gem's public creation task uses unquoted SQL identifiers. Reject unsafe
+# names and accidental database sharing before any preparation can mutate data.
+for production_name_key in DATABASE_NAME CACHE_DATABASE_NAME QUEUE_DATABASE_NAME PG_EVENTSTORE_DATABASE_NAME DATABASE_USERNAME; do
+  if ! [[ "${!production_name_key:-}" =~ ^[a-z_][a-z0-9_]{0,62}$ ]]; then
+    echo "$production_name_key must be a lowercase SQL identifier of at most 63 characters" >&2
+    exit 64
+  fi
+done
+production_database_names=()
+for production_name_key in DATABASE_NAME CACHE_DATABASE_NAME QUEUE_DATABASE_NAME PG_EVENTSTORE_DATABASE_NAME; do
+  production_database_name="${!production_name_key}"
+  case "$production_database_name" in
+    postgres|template0|template1)
+      echo "$production_name_key must not name a PostgreSQL maintenance database" >&2
+      exit 64
+      ;;
+  esac
+  for production_previous_name in "${production_database_names[@]}"; do
+    if [ "$production_database_name" = "$production_previous_name" ]; then
+      echo "Production databases must have four distinct names" >&2
+      exit 64
+    fi
+  done
+  production_database_names+=("$production_database_name")
+done
+
+cd "$(dirname "$0")/.."
+
+# The existing Rakefile loads the gem's public tasks for pg_eventstore:*.
+# Derive their URI from the same application configuration as runtime clients;
+# command substitution keeps credentials out of the preparation log.
+PG_EVENTSTORE_URI="$(bundle exec rails runner 'print PgEventstore.config.pg_uri')"
+export PG_EVENTSTORE_URI
+bundle exec rake pg_eventstore:create pg_eventstore:migrate
+exec bundle exec rails db:prepare

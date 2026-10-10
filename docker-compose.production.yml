@@ -1,0 +1,98 @@
+name: concurrent-development-mcp-production
+
+x-application: &application
+  image: ${COORDINATOR_IMAGE:-concurrent-development-mcp:production}
+  init: true
+  restart: unless-stopped
+  stop_grace_period: 60s
+  environment: &application-environment
+    RAILS_ENV: production
+    RAILS_LOG_TO_STDOUT: "true"
+    RAILS_SERVE_STATIC_FILES: "true"
+    SECRET_KEY_BASE: ${SECRET_KEY_BASE:?Set SECRET_KEY_BASE in the production environment file}
+    DATABASE_HOST: pgbouncer
+    DATABASE_PORT: "5432"
+    DATABASE_USERNAME: ${POSTGRES_USER:-coordinator}
+    DATABASE_PASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in the production environment file}
+    DATABASE_NAME: ${DATABASE_NAME:-concurrent_development_mcp_production}
+    CACHE_DATABASE_NAME: ${CACHE_DATABASE_NAME:-concurrent_development_mcp_production_cache}
+    QUEUE_DATABASE_NAME: ${QUEUE_DATABASE_NAME:-concurrent_development_mcp_production_queue}
+    PG_EVENTSTORE_DATABASE_NAME: ${PG_EVENTSTORE_DATABASE_NAME:-eventstore_production}
+    DATABASE_POOL: ${DATABASE_POOL:-20}
+    PG_EVENTSTORE_POOL: ${PG_EVENTSTORE_POOL:-15}
+    RAILS_MAX_THREADS: ${RAILS_MAX_THREADS:-3}
+    JOB_CONCURRENCY: ${JOB_CONCURRENCY:-1}
+  depends_on:
+    pgbouncer:
+      condition: service_healthy
+
+services:
+  postgres:
+    image: postgres:18@sha256:06cad38a5d9f5d24b4d83d86def30795d5e4b757fedbf5281172b576dedcd941
+    restart: unless-stopped
+    stop_grace_period: 60s
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-coordinator}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in the production environment file}
+      POSTGRES_DB: postgres
+      PGDATA: /var/lib/postgresql/18/docker
+    command: ["postgres", "-c", "max_connections=100"]
+    ports:
+      - "127.0.0.1:${POSTGRES_HOST_PORT:-6435}:5432"
+    volumes:
+      - type: bind
+        source: ${PG_HOST_DATA_DIR:-./data}
+        target: /var/lib/postgresql
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - >-
+          PGPASSWORD="$${POSTGRES_PASSWORD}" psql --host=127.0.0.1
+          --username="$${POSTGRES_USER}" --dbname=postgres --no-password
+          --no-psqlrc --tuples-only --command='SELECT 1' >/dev/null
+      interval: 5s
+      timeout: 5s
+      retries: 12
+      start_period: 10s
+
+  pgbouncer:
+    image: edoburu/pgbouncer@sha256:4c1ca296ef525f108f5d3552cc337c0c09587cf8dae7f0067fd93349e47dc1cd
+    restart: unless-stopped
+    stop_grace_period: 60s
+    environment:
+      DB_HOST: postgres
+      DB_PORT: "5432"
+      DB_USER: ${POSTGRES_USER:-coordinator}
+      DB_PASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in the production environment file}
+      # DB_NAME is intentionally omitted: wildcard routing also handles the
+      # maintenance database and databases created after PgBouncer starts.
+      POOL_MODE: transaction
+      AUTH_TYPE: scram-sha-256
+      MAX_CLIENT_CONN: "300"
+      DEFAULT_POOL_SIZE: "15"
+      MAX_DB_CONNECTIONS: "15"
+      RESERVE_POOL_SIZE: "0"
+    ports:
+      - "127.0.0.1:${PGBOUNCER_HOST_PORT:-6436}:5432"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - >-
+          PGPASSWORD="$${DB_PASSWORD}" psql --host=127.0.0.1
+          --username="$${DB_USER}" --dbname=postgres --no-password
+          --no-psqlrc --tuples-only --command='SELECT 1' >/dev/null
+      interval: 5s
+      timeout: 5s
+      retries: 12
+      start_period: 5s
+
+  prepare:
+    <<: *application
+    build:
+      context: .
+      dockerfile: Dockerfile
+    restart: "no"
+    command: ["./bin/prepare-production"]

@@ -95,13 +95,18 @@ production:
   primary: &primary_production
     <<: *default
     database: <%= ENV.fetch("DATABASE_NAME", "concurrent_development_mcp_production").to_json %>
+    # Fresh production databases run the migration history, not a SQL dump
+    # whose session settings cannot be relied on through transaction pooling.
+    schema_dump: false
   cache:
     <<: *primary_production
     database: <%= ENV.fetch("CACHE_DATABASE_NAME", "concurrent_development_mcp_production_cache").to_json %>
     migrations_paths: db/cache_migrate
     schema_format: ruby
+    schema_dump: cache_schema.rb
   queue:
     <<: *primary_production
     database: <%= ENV.fetch("QUEUE_DATABASE_NAME", "concurrent_development_mcp_production_queue").to_json %>
     migrations_paths: db/queue_migrate
     schema_format: ruby
+    schema_dump: queue_schema.rb

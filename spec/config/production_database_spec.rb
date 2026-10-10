@@ -40,8 +40,13 @@ RSpec.describe "production database configuration" do
         "prepared_statements" => false, "advisory_locks" => false
       )
     end
-    expect(configuration.fetch("cache")).to include("schema_format" => "ruby", "migrations_paths" => "db/cache_migrate")
-    expect(configuration.fetch("queue")).to include("schema_format" => "ruby", "migrations_paths" => "db/queue_migrate")
+    expect(configuration.fetch("primary")).to include("schema_dump" => false)
+    expect(configuration.fetch("cache")).to include(
+      "schema_format" => "ruby", "migrations_paths" => "db/cache_migrate", "schema_dump" => "cache_schema.rb"
+    )
+    expect(configuration.fetch("queue")).to include(
+      "schema_format" => "ruby", "migrations_paths" => "db/queue_migrate", "schema_dump" => "queue_schema.rb"
+    )
   end
 
   it "accepts explicit database names and per-process pool sizes" do
