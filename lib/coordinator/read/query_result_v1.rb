@@ -136,6 +136,10 @@ module Coordinator::Read
       attribute :page, SkillPageV1
     end
 
+    class SearchPageData < Value
+      attribute :page, Search::Page
+    end
+
     class SkillAssetData < Value
       Asset = SkillTextAssetViewV2 | SkillBinaryAssetViewV2
 
@@ -193,6 +197,7 @@ module Coordinator::Read
            ResourceData |
            ResourcePageData |
            SkillPageData |
+           SearchPageData |
            SkillAssetData |
            DevelopmentArtifactData |
            DevelopmentArtifactContentData |

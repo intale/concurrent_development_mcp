@@ -100,7 +100,7 @@ RSpec.describe Coordinator::Read::Repositories::DevelopmentSearch, read_model: t
     expect(page.items.map(&:document_id)).to contain_exactly("current:#{artifact.artifact_id}", "observation:#{old.observation_id}")
     expect(page.items.map { _1.matches.map(&:field) }).to all(eq(%w[development_artifact.content development_artifact.title]))
     current = page.items.find { _1.document_id.start_with?("current:") }
-    expect(current.retrieval.fetch("arguments").fetch("observation_id")).to eq(latest.observation_id)
+    expect(current.retrieval_actions.map { _1.arguments.observation_id }).to eq([ latest.observation_id, latest.observation_id ])
   end
 
   it "serves both divergent current-head and retained observation text without a freshness gate" do
@@ -128,7 +128,21 @@ RSpec.describe Coordinator::Read::Repositories::DevelopmentSearch, read_model: t
     fields = %w[resource.path guidance.text agent_choice.selected_summary decision.rationale].map { [ _1, literal("needle-scalar") ] }
     page = search(*fields)
     expect(page.items.map(&:entity_type)).to contain_exactly("resource", "guidance", "agent_choice", "decision")
-    expect(page.items.map { _1.retrieval.fetch("tool") }).to contain_exactly("resource_get", "guidance_get", "agent_choice_get", "decision_get")
+    expect(page.items.map { _1.retrieval_actions.sole.tool }).to contain_exactly("resource_get", "guidance_get", "agent_choice_get", "decision_get")
+  end
+
+  it "matches alternative summaries as individual indexed raw scalars rather than a literal wildcard JSON path" do
+    matched = create(:coordinator_read_agent_choice, alternatives: [
+      { "option_id" => "one", "summary" => "bar middle baz" }
+    ])
+    create(:coordinator_read_agent_choice, alternatives: [
+      { "option_id" => "one", "summary" => "bar middle" },
+      { "option_id" => "two", "summary" => "middle baz" }
+    ])
+    expression = { operator: "and", operands: [ literal("bar", match: "starts_with"), literal("baz", match: "ends_with") ] }
+    page = search([ "agent_choice.alternative_summary", expression ])
+    expect(page.items.map(&:entity_id)).to eq([ matched.choice_id ])
+    expect(page.items.sole.matches.sole.path).to eq(%w[alternatives 0 summary])
   end
 
   it "uses only declared Guidance, Choice and Decision repository memberships for intersecting filters" do

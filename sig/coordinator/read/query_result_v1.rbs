@@ -132,6 +132,10 @@ module Coordinator
         def page: () -> SkillPageV1
       end
 
+      class SearchPageData < Shared::Value
+        def page: () -> Coordinator::Read::Search::Page
+      end
+
       class SkillAssetData < Shared::Value
         def asset: () -> (SkillTextAssetViewV2 | SkillBinaryAssetViewV2)
       end
@@ -160,7 +164,7 @@ module Coordinator
         def batch: () -> OperationBatchViewV1
       end
 
-      type data = EmptyData | DomainError | OperationData | ContextData | CoordinationPageData | NotModifiedData | GuidanceData | InterpretationPageData | DecisionData | DecisionPageData | DecisionContextData | AgentChoiceData | AgentChoiceImpactPageData | AttemptHistoryPageData | CandidateData | CandidatePageData | CandidateImpactData | VerificationObligationPageData | MergeSnapshotData | ReleaseSetData | SkillData | RepositoryPageData | ResourceData | ResourcePageData | SkillPageData | SkillAssetData | DevelopmentArtifactData | DevelopmentArtifactContentData | DevelopmentArtifactPageData | DevelopmentArtifactRelationPageData | DevelopmentArtifactLocatorPageData | OperationBatchData
+      type data = EmptyData | DomainError | OperationData | ContextData | CoordinationPageData | NotModifiedData | GuidanceData | InterpretationPageData | DecisionData | DecisionPageData | DecisionContextData | AgentChoiceData | AgentChoiceImpactPageData | AttemptHistoryPageData | CandidateData | CandidatePageData | CandidateImpactData | VerificationObligationPageData | MergeSnapshotData | ReleaseSetData | SkillData | RepositoryPageData | ResourceData | ResourcePageData | SkillPageData | SearchPageData | SkillAssetData | DevelopmentArtifactData | DevelopmentArtifactContentData | DevelopmentArtifactPageData | DevelopmentArtifactRelationPageData | DevelopmentArtifactLocatorPageData | OperationBatchData
       type action = Write::NextAction | NextAction
 
       def status: () -> String

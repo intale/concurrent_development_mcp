@@ -56,6 +56,7 @@ module McpWalkingSliceSpec
       "skill_get",
       "skill_list",
       "skill_asset_get",
+      "development_search",
       "development_artifact_get",
       "development_artifact_content_get",
       "development_artifact_relation_list",

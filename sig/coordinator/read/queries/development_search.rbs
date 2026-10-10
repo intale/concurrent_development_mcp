@@ -1,0 +1,11 @@
+module Coordinator::Read::Queries
+  class DevelopmentSearch
+    def initialize: (builder: Coordinator::Read::Search::QueryBuilder, search: Coordinator::Read::Repositories::DevelopmentSearch) -> void
+    # dry-operation prepends #call; runtime RBS wrapping recursively re-enters that wrapper.
+    %a{rbs:test:skip}
+    def call: (Coordinator::Read::command_input input) -> Coordinator::Read::QueryResultV1
+    private
+    def error_result: (Coordinator::Read::Search::Problem problem, status: String) -> Coordinator::Read::QueryResultV1
+    def envelope: (status: String, summary: String, data: Coordinator::Read::QueryResultV1::data) -> Coordinator::Read::QueryResultV1
+  end
+end

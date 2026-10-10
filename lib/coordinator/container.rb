@@ -797,6 +797,18 @@ module Coordinator
       Read::Repositories::Skills.new
     end
 
+    register("search.cursor_codec", memoize: true) do
+      Read::Search::CursorCodec.new(secret: Rails.application.secret_key_base)
+    end
+
+    register("search.query_builder", memoize: true) do
+      Read::Search::QueryBuilder.new(cursor_codec: self["search.cursor_codec"])
+    end
+
+    register("repositories.development_search", memoize: true) do
+      Read::Repositories::DevelopmentSearch.new(cursor_codec: self["search.cursor_codec"])
+    end
+
     register("repositories.development_artifacts", memoize: true) do
       Read::Repositories::DevelopmentArtifacts.new
     end
@@ -1135,6 +1147,10 @@ module Coordinator
 
     register("queries.skill_get") do
       Read::Queries::SkillGet.new(skills: self["repositories.skills"])
+    end
+
+    register("queries.development_search") do
+      Read::Queries::DevelopmentSearch.new(builder: self["search.query_builder"], search: self["repositories.development_search"])
     end
 
     register("queries.skill_list") do

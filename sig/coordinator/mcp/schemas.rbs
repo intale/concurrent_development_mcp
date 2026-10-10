@@ -2,6 +2,7 @@ module Coordinator
   module Mcp
     module Schemas
       def self.envelope: (?data: json_schema, ?next_action: json_schema) -> json_schema
+      def self.development_search: () -> json_schema
       def self.generic_next_action: () -> json_schema
       def self.utf8_text: (maximum_bytes: Integer, ?minimum_bytes: Integer) -> json_schema
       def self.utf8_text_array: (max_items: Integer, maximum_bytes: Integer) -> json_schema

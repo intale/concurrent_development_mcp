@@ -1,0 +1,68 @@
+module Coordinator::Read::Search::Retrieval
+  class SkillArguments < Coordinator::Shared::Value
+    def name: () -> String
+    def scope: () -> String
+    def revision: () -> Integer
+  end
+  class AssetArguments < Coordinator::Read::Search::Retrieval::SkillArguments
+    def path: () -> String
+  end
+  class ResourceArguments < Coordinator::Shared::Value
+    def resource_id: () -> String
+  end
+  class ArtifactArguments < Coordinator::Shared::Value
+    def artifact_id: () -> String
+    def observation_id: () -> String?
+  end
+  class GuidanceArguments < Coordinator::Shared::Value
+    def message_id: () -> String
+  end
+  class ChoiceArguments < Coordinator::Shared::Value
+    def choice_id: () -> String
+  end
+  class DecisionArguments < Coordinator::Shared::Value
+    def decision_id: () -> String
+  end
+  class WorkItemArguments < Coordinator::Shared::Value
+    def change_set_id: () -> String
+    def work_item_id: () -> String
+  end
+  class Skill < Coordinator::Shared::Value
+    def tool: () -> String
+    def arguments: () -> Coordinator::Read::Search::Retrieval::SkillArguments
+  end
+  class Asset < Coordinator::Shared::Value
+    def tool: () -> String
+    def arguments: () -> Coordinator::Read::Search::Retrieval::AssetArguments
+  end
+  class Resource < Coordinator::Shared::Value
+    def tool: () -> String
+    def arguments: () -> Coordinator::Read::Search::Retrieval::ResourceArguments
+  end
+  class ArtifactContent < Coordinator::Shared::Value
+    def tool: () -> String
+    def arguments: () -> Coordinator::Read::Search::Retrieval::ArtifactArguments
+  end
+  class ArtifactMetadata < Coordinator::Shared::Value
+    def tool: () -> String
+    def arguments: () -> Coordinator::Read::Search::Retrieval::ArtifactArguments
+  end
+  class Guidance < Coordinator::Shared::Value
+    def tool: () -> String
+    def arguments: () -> Coordinator::Read::Search::Retrieval::GuidanceArguments
+  end
+  class Choice < Coordinator::Shared::Value
+    def tool: () -> String
+    def arguments: () -> Coordinator::Read::Search::Retrieval::ChoiceArguments
+  end
+  class Decision < Coordinator::Shared::Value
+    def tool: () -> String
+    def arguments: () -> Coordinator::Read::Search::Retrieval::DecisionArguments
+  end
+  class WorkItem < Coordinator::Shared::Value
+    def tool: () -> String
+    def arguments: () -> Coordinator::Read::Search::Retrieval::WorkItemArguments
+  end
+  type action = Skill | Asset | Resource | ArtifactContent | ArtifactMetadata | Guidance | Choice | Decision | WorkItem
+  def self.call: (Hash[String, untyped]? input) -> Array[Coordinator::Read::Search::Retrieval::action]
+end

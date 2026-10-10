@@ -1,0 +1,8 @@
+class Coordinator::Read::Search::Provenance < Coordinator::Shared::Value
+  def source_table: () -> String
+  def source_id: () -> String
+  def observation_id: () -> String?
+  def source_kind: () -> String?
+  def source_locator: () -> String?
+  def source_revision: () -> String?
+end

@@ -5,7 +5,7 @@ class Coordinator::Read::Search::Document < Coordinator::Shared::Value
   def updated_at: () -> String
   def scope: () -> String?
   def repository_id: () -> String?
-  def retrieval: () -> Hash[String, untyped]?
-  def provenance: () -> Hash[String, untyped]
+  def retrieval_actions: () -> Array[Coordinator::Read::Search::Retrieval::action]
+  def provenance: () -> Coordinator::Read::Search::Provenance
   def matches: () -> Array[Coordinator::Read::Search::Evidence]
 end

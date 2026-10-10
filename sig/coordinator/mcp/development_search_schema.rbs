@@ -1,0 +1,6 @@
+class Coordinator::Mcp::DevelopmentSearchSchema
+  def call: () -> Coordinator::Mcp::json_schema
+  private
+  def definitions: () -> Hash[String, Coordinator::Mcp::json_schema]
+  def boolean_schema: (Integer depth, Array[String] operators, minimum: Integer, maximum: Integer) -> Coordinator::Mcp::json_schema
+end

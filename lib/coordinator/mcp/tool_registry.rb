@@ -27,6 +27,7 @@ module Coordinator
           Tools::SkillGet,
           Tools::SkillList,
           Tools::SkillAssetGet,
+          Tools::DevelopmentSearch,
           Tools::DevelopmentArtifactGet,
           Tools::DevelopmentArtifactContentGet,
           Tools::DevelopmentArtifactRelationList,

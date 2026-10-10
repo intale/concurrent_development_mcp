@@ -8,6 +8,10 @@ module Coordinator
 
       module_function
 
+      def development_search
+        DevelopmentSearchSchema.new.call
+      end
+
       def envelope(data: { type: "object" }, next_action: generic_next_action)
         {
           type: "object",

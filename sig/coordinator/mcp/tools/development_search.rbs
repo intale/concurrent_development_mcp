@@ -1,0 +1,4 @@
+class Coordinator::Mcp::Tools::DevelopmentSearch < Coordinator::Mcp::QueryTool
+  private
+  def self.response: (Coordinator::Mcp::ResultV1 result, ?error: bool) -> ::MCP::Tool::Response
+end

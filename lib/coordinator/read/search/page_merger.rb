@@ -12,6 +12,8 @@ module Coordinator::Read::Search
       has_more = candidates.length > query.limit
       items = candidates.first(query.limit).map do |row|
         attributes = row.fetch("document").transform_keys(&:to_sym)
+        attributes[:retrieval_actions] = Retrieval.call(attributes.delete(:retrieval))
+        attributes[:provenance] = Provenance.new(attributes.fetch(:provenance).transform_keys(&:to_sym))
         evidence = row.fetch("matches").map { Evidence.new(_1.transform_keys(&:to_sym)) }
         Document.new(**attributes, matches: evidence)
       end

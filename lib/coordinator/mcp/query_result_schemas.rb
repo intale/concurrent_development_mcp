@@ -24,6 +24,7 @@ module Coordinator
         "resource_list" => [ Coordinator::Read::QueryResultV1::ResourcePageData ],
         "skill_get" => [ Coordinator::Read::QueryResultV1::SkillData ],
         "skill_list" => [ Coordinator::Read::QueryResultV1::SkillPageData ],
+        "development_search" => [ Coordinator::Read::QueryResultV1::SearchPageData ],
         "skill_asset_get" => [ Coordinator::Read::QueryResultV1::SkillAssetData ],
         "development_artifact_get" => [ Coordinator::Read::QueryResultV1::DevelopmentArtifactData ],
         "development_artifact_content_get" => [ Coordinator::Read::QueryResultV1::DevelopmentArtifactContentData ],

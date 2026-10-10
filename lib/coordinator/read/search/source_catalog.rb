@@ -14,10 +14,11 @@ module Coordinator::Read::Search
 
     def skill(field)
       owner = %w[name scope].include?(field.column) ? "s" : "revision"
-      build(field, table: "skills", from: "skills s JOIN skill_revisions revision ON revision.skill_id = s.skill_id AND revision.revision = s.revision",
-        row_id: "s.skill_id", owner:, identity: "s.skill_id", entity_id: "s.skill_id", updated_at: "s.updated_at",
+      table, row_id = owner == "s" ? [ "skills", "s.skill_id" ] : [ "skill_revisions", "revision.id::text" ]
+      build(field, table:, from: "skills s JOIN skill_revisions revision ON revision.skill_id = s.skill_id AND revision.revision = s.revision",
+        row_id:, owner:, identity: "s.skill_id", entity_id: "s.skill_id", updated_at: "s.updated_at",
         scope: "s.scope", direct_scope: true, membership: "repository.scope = s.scope",
-        retrieval: "jsonb_build_object('tool', 'skill_get', 'arguments', jsonb_build_object('name', s.name, 'scope', s.scope))")
+        retrieval: "jsonb_build_object('tool', 'skill_get', 'arguments', jsonb_build_object('name', s.name, 'scope', s.scope, 'revision', s.revision))")
     end
 
     def skill_asset(field)
@@ -67,7 +68,7 @@ module Coordinator::Read::Search
 
     def build(field, table:, from:, row_id:, owner:, identity:, entity_id:, updated_at:, membership:, retrieval:,
       scope: "NULL::text", repository_id: "NULL::text", direct_scope: false, condition: "TRUE")
-      multiple = field.values != "scalar" || field.entity_type == "work_item"
+      multiple = field.values != "scalar" || field.path.include?("*") || field.entity_type == "work_item"
       if multiple
         from += " JOIN coordinator_search_values sv ON sv.source_table = '#{table}' AND sv.source_id = #{row_id} AND sv.field = '#{field.selector}'"
         from += " AND sv.document_id = w.work_item_id" if field.entity_type == "work_item"

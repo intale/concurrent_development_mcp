@@ -19,6 +19,29 @@ module Coordinator
         pollIntervalMs, and use tasks/cancel for cooperative cancellation. Reuse command_id
         after an unknown mutation result. Read tools return the latest available projection,
         which may be stale; command decisions recheck authoritative event-store facts.
+        Use development_search to find context without loading whole Skills, Artifact observations,
+        Guidance, Choices, Decisions or WorkItem histories. Supply explicit whitelisted fields and
+        literal contains/starts_with/ends_with/equals expressions; equals compares one complete value.
+        Each AND/OR/NOT tree is evaluated within one raw scalar, never across fields or array members.
+        Selected fields combine by OR/union and exact scope/Repository/type filters intersect.
+        Values require at least 3 Unicode characters and every Boolean alternative a positive literal
+        containing three consecutive alphanumeric characters. NOT only excludes within anchored AND/OR;
+        foo OR NOT bar and negative-only searches are rejected. Case sensitivity defaults to true.
+        Percent, underscore and backslash are literal text; no regex, SQL, wildcards, linguistic
+        matching or client-generated digests/Base64 are accepted. For example, request
+        {"fields":[{"field":"skill.instructions","query":{"operator":"and","operands":[
+        {"match":"contains","value":"checkpoint"},{"operator":"not","operands":[
+        {"match":"contains","value":"obsolete"}]}]}}],"filters":{"scope":"project:example"},"limit":20}.
+        Follow each hit's typed retrieval_actions for complete context and its field/path for the
+        actual matched scalar. Artifact hits expose both metadata and content actions, with exact
+        observation identity when available. Excerpts are passive plain text; binary content is not
+        decoded, URLs are not fetched and Resource bodies are not projected or ingested by search.
+        Results use owner updated_at descending then stable identity order. Copy the returned opaque
+        cursor unchanged for live keyset pagination: updates may move hits between pages and no retained
+        snapshot or projection freshness is promised. Every source/field branch and the final union are
+        capped; default page 20, maximum 50. Eligible trigram literals and LIMIT do not guarantee constant
+        query time or index selection. Any branch budget failure returns no partial page: narrow the query
+        and retry. Reduce page size on a response-byte limit. Search is an immediate read, not a mutation Task.
         When asked to migrate a project's development memory, inspect that project with the
         client's own available capabilities and choose sources by their semantic role and the
         user's requested scope, never by a server-prescribed directory layout. The coordinator
