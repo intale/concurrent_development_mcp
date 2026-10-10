@@ -110,6 +110,14 @@ RSpec.describe "Development search read-store text derivation", read_model: true
     expect(definitions.grep(/USING btree.*content_text/)).to be_empty
   end
 
+  it "indexes the native latest-observation order rather than incidental projection sequence" do
+    definition = ApplicationRecord.connection.select_value(<<~SQL)
+      SELECT indexdef FROM pg_indexes
+      WHERE schemaname = 'public' AND indexname = 'idx_search_observations_current'
+    SQL
+    expect(definition).to include("(artifact_id, observed_global_position DESC NULLS LAST, observation_id DESC)")
+  end
+
   it "waits for a concurrent source writer before backfilling its latest committed text" do
     artifact = create(:coordinator_read_development_artifact, labels: [ "before writer" ])
     locked = Queue.new

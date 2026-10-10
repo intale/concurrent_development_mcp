@@ -118,6 +118,21 @@ RSpec.describe Coordinator::Read::Repositories::DevelopmentSearch, read_model: t
     expect(page.items.map { _1.matches.first.excerpt }).to contain_exactly("checkpoint current", "checkpoint retained")
   end
 
+  it "selects the latest observation by native position, null placement and ID ties, not sequence" do
+    artifact = create(:coordinator_read_development_artifact, content_text: "checkpoint body")
+    older = create(:coordinator_read_development_artifact_observation, artifact:, observed_global_position: 1, observed_sequence: 500)
+    tied = create(:coordinator_read_development_artifact_observation, artifact:, observed_global_position: 2, observed_sequence: 400)
+    latest = create(:coordinator_read_development_artifact_observation, artifact:, observed_global_position: 2, observed_sequence: 300)
+    unpositioned = create(:coordinator_read_development_artifact_observation, artifact:, observed_global_position: nil,
+      classified_global_position: 3, observed_sequence: 600)
+    expected = [ tied, latest ].max_by(&:observation_id)
+    page = search([ "development_artifact.content", literal("checkpoint") ])
+    current = page.items.find { _1.document_id == "current:#{artifact.artifact_id}" }
+    expect(current.retrieval_actions.first.arguments.observation_id).to eq(expected.observation_id)
+    retained = [ older, tied, latest, unpositioned ].reject { _1 == expected }
+    expect(page.items.map(&:document_id)).to contain_exactly("current:#{artifact.artifact_id}", *retained.map { "observation:#{_1.observation_id}" })
+  end
+
   it "searches current WorkItem goals and raw criteria using their own identity" do
     context = create(:coordinator_read_coord_context)
     work_item = context.document.fetch("work_items").first

@@ -2269,7 +2269,7 @@ CREATE INDEX idx_search_choices_repo_time ON public.agent_choices USING btree ((
 -- Name: idx_search_observations_current; Type: INDEX; Schema: public; Owner: -
 --
 
-CREATE INDEX idx_search_observations_current ON public.development_artifact_observations USING btree (artifact_id, observed_sequence DESC);
+CREATE INDEX idx_search_observations_current ON public.development_artifact_observations USING btree (artifact_id, observed_global_position DESC NULLS LAST, observation_id DESC);
 
 
 --
@@ -3242,6 +3242,7 @@ ALTER TABLE ONLY public.operation_batch_outcomes
 SET search_path TO "$user", public;
 
 INSERT INTO "schema_migrations" (version) VALUES
+('20261010105000'),
 ('20261010081200'),
 ('20261010081130'),
 ('20261010081100'),
