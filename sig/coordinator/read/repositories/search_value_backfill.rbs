@@ -1,0 +1,3 @@
+class Coordinator::Read::Repositories::SearchValueBackfill
+  def call: () -> Integer
+end

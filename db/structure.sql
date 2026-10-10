@@ -10,6 +10,163 @@ SET xmloption = content;
 SET client_min_messages = warning;
 SET row_security = off;
 
+--
+-- Name: pg_trgm; Type: EXTENSION; Schema: -; Owner: -
+--
+
+CREATE EXTENSION IF NOT EXISTS pg_trgm WITH SCHEMA public;
+
+
+--
+-- Name: EXTENSION pg_trgm; Type: COMMENT; Schema: -; Owner: -
+--
+
+COMMENT ON EXTENSION pg_trgm IS 'text similarity measurement and index searching based on trigrams';
+
+
+--
+-- Name: coordinator_extract_search_values(text, jsonb); Type: FUNCTION; Schema: public; Owner: -
+--
+
+CREATE FUNCTION public.coordinator_extract_search_values(source_table text, source jsonb) RETURNS TABLE(document_id text, field text, value_path text[], value text)
+    LANGUAGE sql IMMUTABLE PARALLEL SAFE
+    AS $$
+  SELECT source ->> 'artifact_id', 'development_artifact.labels', leaf.value_path, leaf.value
+FROM coordinator_search_strings(source #> '{labels}',
+  ARRAY['labels']) AS leaf
+WHERE source_table = 'development_artifacts'
+
+UNION ALL
+SELECT source ->> 'observation_id', 'development_artifact.labels', leaf.value_path, leaf.value
+FROM coordinator_search_strings(source #> '{labels}',
+  ARRAY['labels']) AS leaf
+WHERE source_table = 'development_artifact_observations'
+
+UNION ALL
+SELECT source ->> 'choice_id', 'agent_choice.warnings', leaf.value_path, leaf.value
+FROM coordinator_search_strings(source #> '{assessment,warnings}',
+  ARRAY['assessment','warnings']) AS leaf
+WHERE source_table = 'agent_choices'
+
+UNION ALL
+SELECT source ->> 'decision_id', 'decision.topic_aliases', leaf.value_path, leaf.value
+FROM coordinator_search_strings(source #> '{definition,document,topic,aliases}',
+  ARRAY['definition','document','topic','aliases']) AS leaf
+WHERE source_table = 'decision_definitions'
+
+UNION ALL
+SELECT source ->> 'decision_id', 'decision.value_items', leaf.value_path, leaf.value
+FROM coordinator_search_strings(source #> '{definition,document,value,items}',
+  ARRAY['definition','document','value','items']) AS leaf
+WHERE source_table = 'decision_definitions'
+
+UNION ALL
+SELECT source ->> 'decision_id', 'decision.scope', leaf.value_path, leaf.value
+FROM coordinator_search_strings(source #> '{definition,document,scope}',
+  ARRAY['definition','document','scope']) AS leaf
+WHERE source_table = 'decision_definitions'
+
+UNION ALL
+SELECT source ->> 'decision_id', 'decision.conditions', leaf.value_path, leaf.value
+FROM coordinator_search_strings(source #> '{definition,document,conditions}',
+  ARRAY['definition','document','conditions']) AS leaf
+WHERE source_table = 'decision_definitions'
+
+UNION ALL
+SELECT source ->> 'choice_id', 'agent_choice.alternative_summary',
+  ARRAY['alternatives', (alternative.ordinality - 1)::text, 'summary'], alternative.value ->> 'summary'
+FROM jsonb_array_elements(CASE WHEN jsonb_typeof(source -> 'alternatives') = 'array'
+  THEN source -> 'alternatives' ELSE '[]'::jsonb END)
+  WITH ORDINALITY AS alternative(value, ordinality)
+WHERE source_table = 'agent_choices' AND jsonb_typeof(alternative.value -> 'summary') = 'string'
+
+UNION ALL
+SELECT work_item.value ->> 'work_item_id', field.selector, leaf.value_path, leaf.value
+FROM jsonb_array_elements(CASE WHEN jsonb_typeof(source #> '{document,work_items}') = 'array'
+  THEN source #> '{document,work_items}' ELSE '[]'::jsonb END)
+  WITH ORDINALITY AS work_item(value, ordinality)
+CROSS JOIN LATERAL (VALUES
+  ('work_item.goal', 'goal'), ('work_item.acceptance_criteria', 'acceptance_criteria')
+) AS field(selector, key)
+CROSS JOIN LATERAL coordinator_search_strings(work_item.value -> field.key,
+  ARRAY['document', 'work_items', (work_item.ordinality - 1)::text, field.key]) AS leaf
+WHERE source_table = 'coordinator_contexts' AND work_item.value ->> 'work_item_id' IS NOT NULL
+
+$$;
+
+
+--
+-- Name: coordinator_search_strings(jsonb, text[]); Type: FUNCTION; Schema: public; Owner: -
+--
+
+CREATE FUNCTION public.coordinator_search_strings(input jsonb, root_path text[]) RETURNS TABLE(value_path text[], value text)
+    LANGUAGE sql IMMUTABLE PARALLEL SAFE
+    AS $$
+  WITH RECURSIVE nodes(node, path) AS (
+    SELECT input, root_path
+    UNION ALL
+    SELECT child.node, nodes.path || child.key
+    FROM nodes
+    CROSS JOIN LATERAL (
+      SELECT item.value AS node, (item.ordinality - 1)::text AS key
+      FROM jsonb_array_elements(CASE WHEN jsonb_typeof(nodes.node) = 'array'
+        THEN nodes.node ELSE '[]'::jsonb END) WITH ORDINALITY AS item(value, ordinality)
+      UNION ALL
+      SELECT item.value, item.key
+      FROM jsonb_each(CASE WHEN jsonb_typeof(nodes.node) = 'object'
+        THEN nodes.node ELSE '{}'::jsonb END) AS item(key, value)
+    ) AS child
+  )
+  SELECT path, node #>> '{}' FROM nodes WHERE jsonb_typeof(node) = 'string'
+$$;
+
+
+--
+-- Name: coordinator_search_values_changed(); Type: FUNCTION; Schema: public; Owner: -
+--
+
+CREATE FUNCTION public.coordinator_search_values_changed() RETURNS trigger
+    LANGUAGE plpgsql
+    AS $$
+BEGIN
+  IF TG_OP = 'TRUNCATE' THEN
+    DELETE FROM coordinator_search_values WHERE source_table = TG_TABLE_NAME;
+    RETURN NULL;
+  END IF;
+  IF TG_OP = 'DELETE' THEN
+    DELETE FROM coordinator_search_values
+    WHERE source_table = TG_TABLE_NAME AND source_id = to_jsonb(OLD) ->> TG_ARGV[0];
+  ELSIF TG_OP = 'UPDATE' THEN
+    IF (to_jsonb(OLD) ->> TG_ARGV[0]) IS DISTINCT FROM (to_jsonb(NEW) ->> TG_ARGV[0]) THEN
+      DELETE FROM coordinator_search_values
+      WHERE source_table = TG_TABLE_NAME AND source_id = to_jsonb(OLD) ->> TG_ARGV[0];
+    END IF;
+  END IF;
+  IF TG_OP <> 'DELETE' THEN
+    PERFORM coordinator_sync_search_values(TG_TABLE_NAME, to_jsonb(NEW) ->> TG_ARGV[0], to_jsonb(NEW));
+  END IF;
+  RETURN NULL;
+END
+$$;
+
+
+--
+-- Name: coordinator_sync_search_values(text, text, jsonb); Type: FUNCTION; Schema: public; Owner: -
+--
+
+CREATE FUNCTION public.coordinator_sync_search_values(owner_table text, owner_id text, source jsonb) RETURNS void
+    LANGUAGE plpgsql
+    AS $$
+BEGIN
+  DELETE FROM coordinator_search_values WHERE source_table = owner_table AND source_id = owner_id;
+  INSERT INTO coordinator_search_values(source_table, source_id, document_id, field, value_path, value, updated_at)
+  SELECT owner_table, owner_id, leaf.document_id, leaf.field, leaf.value_path, leaf.value,
+    (source ->> 'updated_at')::timestamp
+  FROM coordinator_extract_search_values(owner_table, source) AS leaf;
+END
+$$;
+
+
 SET default_tablespace = '';
 
 SET default_table_access_method = heap;
@@ -375,6 +532,41 @@ CREATE TABLE public.coordinator_context_scopes (
     scope_kind character varying NOT NULL,
     updated_at timestamp(6) without time zone NOT NULL
 );
+
+
+--
+-- Name: coordinator_search_values; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.coordinator_search_values (
+    id bigint NOT NULL,
+    source_table text NOT NULL,
+    source_id text NOT NULL,
+    document_id text NOT NULL,
+    field text NOT NULL,
+    value_path text[] NOT NULL,
+    value text NOT NULL,
+    updated_at timestamp(6) without time zone NOT NULL
+);
+
+
+--
+-- Name: coordinator_search_values_id_seq; Type: SEQUENCE; Schema: public; Owner: -
+--
+
+CREATE SEQUENCE public.coordinator_search_values_id_seq
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1;
+
+
+--
+-- Name: coordinator_search_values_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: -
+--
+
+ALTER SEQUENCE public.coordinator_search_values_id_seq OWNED BY public.coordinator_search_values.id;
 
 
 --
@@ -1377,6 +1569,13 @@ CREATE TABLE public.verification_obligations (
 
 
 --
+-- Name: coordinator_search_values id; Type: DEFAULT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.coordinator_search_values ALTER COLUMN id SET DEFAULT nextval('public.coordinator_search_values_id_seq'::regclass);
+
+
+--
 -- Name: development_artifact_observations observed_sequence; Type: DEFAULT; Schema: public; Owner: -
 --
 
@@ -1486,6 +1685,14 @@ ALTER TABLE ONLY public.command_receipts
 
 ALTER TABLE ONLY public.coordinator_contexts
     ADD CONSTRAINT coordinator_contexts_pkey PRIMARY KEY (change_set_id);
+
+
+--
+-- Name: coordinator_search_values coordinator_search_values_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.coordinator_search_values
+    ADD CONSTRAINT coordinator_search_values_pkey PRIMARY KEY (id);
 
 
 --
@@ -2035,6 +2242,314 @@ CREATE UNIQUE INDEX idx_resources_on_repository_kind_path ON public.resources US
 --
 
 CREATE INDEX idx_resources_on_repository_status_id ON public.resources USING btree (repository_id, lifecycle_status, resource_id);
+
+
+--
+-- Name: idx_search_artifacts_scope_time; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_search_artifacts_scope_time ON public.development_artifacts USING btree (scope, updated_at DESC, artifact_id);
+
+
+--
+-- Name: idx_search_artifacts_time; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_search_artifacts_time ON public.development_artifacts USING btree (updated_at DESC, artifact_id);
+
+
+--
+-- Name: idx_search_choices_repo_time; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_search_choices_repo_time ON public.agent_choices USING btree (((context ->> 'repository_id'::text)), updated_at DESC, choice_id);
+
+
+--
+-- Name: idx_search_observations_current; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_search_observations_current ON public.development_artifact_observations USING btree (artifact_id, observed_sequence DESC);
+
+
+--
+-- Name: idx_search_resources_repo_time; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_search_resources_repo_time ON public.resources USING btree (repository_id, updated_at DESC, resource_id);
+
+
+--
+-- Name: idx_search_scalar_0_0; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_search_scalar_0_0 ON public.skills USING gin (name public.gin_trgm_ops);
+
+
+--
+-- Name: idx_search_scalar_0_1; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_search_scalar_0_1 ON public.skills USING gin (scope public.gin_trgm_ops);
+
+
+--
+-- Name: idx_search_scalar_1_0; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_search_scalar_1_0 ON public.skill_revisions USING gin (description public.gin_trgm_ops);
+
+
+--
+-- Name: idx_search_scalar_1_1; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_search_scalar_1_1 ON public.skill_revisions USING gin (instructions public.gin_trgm_ops);
+
+
+--
+-- Name: idx_search_scalar_2_0; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_search_scalar_2_0 ON public.skill_assets USING gin (path public.gin_trgm_ops);
+
+
+--
+-- Name: idx_search_scalar_2_1; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_search_scalar_2_1 ON public.skill_assets USING gin (content_text public.gin_trgm_ops);
+
+
+--
+-- Name: idx_search_scalar_3_0; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_search_scalar_3_0 ON public.resources USING gin (normalized_path public.gin_trgm_ops);
+
+
+--
+-- Name: idx_search_scalar_3_1; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_search_scalar_3_1 ON public.resources USING gin (kind public.gin_trgm_ops);
+
+
+--
+-- Name: idx_search_scalar_3_2; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_search_scalar_3_2 ON public.resources USING gin (unbinding_reason public.gin_trgm_ops);
+
+
+--
+-- Name: idx_search_scalar_4_0; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_search_scalar_4_0 ON public.development_artifacts USING gin (title public.gin_trgm_ops);
+
+
+--
+-- Name: idx_search_scalar_4_1; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_search_scalar_4_1 ON public.development_artifacts USING gin (scope public.gin_trgm_ops);
+
+
+--
+-- Name: idx_search_scalar_4_2; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_search_scalar_4_2 ON public.development_artifacts USING gin (kind public.gin_trgm_ops);
+
+
+--
+-- Name: idx_search_scalar_4_3; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_search_scalar_4_3 ON public.development_artifacts USING gin (content_text public.gin_trgm_ops);
+
+
+--
+-- Name: idx_search_scalar_4_4; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_search_scalar_4_4 ON public.development_artifacts USING gin (source_locator public.gin_trgm_ops);
+
+
+--
+-- Name: idx_search_scalar_4_5; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_search_scalar_4_5 ON public.development_artifacts USING gin (source_revision public.gin_trgm_ops);
+
+
+--
+-- Name: idx_search_scalar_4_6; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_search_scalar_4_6 ON public.development_artifacts USING gin (source_collector public.gin_trgm_ops);
+
+
+--
+-- Name: idx_search_scalar_5_0; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_search_scalar_5_0 ON public.development_artifact_observations USING gin (title public.gin_trgm_ops);
+
+
+--
+-- Name: idx_search_scalar_5_1; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_search_scalar_5_1 ON public.development_artifact_observations USING gin (scope public.gin_trgm_ops);
+
+
+--
+-- Name: idx_search_scalar_5_2; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_search_scalar_5_2 ON public.development_artifact_observations USING gin (kind public.gin_trgm_ops);
+
+
+--
+-- Name: idx_search_scalar_5_3; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_search_scalar_5_3 ON public.development_artifact_observations USING gin (content_text public.gin_trgm_ops);
+
+
+--
+-- Name: idx_search_scalar_5_4; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_search_scalar_5_4 ON public.development_artifact_observations USING gin (source_locator public.gin_trgm_ops);
+
+
+--
+-- Name: idx_search_scalar_5_5; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_search_scalar_5_5 ON public.development_artifact_observations USING gin (source_revision public.gin_trgm_ops);
+
+
+--
+-- Name: idx_search_scalar_5_6; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_search_scalar_5_6 ON public.development_artifact_observations USING gin (source_collector public.gin_trgm_ops);
+
+
+--
+-- Name: idx_search_scalar_5_7; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_search_scalar_5_7 ON public.development_artifact_observations USING gin (classification_reason public.gin_trgm_ops);
+
+
+--
+-- Name: idx_search_scalar_6_0; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_search_scalar_6_0 ON public.user_utterances USING gin (text public.gin_trgm_ops);
+
+
+--
+-- Name: idx_search_scalar_7_0; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_search_scalar_7_0 ON public.agent_choices USING gin (choice_type public.gin_trgm_ops);
+
+
+--
+-- Name: idx_search_scalar_7_1; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_search_scalar_7_1 ON public.agent_choices USING gin (reason_summary public.gin_trgm_ops);
+
+
+--
+-- Name: idx_search_scalar_7_2; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_search_scalar_7_2 ON public.agent_choices USING gin (((selected ->> 'summary'::text)) public.gin_trgm_ops);
+
+
+--
+-- Name: idx_search_scalar_7_3; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_search_scalar_7_3 ON public.agent_choices USING gin (((invalidation ->> 'reason'::text)) public.gin_trgm_ops);
+
+
+--
+-- Name: idx_search_scalar_8_0; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_search_scalar_8_0 ON public.decision_definitions USING gin (((definition #>> '{document,topic,topic_id}'::text[])) public.gin_trgm_ops);
+
+
+--
+-- Name: idx_search_scalar_8_1; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_search_scalar_8_1 ON public.decision_definitions USING gin (((definition #>> '{document,value,name}'::text[])) public.gin_trgm_ops);
+
+
+--
+-- Name: idx_search_scalar_8_2; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_search_scalar_8_2 ON public.decision_definitions USING gin (((definition #>> '{document,value,action}'::text[])) public.gin_trgm_ops);
+
+
+--
+-- Name: idx_search_scalar_8_3; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_search_scalar_8_3 ON public.decision_definitions USING gin (((definition #>> '{document,value,target_id}'::text[])) public.gin_trgm_ops);
+
+
+--
+-- Name: idx_search_scalar_8_4; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_search_scalar_8_4 ON public.decision_definitions USING gin (((rationale ->> 'summary'::text)) public.gin_trgm_ops);
+
+
+--
+-- Name: idx_search_scalar_8_5; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_search_scalar_8_5 ON public.decision_definitions USING gin (((correction_rationale ->> 'summary'::text)) public.gin_trgm_ops);
+
+
+--
+-- Name: idx_search_skills_scope_time; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_search_skills_scope_time ON public.skills USING btree (scope, updated_at DESC, skill_id);
+
+
+--
+-- Name: idx_search_values_field_time; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_search_values_field_time ON public.coordinator_search_values USING btree (field, updated_at DESC, document_id);
+
+
+--
+-- Name: idx_search_values_source_path; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE UNIQUE INDEX idx_search_values_source_path ON public.coordinator_search_values USING btree (source_table, source_id, field, value_path);
+
+
+--
+-- Name: idx_search_values_text; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_search_values_text ON public.coordinator_search_values USING gin (value public.gin_trgm_ops);
 
 
 --
@@ -2619,6 +3134,76 @@ CREATE UNIQUE INDEX index_user_utterances_on_event_id ON public.user_utterances 
 
 
 --
+-- Name: agent_choices coordinator_search_values_changed; Type: TRIGGER; Schema: public; Owner: -
+--
+
+CREATE TRIGGER coordinator_search_values_changed AFTER INSERT OR DELETE OR UPDATE ON public.agent_choices FOR EACH ROW EXECUTE FUNCTION public.coordinator_search_values_changed('choice_id');
+
+
+--
+-- Name: coordinator_contexts coordinator_search_values_changed; Type: TRIGGER; Schema: public; Owner: -
+--
+
+CREATE TRIGGER coordinator_search_values_changed AFTER INSERT OR DELETE OR UPDATE ON public.coordinator_contexts FOR EACH ROW EXECUTE FUNCTION public.coordinator_search_values_changed('change_set_id');
+
+
+--
+-- Name: decision_definitions coordinator_search_values_changed; Type: TRIGGER; Schema: public; Owner: -
+--
+
+CREATE TRIGGER coordinator_search_values_changed AFTER INSERT OR DELETE OR UPDATE ON public.decision_definitions FOR EACH ROW EXECUTE FUNCTION public.coordinator_search_values_changed('decision_id');
+
+
+--
+-- Name: development_artifact_observations coordinator_search_values_changed; Type: TRIGGER; Schema: public; Owner: -
+--
+
+CREATE TRIGGER coordinator_search_values_changed AFTER INSERT OR DELETE OR UPDATE ON public.development_artifact_observations FOR EACH ROW EXECUTE FUNCTION public.coordinator_search_values_changed('observation_id');
+
+
+--
+-- Name: development_artifacts coordinator_search_values_changed; Type: TRIGGER; Schema: public; Owner: -
+--
+
+CREATE TRIGGER coordinator_search_values_changed AFTER INSERT OR DELETE OR UPDATE ON public.development_artifacts FOR EACH ROW EXECUTE FUNCTION public.coordinator_search_values_changed('artifact_id');
+
+
+--
+-- Name: agent_choices coordinator_search_values_truncated; Type: TRIGGER; Schema: public; Owner: -
+--
+
+CREATE TRIGGER coordinator_search_values_truncated AFTER TRUNCATE ON public.agent_choices FOR EACH STATEMENT EXECUTE FUNCTION public.coordinator_search_values_changed('choice_id');
+
+
+--
+-- Name: coordinator_contexts coordinator_search_values_truncated; Type: TRIGGER; Schema: public; Owner: -
+--
+
+CREATE TRIGGER coordinator_search_values_truncated AFTER TRUNCATE ON public.coordinator_contexts FOR EACH STATEMENT EXECUTE FUNCTION public.coordinator_search_values_changed('change_set_id');
+
+
+--
+-- Name: decision_definitions coordinator_search_values_truncated; Type: TRIGGER; Schema: public; Owner: -
+--
+
+CREATE TRIGGER coordinator_search_values_truncated AFTER TRUNCATE ON public.decision_definitions FOR EACH STATEMENT EXECUTE FUNCTION public.coordinator_search_values_changed('decision_id');
+
+
+--
+-- Name: development_artifact_observations coordinator_search_values_truncated; Type: TRIGGER; Schema: public; Owner: -
+--
+
+CREATE TRIGGER coordinator_search_values_truncated AFTER TRUNCATE ON public.development_artifact_observations FOR EACH STATEMENT EXECUTE FUNCTION public.coordinator_search_values_changed('observation_id');
+
+
+--
+-- Name: development_artifacts coordinator_search_values_truncated; Type: TRIGGER; Schema: public; Owner: -
+--
+
+CREATE TRIGGER coordinator_search_values_truncated AFTER TRUNCATE ON public.development_artifacts FOR EACH STATEMENT EXECUTE FUNCTION public.coordinator_search_values_changed('artifact_id');
+
+
+--
 -- Name: operation_batch_items fk_rails_0609cbe4ba; Type: FK CONSTRAINT; Schema: public; Owner: -
 --
 
@@ -2657,6 +3242,10 @@ ALTER TABLE ONLY public.operation_batch_outcomes
 SET search_path TO "$user", public;
 
 INSERT INTO "schema_migrations" (version) VALUES
+('20261010081200'),
+('20261010081130'),
+('20261010081100'),
+('20261010081000'),
 ('20261009101000'),
 ('20260914125000'),
 ('20260914070000'),
