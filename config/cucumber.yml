@@ -2,9 +2,11 @@
 rerun = File.file?('rerun.txt') ? IO.read('rerun.txt') : ""
 rerun = rerun.strip.gsub /\s/, ' '
 rerun_opts = rerun.empty? ? "--format #{ENV['CUCUMBER_FORMAT'] || 'progress'} features" : "--format #{ENV['CUCUMBER_FORMAT'] || 'pretty'} #{rerun}"
-std_opts = "--format #{ENV['CUCUMBER_FORMAT'] || 'pretty'} --strict --tags 'not @wip'"
+std_opts = "--format #{ENV['CUCUMBER_FORMAT'] || 'pretty'} --strict --tags 'not @wip' --tags 'not @production_deployment'"
 parallel_opts = "--format progress --publish-quiet --strict --tags 'not @wip'"
+parallel_opts << " --tags 'not @production_deployment'"
 %>
 default: <%= std_opts %> features
 parallel: <%= parallel_opts %>
-rerun: <%= rerun_opts %> --format rerun --out rerun.txt --strict --tags 'not @wip'
+rerun: <%= rerun_opts %> --format rerun --out rerun.txt --strict --tags 'not @wip' --tags 'not @production_deployment'
+production_deployment: --format progress --publish-quiet --strict --require features/production_support --require features/step_definitions/production_deployment_steps.rb --tags @production_deployment features/production_deployment.feature

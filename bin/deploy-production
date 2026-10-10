@@ -1,0 +1,41 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+cd "$(dirname "$0")/.."
+production_env_file="${PRODUCTION_ENV_FILE:-.env.production}"
+production_project="${PRODUCTION_COMPOSE_PROJECT:-concurrent-development-mcp-production}"
+
+if [ ! -r "$production_env_file" ]; then
+  echo "Create a readable $production_env_file from config/production.env.example first" >&2
+  exit 64
+fi
+if ! [[ "$production_project" =~ ^[a-z0-9][a-z0-9_-]*$ ]]; then
+  echo "PRODUCTION_COMPOSE_PROJECT must be a valid lowercase Compose project name" >&2
+  exit 64
+fi
+
+production_compose=(docker compose --env-file "$production_env_file" --project-name "$production_project" -f docker-compose.production.yml)
+production_compose_services=(web subscription-process-managers subscription-task-results subscription-read-models jobs)
+"${production_compose[@]}" config --quiet
+
+# Serialize deployments without a PostgreSQL session lock or extra host tool.
+# A killed deployment can leave this empty marker; see README for recovery.
+mkdir -p tmp
+production_deploy_lock="tmp/deploy-${production_project}.lock"
+if ! mkdir "$production_deploy_lock" 2>/dev/null; then
+  echo "Deployment lock exists: $production_deploy_lock. Verify no deployment is running before removing it." >&2
+  exit 73
+fi
+trap 'rmdir "$production_deploy_lock"' EXIT
+trap 'exit 130' INT
+trap 'exit 143' TERM
+
+# Build first to keep the planned deployment outage short.
+"${production_compose[@]}" build prepare
+"${production_compose[@]}" up -d --wait --wait-timeout 90 postgres pgbouncer
+"${production_compose[@]}" stop "${production_compose_services[@]}"
+
+# Always run a fresh one-off preparation, even if a prior prepare container
+# already exited successfully. Any failure exits before consumers are started.
+"${production_compose[@]}" run --rm --no-deps prepare
+"${production_compose[@]}" up -d --no-deps --force-recreate --wait --wait-timeout 120 "${production_compose_services[@]}"
