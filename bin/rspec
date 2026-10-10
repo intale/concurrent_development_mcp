@@ -1,6 +1,6 @@
 #!/usr/bin/env sh
 
-RBS_TEST_TARGET='PgEventstore::*,Coordinator::Write::*,Coordinator::Processes::*,Coordinator::Read::Queries::*,Coordinator::Read::Projectors::*,Coordinator::Read::Web::*,Coordinator::Shared::*,Coordinator::Mcp::*' \
+RBS_TEST_TARGET='PgEventstore::*,Coordinator::Write::*,Coordinator::Processes::*,Coordinator::Read::Queries::*,Coordinator::Read::Projectors::*,Coordinator::Read::Web::*,Coordinator::Read::Search::*,Coordinator::Read::Contracts::DevelopmentSearch,Coordinator::Shared::*,Coordinator::Mcp::*' \
   RBS_TEST_SKIP='::Coordinator::Processes::Jobs::*,::Coordinator::Read::Repositories::*,::Coordinator::Read::Web::Repositories::*' \
   RBS_TEST_LOGLEVEL='error' \
   RBS_TEST_OPT='-r forwardable -r optparse -r monitor -I sig' \

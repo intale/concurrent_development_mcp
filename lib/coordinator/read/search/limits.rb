@@ -1,0 +1,21 @@
+# frozen_string_literal: true
+
+module Coordinator::Read::Search
+  module Limits
+    FIELDS = 8
+    DEPTH = 6
+    OPERANDS = 8
+    FIELD_NODES = 64
+    REQUEST_NODES = 128
+    LITERAL_CHARACTERS = 1024
+    LITERAL_BYTES = 4096
+    INPUT_BYTES = 65_536
+    DEFAULT_PAGE = 20
+    PAGE = 50
+    CURSOR_BYTES = 4096
+    EXCERPT_CHARACTERS = 240
+    RESPONSE_BYTES = 262_144
+    STATEMENT_MILLISECONDS = 1000
+    REQUEST_MILLISECONDS = 3000
+  end
+end

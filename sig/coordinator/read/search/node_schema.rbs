@@ -1,0 +1,3 @@
+module Coordinator::Read::Search::NodeSchema
+  def self.build: (?Integer depth) -> Dry::Schema::Processor
+end

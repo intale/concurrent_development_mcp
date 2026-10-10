@@ -1,0 +1,4 @@
+module Coordinator::Read::Search
+  type input = Hash[String | Symbol, untyped]
+  type issue_path = Array[String | Integer]
+end

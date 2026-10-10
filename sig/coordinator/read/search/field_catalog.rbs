@@ -1,0 +1,3 @@
+module Coordinator::Read::Search::FieldCatalog
+  def self.fetch: (String selector) -> Coordinator::Read::Search::Field
+end

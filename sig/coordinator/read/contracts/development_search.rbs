@@ -1,0 +1,3 @@
+class Coordinator::Read::Contracts::DevelopmentSearch < Dry::Validation::Contract
+  def call: (Coordinator::Read::Search::input input) -> Dry::Validation::Result
+end

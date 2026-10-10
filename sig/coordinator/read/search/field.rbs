@@ -1,0 +1,9 @@
+class Coordinator::Read::Search::Field < Coordinator::Shared::Value
+  def selector: () -> String
+  def entity_type: () -> String
+  def source: () -> String
+  def column: () -> String
+  def path: () -> Array[String]
+  def values: () -> String
+  def retrieval_tool: () -> String
+end

@@ -1,0 +1,2 @@
+module Coordinator::Read::Search::Limits
+end

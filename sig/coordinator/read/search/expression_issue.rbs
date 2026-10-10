@@ -1,0 +1,4 @@
+class Coordinator::Read::Search::ExpressionIssue < Coordinator::Shared::Value
+  def path: () -> Coordinator::Read::Search::issue_path
+  def message: () -> String
+end

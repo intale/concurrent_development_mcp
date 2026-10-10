@@ -1,0 +1,6 @@
+class Coordinator::Read::Search::ExpressionValidator
+  def initialize: (?contract: Coordinator::Read::Search::ExpressionNodeContract) -> void
+  def call: (Coordinator::Read::Search::input input) -> Coordinator::Read::Search::ExpressionValidation
+  private
+  def anchored?: (Coordinator::Read::Search::input input, ?bool negated) -> bool
+end

@@ -1,0 +1,4 @@
+class Coordinator::Read::Search::ExpressionValidation < Coordinator::Shared::Value
+  def node_count: () -> Integer
+  def issues: () -> Array[Coordinator::Read::Search::ExpressionIssue]
+end

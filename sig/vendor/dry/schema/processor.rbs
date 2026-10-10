@@ -1,0 +1,5 @@
+module Dry::Schema
+  class Processor
+    def call: (*untyped, **untyped) -> untyped
+  end
+end
