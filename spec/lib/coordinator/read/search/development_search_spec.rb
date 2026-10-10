@@ -92,6 +92,13 @@ RSpec.describe Coordinator::Read::Repositories::DevelopmentSearch, read_model: t
     expect(all.uniq.length).to eq(5)
   end
 
+  it "searches a valid long registered project scope rather than narrowing Repository identity" do
+    registered = create(:coordinator_read_repository, scope: "project:" + "a" * 300)
+    resource = create(:coordinator_read_resource, repository_id: registered.repository_id, normalized_path: "docs/checkpoint.md")
+    page = search([ "resource.path", literal("checkpoint") ], filters: { scope: registered.scope })
+    expect(page.items.map(&:entity_id)).to eq([ resource.resource_id ])
+  end
+
   it "aliases the matching latest observation with the head but keeps older observations distinct" do
     artifact = create(:coordinator_read_development_artifact, title: "checkpoint", content_text: "checkpoint body")
     old = create(:coordinator_read_development_artifact_observation, artifact:, observed_global_position: 1)

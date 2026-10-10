@@ -24,7 +24,6 @@ module Coordinator::Read::Search::Retrieval
     def decision_id: () -> String
   end
   class WorkItemArguments < Coordinator::Shared::Value
-    def change_set_id: () -> String
     def work_item_id: () -> String
   end
   class Skill < Coordinator::Shared::Value

@@ -34,7 +34,6 @@ module Coordinator::Read::Search
     end
 
     class WorkItemArguments < Coordinator::Read::Value
-      attribute :change_set_id, Coordinator::Read::Types::Identifier
       attribute :work_item_id, Coordinator::Read::Types::Identifier
     end
 
@@ -96,7 +95,7 @@ module Coordinator::Read::Search
       tool = input.fetch("tool")
       action = CLASSES.fetch(tool).new(tool:, arguments: input.fetch("arguments").transform_keys(&:to_sym))
       actions = [ action ]
-      if tool == "development_artifact_content_get"
+      if tool == "development_artifact_content_get" && action.arguments.to_h[:observation_id]
         actions << ArtifactMetadata.new(tool: "development_artifact_get", arguments: action.arguments)
       end
       actions

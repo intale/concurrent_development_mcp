@@ -98,4 +98,38 @@ RSpec.describe "MCP development_search", :read_model do
     expect(JSON.generate(response).bytesize).to be <= Coordinator::Read::Search::Limits::RESPONSE_BYTES
     expect(call_search(input.merge(limit: 5)).dig("structuredContent", "data", "page", "items").length).to eq(5)
   end
+
+  it "provides valid canonical retrieval for Resource, Guidance, Choice, Decision and WorkItem hits" do
+    create(:coordinator_read_resource, normalized_path: "docs/canonical-needle.md")
+    create(:coordinator_read_user_utterance, text: "canonical-needle guidance")
+    create(:coordinator_read_agent_choice, selected: { "option_id" => "rspec", "summary" => "canonical-needle choice" })
+    create(:coordinator_read_decision_definition, :active, rationale: { "code" => "activated", "summary" => "canonical-needle rationale" })
+    context = create(:coordinator_read_coord_context)
+    document = context.document.deep_dup
+    document.fetch("work_items").sole["goal"] = "canonical-needle work"
+    context.update!(document:)
+    work_item_id = document.fetch("work_items").sole.fetch("work_item_id")
+    create(:coordinator_read_coord_context_scope, change_set_id: context.change_set_id, scope_kind: "work_item", scope_id: work_item_id)
+    fields = %w[resource.path guidance.text agent_choice.selected_summary decision.rationale work_item.goal].map do |field|
+      { field:, query: literal("canonical-needle") }
+    end
+    items = call_search(fields:).dig("structuredContent", "data", "page", "items")
+    expect(items.map { _1.fetch("entity_type") }).to contain_exactly("resource", "guidance", "agent_choice", "decision", "work_item")
+    items.each do |item|
+      action = item.fetch("retrieval_actions").sole
+      retrieved = rpc("tools/call", { name: action.fetch("tool"), arguments: action.fetch("arguments") })
+      expect(retrieved.dig("result", "structuredContent", "status")).to eq("ok"), "#{action.inspect}: #{retrieved.inspect}"
+    end
+  end
+
+  it "retrieves divergent Artifact head content without mislabeling retained observation metadata as head metadata" do
+    artifact = create(:coordinator_read_development_artifact, title: "Current head", content_text: "canonical-needle current")
+    create(:coordinator_read_development_artifact_observation, artifact:, title: "Retained title", content_text: "old retained body")
+    response = call_search(fields: [ { field: "development_artifact.content", query: literal("canonical-needle") } ])
+    action = response.dig("structuredContent", "data", "page", "items").sole.fetch("retrieval_actions").sole
+    expect(action.fetch("tool")).to eq("development_artifact_content_get")
+    expect(action.fetch("arguments")).to eq("artifact_id" => artifact.artifact_id)
+    retrieved = rpc("tools/call", { name: action.fetch("tool"), arguments: action.fetch("arguments") })
+    expect(retrieved.dig("result", "structuredContent", "data", "content", "text")).to eq("canonical-needle current")
+  end
 end

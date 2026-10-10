@@ -14,7 +14,7 @@ module Coordinator::Mcp
             query: { "$ref" => "#/$defs/expression1" }
           }, required: %w[field query]) },
         filters: Schemas.object_schema(properties: {
-          scope: { type: "string", minLength: 1, maxLength: 256,
+          scope: { type: "string", minLength: 1, maxLength: 500, "x-maxBytes": 500,
             description: "Exact scope; intersects Repository membership. No implicit hierarchy or global inclusion." },
           repository_id: Schemas.uuid_v7.merge(description: "Exact registered Repository membership, intersected with every other filter."),
           entity_types: { type: "array", minItems: 1, maxItems: 8, uniqueItems: true,

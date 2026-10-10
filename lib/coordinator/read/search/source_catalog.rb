@@ -61,7 +61,7 @@ module Coordinator::Read::Search
         from: "coordinator_contexts c JOIN coordination_dashboard_work_items w ON w.change_set_id = c.change_set_id",
         row_id: "c.change_set_id", owner: "w", identity: "w.work_item_id", entity_id: "w.work_item_id", updated_at: "c.updated_at",
         repository_id: "w.repository_id", membership: "repository.repository_id = w.repository_id",
-        retrieval: "jsonb_build_object('tool', 'coord_context', 'arguments', jsonb_build_object('change_set_id', w.change_set_id, 'work_item_id', w.work_item_id))")
+        retrieval: "jsonb_build_object('tool', 'coord_context', 'arguments', jsonb_build_object('work_item_id', w.work_item_id))")
     end
 
     private

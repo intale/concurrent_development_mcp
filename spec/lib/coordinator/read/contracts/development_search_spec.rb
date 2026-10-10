@@ -105,4 +105,13 @@ RSpec.describe Coordinator::Read::Contracts::DevelopmentSearch do
     expect(contract.call(fields:)).to be_failure
     expect(contract.call(fields:).errors.to_h.fetch(nil).join).to include("UTF-8 bytes")
   end
+
+  it "accepts existing Repository scopes up to 500 UTF-8 bytes without accepting oversized or NUL text" do
+    [ "project:" + "a" * 492, "project:" + "界" * 164 ].each do |scope|
+      expect(contract.call(request(literal, filters: { scope: }))).to be_success
+    end
+    [ "a" * 501, "界" * 167, "foo\0bar", "project:latin".encode(Encoding::ISO_8859_1) ].each do |scope|
+      expect(contract.call(request(literal, filters: { scope: }))).to be_failure
+    end
+  end
 end

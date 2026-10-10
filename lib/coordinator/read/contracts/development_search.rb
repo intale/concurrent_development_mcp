@@ -12,7 +12,7 @@ module Coordinator::Read
           required(:query).hash(Search::NodeSchema.build)
         end
         optional(:filters).hash do
-          optional(:scope).filled(:string, max_size?: 256)
+          optional(:scope).filled(:string, max_size?: 500)
           optional(:repository_id).filled(:string, format?: Types::UUID_V7_PATTERN)
           optional(:entity_types).value(:array, min_size?: 1, max_size?: 8).each(:string, included_in?: Search::FieldCatalog::ENTITY_TYPES)
         end
@@ -37,9 +37,10 @@ module Coordinator::Read
       rule(:filters) do
         next unless value
 
-        if value[:scope] && (!value[:scope].valid_encoding? || value[:scope].include?("\0"))
+        if value[:scope] && (value[:scope].encoding != Encoding::UTF_8 || !value[:scope].valid_encoding? || value[:scope].include?("\0"))
           key.failure("scope must be valid UTF-8 text without NUL characters")
         end
+        key.failure("scope must be at most 500 UTF-8 bytes") if value[:scope] && value[:scope].bytesize > 500
         next unless value[:entity_types]
 
         types = value[:entity_types]

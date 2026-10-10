@@ -32,6 +32,8 @@ RSpec.describe Coordinator::Read::Projectors::SkillsV1, :read_model, :event_stor
     projector.call(first_event)
     available = repository.fetch(name: "review", scope: "project:alpha")
     expect(available).to have_attributes(revision: 1, instructions: "Inspect the complete diff.")
+    expect(search_items("skill.instructions", "complete diff").map(&:entity_id)).to eq([ identity.skill_id ])
+    expect(search_items("skill_asset.path", "scripts/check").length).to eq(1)
 
     projector.call(second_event)
     projector.call(second_event)
@@ -66,6 +68,11 @@ RSpec.describe Coordinator::Read::Projectors::SkillsV1, :read_model, :event_stor
     [ Coordinator::Read::Skill, Coordinator::Read::SkillRevision, Coordinator::Read::SkillAsset ].each do |model|
       expect(model.sole.updated_at).to eq(second_event.created_at)
     end
+    expect(search_items("skill.instructions", "complete diff")).to be_empty
+    expect(search_items("skill_asset.path", "scripts/check")).to be_empty
+    matched = search_items("skill.instructions", "behavior and contracts").sole
+    expect(matched.updated_at).to eq(second_event.created_at.utc.iso8601(6))
+    expect(matched.retrieval_actions.sole.arguments.revision).to eq(2)
   end
 
   it "builds the newer granular revision first and never regresses on delayed older delivery" do
@@ -91,6 +98,8 @@ RSpec.describe Coordinator::Read::Projectors::SkillsV1, :read_model, :event_stor
     expect(historical).to be_nil
     expect(processed_events.count).to eq(2)
     expect(Coordinator::Read::Skill.sole.updated_at).to eq(second_event.created_at)
+    expect(search_items("skill.instructions", "complete diff")).to be_empty
+    expect(search_items("skill.instructions", "Newest").sole.updated_at).to eq(second_event.created_at.utc.iso8601(6))
   end
 
   it "preserves attributed historical policy evidence on a current granular publication" do
@@ -195,5 +204,13 @@ RSpec.describe Coordinator::Read::Projectors::SkillsV1, :read_model, :event_stor
       projection_name: "skills",
       projection_version: 4
     )
+  end
+
+  def search_items(field, value)
+    codec = Coordinator::Read::Search::CursorCodec.new(secret: "skill-projector-search")
+    query = Coordinator::Read::Search::QueryBuilder.new(cursor_codec: codec).call(
+      fields: [ { field:, query: { match: "contains", value: } } ]
+    ).value!
+    Coordinator::Read::Repositories::DevelopmentSearch.new(cursor_codec: codec).page(query).value!.items
   end
 end

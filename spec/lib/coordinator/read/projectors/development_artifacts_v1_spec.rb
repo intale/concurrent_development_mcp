@@ -221,6 +221,14 @@ RSpec.describe Coordinator::Read::Projectors::DevelopmentArtifactsV1, :read_mode
       observed: have_attributes(event: have_attributes(type: "DevelopmentArtifactObservationRecorded")),
       classified: have_attributes(event: have_attributes(type: "DevelopmentArtifactClassificationCorrectionRecorded"))
     )
+    old = search_items("development_artifact.title", "Captured evidence").sole
+    expect(old.document_id).to eq("observation:#{first_observation.observation_id}")
+    current = search_items("development_artifact.title", "Corrected title").sole
+    expect(current.document_id).to eq("current:#{artifact_id}")
+    classified = search_items("development_artifact.classification_reason", "Correct imported classification").sole
+    expect(classified.document_id).to eq(current.document_id)
+    expect(classified.updated_at).to eq(Coordinator::Read::DevelopmentArtifactObservation.find(second_observation.observation_id).updated_at.utc.iso8601(6))
+    expect(classified.retrieval_actions.first.arguments.observation_id).to eq(second_observation.observation_id)
   end
 
   it "rejects superseded relation schema before claiming or writing a projection" do
@@ -266,6 +274,14 @@ RSpec.describe Coordinator::Read::Projectors::DevelopmentArtifactsV1, :read_mode
     end
     observation = Coordinator::Write::DevelopmentArtifacts::ObservationBuilder.new.call(artifact:)
     [ artifact, observation ]
+  end
+
+  def search_items(field, value)
+    codec = Coordinator::Read::Search::CursorCodec.new(secret: "artifact-projector-search")
+    query = Coordinator::Read::Search::QueryBuilder.new(cursor_codec: codec).call(
+      fields: [ { field:, query: { match: "contains", value: } } ]
+    ).value!
+    Coordinator::Read::Repositories::DevelopmentSearch.new(cursor_codec: codec).page(query).value!.items
   end
 
   def observation_facts(artifact, observation)
