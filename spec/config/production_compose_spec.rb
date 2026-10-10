@@ -5,7 +5,7 @@ RSpec.describe "production Compose configuration" do
     environment = {
       "POSTGRES_PASSWORD" => "compose-configuration-spec", "SECRET_KEY_BASE" => "compose-configuration-spec",
       "POSTGRES_USER" => nil, "PG_HOST_DATA_DIR" => nil,
-      "POSTGRES_HOST_PORT" => nil, "PGBOUNCER_HOST_PORT" => nil
+      "POSTGRES_HOST_PORT" => nil, "PGBOUNCER_HOST_PORT" => nil, "MCP_HOST_PORT" => nil
     }.merge(overrides)
     output, error, status = Open3.capture3(
       environment, "docker", "compose", "--env-file", "/dev/null",
@@ -72,5 +72,44 @@ RSpec.describe "production Compose configuration" do
     _, error, status = Open3.capture3(environment, Rails.root.join("bin/prepare-production").to_s)
     expect(status.exitstatus).to eq(64)
     expect(error).to include("four distinct names")
+  end
+
+  it "serves Rails and the compiled client UI over the loopback-only MCP port" do
+    status, output, error = compose_configuration
+    expect(status).to be_success, error
+    web = JSON.parse(output).dig("services", "web")
+    expect(web.fetch("ports")).to include(include("host_ip" => "127.0.0.1", "published" => "8088", "target" => 80))
+    expect(web.fetch("command")).to eq([ "./bin/thrust", "./bin/rails", "server", "-b", "0.0.0.0" ])
+    expect(web.fetch("environment")).not_to have_key("SOLID_QUEUE_IN_PUMA")
+  end
+
+  it "starts every consumer only after successful preparation using the same pooled image" do
+    status, output, error = compose_configuration
+    expect(status).to be_success, error
+    services = JSON.parse(output).fetch("services")
+    %w[web subscription-process-managers subscription-task-results subscription-read-models jobs].each do |name|
+      consumer = services.fetch(name)
+      expect(consumer.fetch("image")).to eq(services.dig("prepare", "image"))
+      expect(consumer.dig("depends_on", "prepare", "condition")).to eq("service_completed_successfully")
+      expect(consumer.dig("depends_on", "pgbouncer", "condition")).to eq("service_healthy")
+      expect(consumer.fetch("environment")).to include("DATABASE_HOST" => "pgbouncer", "DATABASE_PORT" => "5432")
+      expect(consumer.fetch("restart")).to eq("unless-stopped")
+      expect(consumer.fetch("init")).to be(true)
+    end
+    expect(services.dig("jobs", "command")).to eq([ "./bin/jobs" ])
+  end
+
+  it "loads exactly one existing semantic set per public subscription CLI process" do
+    status, output, error = compose_configuration
+    expect(status).to be_success, error
+    services = JSON.parse(output).fetch("services")
+    { "process-managers" => "process_managers", "task-results" => "task_results", "read-models" => "read_models" }.each do |service_suffix, set|
+      filename = "./config/pg_eventstore_#{set}_subscriptions.rb"
+      expect(services.dig("subscription-#{service_suffix}", "command")).to eq(
+        [ "bundle", "exec", "pg-eventstore", "subscriptions", "start", "-r", "./config/environment.rb", "-r", filename ]
+      )
+      references = File.read(Rails.root.join(filename)).scan(/Coordinator::Container\["([^"]+)"\]\.start/).flatten
+      expect(references).to eq([ "subscription_sets.#{set}" ])
+    end
   end
 end

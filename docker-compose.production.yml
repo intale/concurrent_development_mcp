@@ -26,6 +26,14 @@ x-application: &application
     pgbouncer:
       condition: service_healthy
 
+x-consumer: &consumer
+  <<: *application
+  depends_on:
+    pgbouncer:
+      condition: service_healthy
+    prepare:
+      condition: service_completed_successfully
+
 services:
   postgres:
     image: postgres:18@sha256:06cad38a5d9f5d24b4d83d86def30795d5e4b757fedbf5281172b576dedcd941
@@ -96,3 +104,58 @@ services:
       dockerfile: Dockerfile
     restart: "no"
     command: ["./bin/prepare-production"]
+
+  web:
+    <<: *consumer
+    command: ["./bin/thrust", "./bin/rails", "server", "-b", "0.0.0.0"]
+    ports:
+      - "127.0.0.1:${MCP_HOST_PORT:-8088}:80"
+    healthcheck:
+      test: ["CMD", "curl", "--fail", "--silent", "http://127.0.0.1/up"]
+      interval: 5s
+      timeout: 5s
+      retries: 12
+      start_period: 15s
+
+  subscription-process-managers:
+    <<: *consumer
+    command:
+      - bundle
+      - exec
+      - pg-eventstore
+      - subscriptions
+      - start
+      - -r
+      - ./config/environment.rb
+      - -r
+      - ./config/pg_eventstore_process_managers_subscriptions.rb
+
+  subscription-task-results:
+    <<: *consumer
+    command:
+      - bundle
+      - exec
+      - pg-eventstore
+      - subscriptions
+      - start
+      - -r
+      - ./config/environment.rb
+      - -r
+      - ./config/pg_eventstore_task_results_subscriptions.rb
+
+  subscription-read-models:
+    <<: *consumer
+    command:
+      - bundle
+      - exec
+      - pg-eventstore
+      - subscriptions
+      - start
+      - -r
+      - ./config/environment.rb
+      - -r
+      - ./config/pg_eventstore_read_models_subscriptions.rb
+
+  jobs:
+    <<: *consumer
+    command: ["./bin/jobs"]
