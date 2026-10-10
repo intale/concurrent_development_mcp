@@ -44,7 +44,7 @@ services:
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in the production environment file}
       POSTGRES_DB: postgres
       PGDATA: /var/lib/postgresql/18/docker
-    command: ["postgres", "-c", "max_connections=100"]
+    command: ["postgres", "-c", "max_connections=300"]
     ports:
       - "127.0.0.1:${POSTGRES_HOST_PORT:-6435}:5432"
     volumes:
@@ -76,9 +76,9 @@ services:
       # maintenance database and databases created after PgBouncer starts.
       POOL_MODE: transaction
       AUTH_TYPE: scram-sha-256
-      MAX_CLIENT_CONN: "300"
+      MAX_CLIENT_CONN: "500"
       DEFAULT_POOL_SIZE: "15"
-      MAX_DB_CONNECTIONS: "15"
+      MAX_DB_CONNECTIONS: "50"
       RESERVE_POOL_SIZE: "0"
     ports:
       - "127.0.0.1:${PGBOUNCER_HOST_PORT:-6436}:5432"
