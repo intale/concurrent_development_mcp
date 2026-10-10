@@ -15,6 +15,7 @@ module Coordinator::Write
         succeed_command: Domain::CommandLifecycles::Succeed.new,
         reject_command: Domain::CommandLifecycles::Reject.new,
         input_digest: CommandInputDigest.new,
+        id_generator: IdGenerator.new,
         rejection_retryability: CommandRejectionRetryability.new,
         remove_resource: Operations::ExecuteRemoveResource.new(event_store:),
         create_change_set: Operations::ExecuteCreateChangeSet.new(event_store:),
@@ -79,6 +80,7 @@ module Coordinator::Write
         @succeed_command = succeed_command
         @reject_command = reject_command
         @input_digest = input_digest
+        @id_generator = id_generator
         @rejection_retryability = rejection_retryability
         @register_repository = Operations::ExecuteRegisterRepository.new(event_store:)
         @resolve_resource = Operations::ExecuteResolveResource.new(event_store:)
@@ -124,15 +126,23 @@ module Coordinator::Write
       end
 
       def call(command, caused_by:)
+        contract = TargetContractRegistry.fetch_for(command)
+        contract.command_type[command]
+        requested_digest = @input_digest.request(command)
+        terminal_event_id = @id_generator.uuid_v7
+        handler = instance_variable_get(contract.executor_variable)
+        preparation = prepare_target(handler, command)
+
         @event_store.multiple do
-          contract = TargetContractRegistry.fetch_for(command)
-          contract.command_type[command]
           snapshot = @command_loader.call(command.command_id)
-          validate_registration!(snapshot.state, command:, contract:)
+          validate_registration!(snapshot.state, command:, contract:, requested_digest:)
           next Success(target_execution(snapshot)) if snapshot.state.terminal?
 
-          handler = instance_variable_get(contract.executor_variable)
-          result = handler.call_command(command, caused_by:)
+          result = if preparation
+            handler.call_prepared_command(command, preparation:, caused_by:)
+          else
+            handler.call_command(command, caused_by:)
+          end
           contract.receipt_type[result.value!.data] if result.success?
 
           transition = if result.success?
@@ -140,6 +150,8 @@ module Coordinator::Write
               command,
               actor: command.actor,
               tool_name: contract.tool_name,
+              snapshot:,
+              event_id: terminal_event_id,
               caused_by: terminal_parent(result.value!, fallback: caused_by)
             )
           else
@@ -148,6 +160,8 @@ module Coordinator::Write
               error: result.failure,
               actor: command.actor,
               tool_name: contract.tool_name,
+              snapshot:,
+              event_id: terminal_event_id,
               caused_by:
             )
           end
@@ -164,14 +178,20 @@ module Coordinator::Write
 
       private
 
+      def prepare_target(handler, command)
+        case command
+        when Commands::CaptureDevelopmentArtifact, Commands::DeclareDevelopmentArtifactRelation
+          handler.prepare(command)
+        end
+      end
+
       def target_execution(snapshot)
         TargetExecution.new(
           command_state: snapshot.state,
           terminal_event: snapshot.persisted_events.last
         )
       end
-      def validate_registration!(state, command:, contract:)
-        requested_digest = @input_digest.request(command)
+      def validate_registration!(state, command:, contract:, requested_digest:)
         unless state.command_id == command.command_id &&
                state.tool_name == contract.tool_name &&
                state.canonical_input_digest == requested_digest
@@ -180,18 +200,20 @@ module Coordinator::Write
         end
       end
 
-      def succeed(command, actor:, tool_name:, caused_by:)
-        @command_transition.call(
+      def succeed(command, actor:, tool_name:, caused_by:, snapshot:, event_id:)
+        @command_transition.call_in_transaction(
           command: Commands::SucceedCommand.new(command_id: command.command_id),
           decider: @succeed_command,
           actor:,
           tool_name:,
-          caused_by:
+          caused_by:,
+          snapshot:,
+          event_id:
         )
       end
 
-      def reject(command, error:, actor:, tool_name:, caused_by:)
-        @command_transition.call(
+      def reject(command, error:, actor:, tool_name:, caused_by:, snapshot:, event_id:)
+        @command_transition.call_in_transaction(
           command: Commands::RejectCommand.new(
             command_id: command.command_id,
             error: DomainErrorV1::Type[
@@ -206,25 +228,14 @@ module Coordinator::Write
           decider: @reject_command,
           actor:,
           tool_name:,
-          caused_by:
+          caused_by:,
+          snapshot:,
+          event_id:
         )
       end
 
       def terminal_parent(completion, fallback:)
-        reference = completion.emitted_events.last
-        return fallback unless reference
-
-        event = @event_store.read_at(
-          StreamReference.new(
-            context: reference.stream_context,
-            stream_name: reference.stream_name,
-            stream_id: reference.stream_id
-          ),
-          reference.stream_revision
-        )
-        return event if event&.id == reference.event_id && event.type == reference.type
-
-        raise InvalidCommandHistory, "Command completion references a missing terminal parent"
+        completion.terminal_event || fallback
       end
     end
   end

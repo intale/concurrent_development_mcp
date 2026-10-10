@@ -247,6 +247,7 @@ module Coordinator::Write
           warnings:,
           next_actions: [],
           emitted_events: persisted_events.map { event_reference(_1) },
+          terminal_event: persisted_events.last,
           completed_at: abandoned_at
         )
       end

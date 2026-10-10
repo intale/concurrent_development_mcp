@@ -21,6 +21,7 @@ RSpec.describe Coordinator::Write::Operations::ExecuteAbandonAttempt, :event_sto
       "AttemptAbandoned",
       "WorkItemRequeued"
     ])
+    expect(result.value!.terminal_event.id).to eq(result.value!.emitted_events.last.event_id)
     expect(candidate_events(candidate).map(&:type)).to include("CandidateSubmitted")
   end
 

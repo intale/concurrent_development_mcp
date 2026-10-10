@@ -293,6 +293,7 @@ module Coordinator::Write
           warnings: [],
           next_actions: [],
           emitted_events: persisted_events.map { event_reference(_1) },
+          terminal_event: persisted_events.last,
           completed_at: (unbinding_event || binding_event || persisted_events.first).created_at.utc.iso8601(6)
         )
       end

@@ -242,7 +242,7 @@ module Coordinator::Read
 
         request_id = source.command_state.request_id
         CompletionV1.new(
-          completion.to_h.merge(
+          completion.to_h.except(:terminal_event).merge(
             command_id: request_id,
             receipt: request_id
           )

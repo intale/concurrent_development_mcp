@@ -11,6 +11,7 @@ module Coordinator
       def warnings: () -> Array[String]
       def next_actions: () -> Array[NextAction]
       def emitted_events: () -> Array[EventReference]
+      def terminal_event: () -> PgEventstore::Event?
       def completed_at: () -> String
     end
   end

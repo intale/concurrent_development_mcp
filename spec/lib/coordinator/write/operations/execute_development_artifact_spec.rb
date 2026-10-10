@@ -13,7 +13,14 @@ RSpec.describe "Development Artifact write operations", :event_store do
   end
 
   it "captures a fresh Artifact and Observation as granular facts with typed metadata" do
-    result = capture.call(capture_input)
+    appended_groups = []
+    trace = TracePoint.new(:call) do |frame|
+      next unless frame.self.equal?(event_store) && frame.method_id == :append &&
+                  frame.defined_class == Coordinator::Write::EventStore
+
+      appended_groups << frame.binding.local_variable_get(:events).map(&:type)
+    end
+    result = trace.enable { capture.call(capture_input) }
 
     expect(result).to be_success
     expect(result.value!.data).to have_attributes(outcome: "captured")
@@ -85,6 +92,10 @@ RSpec.describe "Development Artifact write operations", :event_store do
       %w[created scope title kind source content label label]
     )
     expect(observations.drop(1).map { _1.data.dig("observed_fact", "stream_revision") }).to eq((0..7).to_a)
+    # Native SERIALIZABLE retries may repeat a complete or partial attempt.
+    expect(appended_groups.uniq).to eq([ persisted.map(&:type), observations.map(&:type) ])
+    expect(observations.drop(1).map { _1.data.dig("observed_fact", "event_id") }).to eq(persisted.map(&:id))
+    expect(result.value!.terminal_event).to eq(observations.last)
   end
 
   it "allocates a new Artifact and Observation identity for every capture" do

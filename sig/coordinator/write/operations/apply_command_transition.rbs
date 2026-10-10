@@ -17,6 +17,16 @@ module Coordinator
           tool_name: String,
           caused_by: PgEventstore::Event
         ) -> Dry::Monads::Result
+
+        def call_in_transaction: (
+          snapshot: CommandLifecycle::Snapshot,
+          command: Commands::SucceedCommand | Commands::RejectCommand,
+          decider: Domain::CommandLifecycles::Succeed | Domain::CommandLifecycles::Reject,
+          actor: Commands::Actor,
+          tool_name: String,
+          caused_by: PgEventstore::Event,
+          event_id: String
+        ) -> Dry::Monads::Result
       end
     end
   end

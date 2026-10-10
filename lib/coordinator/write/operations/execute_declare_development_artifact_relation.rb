@@ -41,21 +41,24 @@ module Coordinator::Write
       end
 
       def call_command(command, caused_by: nil)
+        call_prepared_command(command, preparation: prepare(command), caused_by:)
+      end
+
+      def call_prepared_command(command, preparation:, caused_by: nil)
         steps do
-          preparation = prepare_logical_values(command)
           step @event_store.multiple { execute_attempt(command:, preparation:, caused_by:) }
         end
       end
 
-      private
-
-      def prepare_logical_values(command)
+      def prepare(command)
         DevelopmentArtifactRelationPreparationV1.new(
           declared_at: @clock.now,
           input_digest: @input_digest.development_artifact_relation_declare(command),
           domain_event_ids: [ @id_generator.uuid_v7, @id_generator.uuid_v7 ],
         )
       end
+
+      private
 
       def execute_attempt(command:, preparation:, caused_by:)
         resolved = resolve_relation(command)
@@ -70,8 +73,7 @@ module Coordinator::Write
         )
         return target if target.failure?
 
-        source_state = @loader.load(artifact_relation.source_artifact_id)
-        unless source_state.created
+        unless @loader.captured?(artifact_relation.source_artifact_id)
           return Failure(OutcomeError.new(
             code: :development_artifact_not_found,
             message: "Source Development Artifact was not found",

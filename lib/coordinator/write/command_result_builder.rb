@@ -1394,6 +1394,7 @@ module Coordinator::Write
         warnings: [],
         next_actions:,
         emitted_events:,
+        terminal_event: events.last,
         completed_at:
       )
     end

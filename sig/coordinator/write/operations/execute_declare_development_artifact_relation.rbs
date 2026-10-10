@@ -7,6 +7,8 @@ module Coordinator
         %a{rbs:test:skip}
         def call: (command_input input) -> Dry::Monads::Result
         def call_command: (Commands::DeclareDevelopmentArtifactRelation command, ?caused_by: PgEventstore::Event?) -> Dry::Monads::Result
+        def prepare: (Commands::DeclareDevelopmentArtifactRelation command) -> DevelopmentArtifactRelationPreparationV1
+        def call_prepared_command: (Commands::DeclareDevelopmentArtifactRelation command, preparation: DevelopmentArtifactRelationPreparationV1, ?caused_by: PgEventstore::Event?) -> Dry::Monads::Result
       end
     end
   end

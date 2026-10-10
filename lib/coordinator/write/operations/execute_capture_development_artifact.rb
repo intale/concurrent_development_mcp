@@ -37,15 +37,16 @@ module Coordinator::Write
       end
 
       def call_command(command, caused_by: nil)
+        call_prepared_command(command, preparation: prepare(command), caused_by:)
+      end
+
+      def call_prepared_command(command, preparation:, caused_by: nil)
         steps do
-          preparation = prepare_logical_values(command)
           step @event_store.multiple { execute_attempt(command:, preparation:, caused_by:) }
         end
       end
 
-      private
-
-      def prepare_logical_values(command)
+      def prepare(command)
         fact_count = 6 + command.artifact.labels.length
         DevelopmentArtifactCapturePreparationV1.new(
           captured_at: @clock.now,
@@ -56,13 +57,14 @@ module Coordinator::Write
         )
       end
 
+      private
+
       def execute_attempt(command:, preparation:, caused_by:)
-        state = @loader.load(command.artifact.artifact_id)
         return Failure(OutcomeError.new(
           code: :development_artifact_identity_conflict,
           message: "Artifact UUIDv7 is already occupied",
           details: { artifact_id: command.artifact.artifact_id }
-        )) if state.created
+        )) if @loader.captured?(command.artifact.artifact_id)
 
         fact_references = proposed_fact_references(command.artifact.artifact_id, command, preparation)
         decision_result = @decider.call(
@@ -95,7 +97,7 @@ module Coordinator::Write
 
         artifact_index = 0
         observation_index = 0
-        plan.writes.flat_map do |write|
+        built = plan.writes.map do |write|
           event = write.event
           event_id = if event.is_a?(Events::DevelopmentArtifactObservationRecordedV1)
             preparation.observation_event_id
@@ -111,7 +113,10 @@ module Coordinator::Write
             markers: event_markers(event, command),
             caused_by:
           )
-          @event_store.append(write.stream, [ persisted ])
+          [ write.stream, persisted ]
+        end
+        built.chunk_while { |left, right| left.first == right.first }.flat_map do |writes|
+          @event_store.append(writes.first.first, writes.map(&:last))
         end
       end
 

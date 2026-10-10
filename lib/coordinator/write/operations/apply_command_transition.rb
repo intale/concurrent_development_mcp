@@ -21,6 +21,29 @@ module Coordinator::Write
 
       def call(command:, decider:, actor:, tool_name:, caused_by:)
         snapshot = @loader.call(command.command_id)
+        apply(
+          snapshot:, command:, decider:, actor:, tool_name:, caused_by:,
+          event_id: @id_generator.uuid_v7,
+          expected_revision: snapshot.latest_revision
+        )
+      rescue PgEventstore::WrongExpectedRevisionError
+        Failure(
+          OutcomeError.new(
+            code: :concurrency_conflict,
+            message: "Command changed concurrently; the request may succeed if retried",
+            details: { command_id: command.command_id }
+          )
+        )
+      end
+
+      # The caller owns the SERIALIZABLE transaction and supplies its own read.
+      def call_in_transaction(snapshot:, command:, decider:, actor:, tool_name:, caused_by:, event_id:)
+        apply(snapshot:, command:, decider:, actor:, tool_name:, caused_by:, event_id:, expected_revision: nil)
+      end
+
+      private
+
+      def apply(snapshot:, command:, decider:, actor:, tool_name:, caused_by:, event_id:, expected_revision:)
         decision = decider.call(state: snapshot.state, command:)
         return decision if decision.failure?
 
@@ -36,7 +59,8 @@ module Coordinator::Write
 
         persisted = append(
           event:,
-          latest_revision: snapshot.latest_revision,
+          expected_revision:,
+          event_id:,
           actor:,
           tool_name:,
           caused_by:
@@ -47,22 +71,12 @@ module Coordinator::Write
             terminal_event: persisted
           )
         )
-      rescue PgEventstore::WrongExpectedRevisionError
-        Failure(
-          OutcomeError.new(
-            code: :concurrency_conflict,
-            message: "Command changed concurrently; the request may succeed if retried",
-            details: { command_id: command.command_id }
-          )
-        )
       end
 
-      private
-
-      def append(event:, latest_revision:, actor:, tool_name:, caused_by:)
+      def append(event:, expected_revision:, event_id:, actor:, tool_name:, caused_by:)
         persisted = @event_factory.build!(
           event:,
-          event_id: @id_generator.uuid_v7,
+          event_id:,
           metadata: EventMetadata.new(
             command_id: event.command_id,
             actor_kind: actor.kind,
@@ -77,7 +91,7 @@ module Coordinator::Write
         @event_store.append(
           @stream_factory.command(event.command_id),
           [ persisted ],
-          expected_revision: latest_revision
+          expected_revision:
         ).sole
       end
     end

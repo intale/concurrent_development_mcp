@@ -13,6 +13,7 @@ module Coordinator::Write
     attribute :next_actions, Types::Array.of(NextAction).constrained(max_size: 100)
     attribute :emitted_events,
               Types::Array.of(EventReference).constrained(max_size: Types::OPERATION_BATCH_MAXIMUM_HISTORY_EVENTS)
+    attribute :terminal_event, Types.Instance(PgEventstore::Event).optional.default(nil)
     attribute :completed_at, Types::Timestamp
   end
 end

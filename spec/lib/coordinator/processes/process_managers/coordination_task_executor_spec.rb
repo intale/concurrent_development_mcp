@@ -71,10 +71,29 @@ RSpec.describe Coordinator::Processes::ProcessManagers::CoordinationTaskExecutor
     ).value!
     started = task_events(task_id).last
     target = stored_target(task_id)
-    execution = Coordinator::Write::Tasks::TargetExecutor.new(event_store:).call(
-      target,
-      caused_by: started
-    ).value!
+    command_reads = []
+    transition_reads = []
+    terminal_revisions = []
+    trace = TracePoint.new(:call) do |frame|
+      next unless frame.self.equal?(event_store) && frame.defined_class == Coordinator::Write::EventStore
+
+      if frame.method_id == :read
+        criteria = frame.binding.local_variable_get(:criteria)
+        if criteria == Coordinator::Write::EventQueries::COMMAND_HISTORY
+          command_reads << criteria
+          transition_reads << criteria if caller_locations.any? { _1.path.end_with?("operations/apply_command_transition.rb") }
+        end
+      elsif frame.method_id == :append && frame.binding.local_variable_get(:reference) == streams.command(target.command_id)
+        terminal_revisions << frame.binding.local_variable_get(:expected_revision)
+      end
+    end
+    execution = trace.enable do
+      Coordinator::Write::Tasks::TargetExecutor.new(event_store:).call(target, caused_by: started).value!
+    end
+    expect(command_reads).not_to be_empty
+    expect(transition_reads).to be_empty
+    expect(terminal_revisions).not_to be_empty
+    expect(terminal_revisions).to all(be_nil)
 
     expect(loader.call(task_id).state.status).to eq("working")
 
