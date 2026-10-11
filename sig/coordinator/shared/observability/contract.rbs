@@ -1,0 +1,19 @@
+module Coordinator
+  module Shared
+    module Observability
+      module Contract
+        OUTCOMES: Array[String]
+        SQL_OPERATIONS: Array[String]
+        DURATION_BOUNDARIES: Array[Float]
+        AGE_BOUNDARIES: Array[Float]
+        MCP_DIMENSIONS: Array[String]
+        SUBSCRIPTION_DIMENSIONS: Array[String]
+        SQL_DIMENSIONS: Array[String]
+
+        def self.metrics: () -> Array[MetricDefinition]
+        def self.outcome: (String? value) -> String
+        def self.definition: (Symbol key, Symbol kind, String unit, Array[String] dimensions, String description, ?Array[Float] boundaries) -> MetricDefinition
+      end
+    end
+  end
+end

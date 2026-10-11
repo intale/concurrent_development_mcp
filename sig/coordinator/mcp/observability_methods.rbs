@@ -1,0 +1,7 @@
+module Coordinator
+  module Mcp
+    module ObservabilityMethods
+      NAMES: Array[String]
+    end
+  end
+end

@@ -1,0 +1,26 @@
+module Coordinator
+  module Shared
+    module Observability
+      interface _SubscriptionDescriptor
+        def set_name: () -> String
+        def subscription_name: () -> String
+        def event_types: () -> Array[String]
+        def identity: () -> Subscriptions::Identity
+      end
+
+      class Inventory
+        attr_reader tool_names: Array[String]
+        attr_reader rpc_method_names: Array[String]
+        attr_reader subscription_definitions: Array[_SubscriptionDescriptor]
+
+        def initialize: (tool_names: Array[String], rpc_method_names: Array[String], subscription_definitions: Array[_SubscriptionDescriptor]) -> void
+        def mcp_attributes: (method: String?, ?tool_name: String?) -> Hash[String, String]
+        def subscription_attributes: (definition: _SubscriptionDescriptor, event_type: String) -> Hash[String, String]
+
+        private
+        def bounded_tool_name: (String? name) -> String
+        def unknown_subscription_attributes: () -> Hash[String, String]
+      end
+    end
+  end
+end

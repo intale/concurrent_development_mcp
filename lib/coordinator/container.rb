@@ -8,6 +8,15 @@ module Coordinator
     end
     register("clock", memoize: true) { Shared::SystemClock.new }
     register("id_generator", memoize: true) { Shared::IdGenerator.new }
+    register("observability.inventory", memoize: true) do
+      Shared::Observability::Inventory.new(
+        tool_names: Mcp::ToolRegistry.all.map(&:tool_name),
+        rpc_method_names: Mcp::ObservabilityMethods::NAMES,
+        subscription_definitions: %w[process_managers task_results read_models].flat_map do |set|
+          self["subscription_registrations.#{set}"].map(&:definition)
+        end
+      )
+    end
     register("stream_factory", memoize: true) { Write::StreamFactory.new }
     register("event_schema_registry", memoize: true) { Write::EventSchemaRegistry.new }
     register("skills.identity_builder", memoize: true) do

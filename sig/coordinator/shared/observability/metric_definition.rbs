@@ -1,0 +1,15 @@
+module Coordinator
+  module Shared
+    module Observability
+      class MetricDefinition < Value
+        def key: () -> Symbol
+        def name: () -> String
+        def kind: () -> (:counter | :histogram | :up_down_counter | :observable_gauge)
+        def unit: () -> String
+        def description: () -> String
+        def dimensions: () -> Array[String]
+        def boundaries: () -> Array[Float]
+      end
+    end
+  end
+end
