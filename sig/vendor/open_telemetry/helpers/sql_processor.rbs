@@ -1,0 +1,7 @@
+module OpenTelemetry
+  module Helpers
+    module SqlProcessor
+      def self.obfuscate_sql: (*untyped, **untyped) -> untyped
+    end
+  end
+end

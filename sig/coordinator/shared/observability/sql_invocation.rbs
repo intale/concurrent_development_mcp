@@ -1,0 +1,10 @@
+module Coordinator
+  module Shared
+    module Observability
+      class SqlInvocation
+        def initialize: (session: Session) -> void
+        def call: (sql: String, started_at: Float, finished_at: Float, ?exception_type: String?) -> void
+      end
+    end
+  end
+end

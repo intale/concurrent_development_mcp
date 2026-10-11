@@ -20,6 +20,10 @@ module Coordinator::Shared
         resource = OpenTelemetry::SDK::Resources::Resource.create(resource_attributes)
         build_tracing(resource)
         build_metrics(resource)
+        Runtime.safely(:sql_notifications) do
+          @sql_notifications = SqlNotifications.new(session: self)
+          @sql_notifications.start
+        end
       rescue StandardError
         shutdown
         raise
@@ -65,6 +69,7 @@ module Coordinator::Shared
         return if @stopped
 
         @stopped = true
+        detach_observers
         begin
           tracer_provider&.shutdown(timeout: timeout)
         ensure
@@ -72,6 +77,13 @@ module Coordinator::Shared
           # It owns no thread; avoid MeterProvider's keyword forwarding to it.
           memory? ? metric_reader&.shutdown : meter_provider&.shutdown(timeout: timeout)
         end
+        nil
+      end
+
+      # Safe after fork: unsubscribe Rails callbacks without shutting down an
+      # inherited exporter whose background thread no longer exists.
+      def detach_observers
+        Runtime.safely(:sql_notifications) { @sql_notifications&.stop }
         nil
       end
 
@@ -101,7 +113,7 @@ module Coordinator::Shared
           sampler: OpenTelemetry::SDK::Trace::Samplers.parent_based(
             root: OpenTelemetry::SDK::Trace::Samplers.trace_id_ratio_based(settings.trace_sample_ratio)
           ),
-          span_limits: OpenTelemetry::SDK::Trace::SpanLimits.new(attribute_count_limit: 32, attribute_length_limit: 512)
+          span_limits: OpenTelemetry::SDK::Trace::SpanLimits.new(attribute_count_limit: 32, attribute_length_limit: 4096)
         )
         @span_exporter = if memory?
                            OpenTelemetry::SDK::Trace::Export::InMemorySpanExporter.new

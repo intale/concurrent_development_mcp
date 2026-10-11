@@ -54,6 +54,7 @@ module Coordinator::Shared
           @mutex = Mutex.new
           @failure_mutex = Mutex.new
           @reported_failures = {}
+          @session&.detach_observers
           @session = nil
           start(@settings) if @settings
           nil

@@ -64,7 +64,7 @@ RSpec.describe Coordinator::Shared::Observability::SubscriptionHandler, :event_s
     first_age = points("oldest.in.flight").first.value
     expect(points("in.flight").first.value).to eq(1)
     expect(points("oldest.in.flight").first.value).to be > first_age
-    expect(telemetry_spans).to be_empty
+    expect(telemetry_spans.select { _1.name.start_with?("subscription ") }).to be_empty
     released << true
     expect(thread.value).to eq(:original)
     expect(points("oldest.in.flight").first.value).to eq(0.0)

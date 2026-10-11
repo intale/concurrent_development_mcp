@@ -52,7 +52,7 @@ gem "kaminari", ">= 1.2.2"
 gem "kaminari-activerecord", ">= 1.2.2"
 
 gem "opentelemetry-sdk", "~> 1.13.1"
-gem "opentelemetry-instrumentation-all", "~> 0.98.0"
+gem "opentelemetry-instrumentation-all", "~> 0.98.0", require: [ "opentelemetry-instrumentation-all", "opentelemetry-helpers-sql-processor" ]
 gem "opentelemetry-metrics-sdk", "~> 0.20.0"
 gem "opentelemetry-exporter-otlp", "~> 0.37.0"
 gem "opentelemetry-exporter-otlp-metrics", "~> 0.13.0"

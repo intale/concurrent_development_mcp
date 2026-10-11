@@ -1,0 +1,13 @@
+module Coordinator
+  module Shared
+    module Observability
+      class SqlStatement
+        INPUT_BYTE_LIMIT: Integer
+        TEXT_CHARACTER_LIMIT: Integer
+        DOLLAR_QUOTE: Regexp
+        def self.operation: (String sql) -> String
+        def self.text: (String sql) -> String?
+      end
+    end
+  end
+end

@@ -17,6 +17,7 @@ module Coordinator
         def register_observer: (Symbol key, attributes: Hash[String, String]) { () -> Numeric } -> void
         def force_flush: () -> void
         def shutdown: () -> void
+        def detach_observers: () -> void
 
         private
         def memory?: () -> bool
