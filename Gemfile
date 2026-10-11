@@ -79,6 +79,8 @@ group :development, :test do
   gem "parallel_tests", ">= 5.7"
 
   gem 'dotenv-rails', '>= 3.2'
+
+  gem 'faker', '>= 3.8', require: false
 end
 
 group :test do
