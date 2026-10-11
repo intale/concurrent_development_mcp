@@ -34,6 +34,8 @@ module Coordinator::Processes
 
       def call(event)
         source = @source_builder.call(event)
+        return nil if @task_loader.call(source.payload.task_id).state.terminal?
+
         started_state = transition_value!(
           @start_task.call(task_id: source.payload.task_id, caused_by: source.event),
           transition: "start"

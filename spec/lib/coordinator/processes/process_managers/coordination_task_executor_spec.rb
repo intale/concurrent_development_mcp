@@ -62,6 +62,83 @@ RSpec.describe Coordinator::Processes::ProcessManagers::CoordinationTaskExecutor
     expect(task_events(task_id).last.metadata.fetch("schema_version")).to eq(3)
   end
 
+  %w[completed failed cancelled].each do |status|
+    it "acknowledges replay of a #{status} Task with persisted migration provenance without new facts" do
+      task_id, source = CoordinationTaskReplayFixture.submit(create_change_set_command, event_store:, streams:)
+      if status == "cancelled"
+        cancel.call(task_id:).value!
+      else
+        Coordinator::Write::Operations::StartCoordinationTask.new(transition:).call(task_id:, caused_by: source).value!
+        started = task_events(task_id).last
+        if status == "completed"
+          execution = Coordinator::Write::Tasks::TargetExecutor.new(event_store:).call(stored_target(task_id), caused_by: started).value!
+          outcome = Coordinator::Write::Tasks::OutcomeV3::Completed.new
+          parent = execution.terminal_event
+        else
+          outcome = Coordinator::Write::Tasks::OutcomeV3::Failed.new(code: "execution_failed", reason: "Execution failed", retryable: false)
+          parent = started
+        end
+        Coordinator::Write::Operations::RecordCoordinationTaskOutcome.new(transition:).call(task_id:, outcome:, caused_by: parent).value!
+      end
+      before = [ task_events(task_id), command_events(task_id), change_set_events ].map { _1.map(&:id) }
+
+      expect(process_manager.call(source)).to be_nil
+      expect(process_manager.call(event_store.read_at(streams.coordination_task(task_id), 0))).to be_nil
+
+      expect(loader.call(task_id).state.status).to eq(status)
+      expect([ task_events(task_id), command_events(task_id), change_set_events ].map { _1.map(&:id) }).to eq(before)
+    end
+  end
+
+  it "resumes a migrated unfinished submission from its committed target outcome exactly once" do
+    task_id, source = CoordinationTaskReplayFixture.submit(create_change_set_command, event_store:, streams:)
+    Coordinator::Write::Operations::StartCoordinationTask.new(transition:).call(task_id:, caused_by: source).value!
+    started = task_events(task_id).last
+    execution = Coordinator::Write::Tasks::TargetExecutor.new(event_store:).call(stored_target(task_id), caused_by: started).value!
+    target_ids = change_set_events.map(&:id)
+    command_ids = command_events(task_id).map(&:id)
+
+    process_manager.call(source)
+    process_manager.call(source)
+
+    expect(loader.call(task_id).state.status).to eq("completed")
+    expect(task_events(task_id).map(&:type)).to eq(%w[CoordinationTaskSubmitted CoordinationTaskExecutionStarted CoordinationTaskCompleted])
+    expect(task_events(task_id).last.causation_id).to eq(execution.terminal_event.id)
+    expect(change_set_events.map(&:id)).to eq(target_ids)
+    expect(command_events(task_id).map(&:id)).to eq(command_ids)
+  end
+
+  it "still rejects incomplete routing or mismatched command attribution before handling replay" do
+    task_id, source = submit_task(create_change_set_command)
+    process_manager.call(source)
+    before = task_events(task_id).map(&:id)
+    missing_route = source.dup
+    missing_route.markers = source.markers - [ Coordinator::Write::Tasks::ExecutionLane.new.marker(task_id) ]
+    wrong_command = source.dup
+    wrong_command.metadata = source.metadata.merge("command_id" => SecureRandom.uuid_v7)
+
+    expect { process_manager.call(missing_route) }.to raise_error(Coordinator::Processes::InvalidSourceEvent, /routing markers/)
+    expect { process_manager.call(wrong_command) }.to raise_error(Coordinator::Processes::InvalidSourceEvent, /command provenance/)
+    expect(task_events(task_id).map(&:id)).to eq(before)
+  end
+
+  it "rejects ambiguous request identity, absent causation and a retired submission schema on replay" do
+    task_id, source = submit_task(create_change_set_command)
+    process_manager.call(source)
+    before = task_events(task_id).map(&:id)
+    ambiguous_request = source.dup
+    ambiguous_request.markers = source.markers + [ "compound:command-request:v2|another-request" ]
+    absent_causation = source.dup
+    absent_causation.causation_id = nil
+    retired_schema = source.dup
+    retired_schema.metadata = source.metadata.merge("schema_version" => 2)
+
+    expect { process_manager.call(ambiguous_request) }.to raise_error(Coordinator::Processes::InvalidSourceEvent, /routing markers/)
+    expect { process_manager.call(absent_causation) }.to raise_error(Coordinator::Processes::InvalidSourceEvent, /causation/)
+    expect { process_manager.call(retired_schema) }.to raise_error(Coordinator::Processes::InvalidSourceEvent, /Submitted@3/)
+    expect(task_events(task_id).map(&:id)).to eq(before)
+  end
+
   it "reconciles a working Task from its already committed target outcome" do
     command = create_change_set_command
     task_id, source = submit_task(command)

@@ -19,6 +19,13 @@ RSpec.describe "observability Compose configuration" do
     YAML.safe_load_file(Rails.root.join("config/observability", path))
   end
 
+  it "configures retention under the pinned Tempo 3 backend worker instead of an invalid root key" do
+    tempo = provisioned_yaml("tempo.yml")
+    expect(tempo.dig("backend_worker", "compaction", "block_retention")).to eq("${TEMPO_RETENTION:-168h}")
+    expect(tempo).not_to have_key("compaction")
+    expect(tempo).not_to have_key("compactor")
+  end
+
   it "pins three directly connected backends and gives each independent persistent storage" do
     %w[docker-compose.yml docker-compose.production.yml].each do |filename|
       configuration = telemetry_compose(filename)
@@ -85,7 +92,7 @@ RSpec.describe "observability Compose configuration" do
     tempo = provisioned_yaml("tempo.yml")
     expect(tempo.dig("distributor", "receivers", "otlp", "protocols", "http", "endpoint")).to eq("0.0.0.0:4318")
     expect(tempo.dig("storage", "trace")).to include("backend" => "local", "wal" => { "path" => "/var/tempo/wal" }, "local" => { "path" => "/var/tempo/blocks" })
-    expect(tempo.dig("compaction", "block_retention")).to eq("${TEMPO_RETENTION:-168h}")
+    expect(tempo.dig("backend_worker", "compaction", "block_retention")).to eq("${TEMPO_RETENTION:-168h}")
     expect(tempo).not_to have_key("ingester")
     expect(tempo).not_to have_key("ingest")
   end

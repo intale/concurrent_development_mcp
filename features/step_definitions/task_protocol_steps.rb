@@ -117,6 +117,37 @@ When("the Task workers restart") do
   start_live_subscriptions
 end
 
+When("the production Task executor registrations replay submissions from the beginning") do
+  @replayed_task_id = @original_task_id
+  command_id = task_command_id(@original_task_id)
+  @subscription_replay_fact_ids = [
+    task_events(@original_task_id).map(&:id),
+    event_store.read(streams.command(command_id), Coordinator::Write::EventQueries::COMMAND_HISTORY).map(&:id),
+    change_set_events(@current_arguments.fetch(:change_set_id)).map(&:id)
+  ]
+  stop_process_subscriptions
+  manager = PgEventstore.subscriptions_manager(subscription_set: "coordinator-task-replay-acceptance")
+  replay = start_subscription_set(:process_managers, "subscription_set_factories.process_managers", manager:)
+  lane = Coordinator::Write::Tasks::ExecutionLane.new.index(@original_task_id)
+  subscription = "coordination-task-executor-lane-#{lane}-v2"
+  eventually("completed Task submission to be replayed by its real subscription") do
+    count = replay.processed_event_count(subscription)
+    [ count.positive?, count ]
+  end
+end
+
+Then("subscription replay preserves the original Task result and all coordination facts") do
+  replayed = task_request("tasks/get", @original_task_id)
+  command_id = task_command_id(@original_task_id)
+  ids = [
+    task_events(@original_task_id).map(&:id),
+    event_store.read(streams.command(command_id), Coordinator::Write::EventQueries::COMMAND_HISTORY).map(&:id),
+    change_set_events(@current_arguments.fetch(:change_set_id)).map(&:id)
+  ]
+  assert_acceptance_equal(@subscription_replay_fact_ids, ids, "Facts after subscription replay")
+  assert_acceptance_equal(@original_task_state.dig("result", "result"), replayed.dig("result", "result"), "Original terminal result")
+end
+
 Then("the replayed Task exposes the original completed result") do
   replayed = await_task_terminal(@replayed_task_id)
   assert_acceptance_equal("completed", replayed.dig("result", "status"), "Replayed status")

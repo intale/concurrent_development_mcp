@@ -38,6 +38,13 @@ Feature: Durable MCP Task protocol
       When the Task workers restart
       Then the current Task eventually completes successfully
 
+    @TASK-SUBSCRIPTION-REPLAY-01 @live-subscriptions
+    Scenario: Replaying subscriptions from the beginning does not execute completed coordination again
+      Given agent "planner-replay" completed ChangeSet "CS-TASK-SUBSCRIPTION-REPLAY" with command "cmd-task-subscription-replay" through live subscriptions
+      When the production Task executor registrations replay submissions from the beginning
+      Then subscription replay preserves the original Task result and all coordination facts
+      And an independent MCP client reconstructs the same terminal result
+
     @CDM-TASK-002
     Scenario: Changed input cannot reuse a completed command identity
       When agent "planner-1" submits ChangeSet "CS-CUC-REUSE" with command "cmd-cuc-reuse"

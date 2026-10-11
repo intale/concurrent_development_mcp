@@ -15,7 +15,7 @@ module Coordinator::Processes
       rule(:event) do
         key.failure("must be a persisted event") unless persisted?(value)
         key.failure("must have a UUIDv7 event ID") unless Types::UUID_V7_PATTERN.match?(value.id)
-        key.failure("must be CoordinationTaskSubmitted@2 or @3") unless submitted_schema?(value)
+        key.failure("must be CoordinationTaskSubmitted@3") unless submitted_schema?(value)
         key.failure("must belong to its CoordinationTask stream") unless matching_task_stream?(value)
         key.failure("must carry its submitted command provenance") unless matching_provenance?(value)
         key.failure("must carry its complete routing markers") unless matching_markers?(value)
@@ -30,7 +30,7 @@ module Coordinator::Processes
       end
 
       def submitted_schema?(event)
-        event.type == "CoordinationTaskSubmitted" && [ 2, 3 ].include?(event.metadata["schema_version"])
+        event.type == "CoordinationTaskSubmitted" && event.metadata["schema_version"] == 3
       end
 
       def matching_task_stream?(event)
@@ -44,11 +44,8 @@ module Coordinator::Processes
       end
 
       def matching_provenance?(event)
-        task_id = event.data["task_id"]
         command_id = event.data["command_id"]
-
-        expected_policy = "coordination-task/v#{event.metadata['schema_version']}"
-        event.metadata["command_id"] == command_id && event.metadata["policy_version"] == expected_policy
+        event.metadata["command_id"] == command_id
       end
 
       def matching_markers?(event)
@@ -58,15 +55,11 @@ module Coordinator::Processes
           "task:#{event.data['task_id']}",
           "tool:#{event.data['tool_name']}"
         ]
-        return event.markers == required.sort if event.metadata["schema_version"] == 2
-
         request_markers = event.markers.grep(/\Acompound:command-request:v2\|/)
-        request_markers.one? && (required - event.markers).empty? && event.markers.length == required.length + 1
+        request_markers.one? && (required - event.markers).empty?
       end
 
       def matching_causation?(event)
-        return event.causation_id.nil? if event.metadata["schema_version"] == 2
-
         Types::UUID_V7_PATTERN.match?(event.causation_id.to_s)
       end
 
