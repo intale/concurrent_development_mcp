@@ -1,0 +1,12 @@
+module Coordinator
+  module Shared
+    module Observability
+      module McpOutcome
+        def self.call: (json_value response) -> String
+        private
+        def self.error_outcome: (json_value error) -> String
+        def self.value: (json_value object, String key) -> json_value
+      end
+    end
+  end
+end

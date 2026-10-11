@@ -1,0 +1,18 @@
+module Coordinator
+  module Shared
+    module Observability
+      interface _Outcome[T]
+        def call: (T result) -> String
+      end
+
+      class Invocation
+        def initialize: (session: Session, prefix: :mcp | :subscription, name: String, attributes: Hash[String, String]) -> void
+        def call: [T] (outcome: _Outcome[T]) { () -> T } -> T
+
+        private
+        def start: () -> void
+        def finish: (outcome: String, exception_type: String?) -> void
+      end
+    end
+  end
+end

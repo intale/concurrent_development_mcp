@@ -3,6 +3,21 @@
 module Coordinator::Mcp
   module Tasks
     class Server < ::MCP::Server
+      def initialize(observability:, **options)
+        @observability = observability
+        super(**options)
+      end
+
+      # The SDK's public Hash and JSON entrypoints are independent. Wrapping
+      # each here covers both transports without a second tool-level span.
+      def handle(request, session: nil)
+        @observability.call(request) { super }
+      end
+
+      def handle_json(request, session: nil)
+        @observability.call(request) { super }
+      end
+
       private
 
       def call_tool(

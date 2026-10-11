@@ -1,0 +1,7 @@
+module Coordinator
+  module Shared
+    module Observability
+      type json_value = nil | bool | Integer | Float | String | Array[json_value] | Hash[String | Symbol, json_value]
+    end
+  end
+end

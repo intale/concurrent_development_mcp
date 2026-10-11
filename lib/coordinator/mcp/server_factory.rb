@@ -172,6 +172,7 @@ module Coordinator
 
       def call
         server = Tasks::Server.new(
+          observability: Shared::Observability::McpInvocation.new(inventory: Container["observability.inventory"]),
           name: "concurrent-development-coordinator",
           title: "Concurrent Development Coordinator",
           version: "0.1.0",

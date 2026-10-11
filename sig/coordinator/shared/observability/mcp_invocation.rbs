@@ -1,0 +1,12 @@
+module Coordinator
+  module Shared
+    module Observability
+      class McpInvocation
+        def initialize: (inventory: Inventory) -> void
+        def call: [T < json_value] (json_value request) { () -> T } -> T
+        private
+        def request_attributes: (json_value request) -> Hash[String, String]
+      end
+    end
+  end
+end
