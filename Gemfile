@@ -77,6 +77,8 @@ group :development, :test do
   gem "cucumber-rails", ">= 4.1", require: false
 
   gem "parallel_tests", ">= 5.7"
+
+  gem 'dotenv-rails', '>= 3.2'
 end
 
 group :test do
