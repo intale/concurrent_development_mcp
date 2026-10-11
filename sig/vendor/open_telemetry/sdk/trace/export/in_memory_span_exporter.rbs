@@ -1,0 +1,13 @@
+module OpenTelemetry
+  module SDK
+    module Trace
+      module Export
+        class InMemorySpanExporter
+          def finished_spans: (*untyped, **untyped) -> untyped
+          def reset: (*untyped, **untyped) -> untyped
+          def shutdown: (*untyped, **untyped) -> untyped
+        end
+      end
+    end
+  end
+end

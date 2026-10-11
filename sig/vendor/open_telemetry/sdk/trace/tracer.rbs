@@ -1,0 +1,9 @@
+module OpenTelemetry
+  module SDK
+    module Trace
+      class Tracer
+        def start_span: (*untyped, **untyped) -> untyped
+      end
+    end
+  end
+end

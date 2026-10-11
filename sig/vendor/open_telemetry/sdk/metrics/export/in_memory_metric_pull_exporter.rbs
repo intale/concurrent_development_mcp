@@ -1,0 +1,15 @@
+module OpenTelemetry
+  module SDK
+    module Metrics
+      module Export
+        class InMemoryMetricPullExporter
+          def initialize: (*untyped, **untyped) -> void
+          def pull: (*untyped, **untyped) -> untyped
+          def reset: (*untyped, **untyped) -> untyped
+          def metric_snapshots: (*untyped, **untyped) -> untyped
+          def shutdown: (*untyped, **untyped) -> untyped
+        end
+      end
+    end
+  end
+end

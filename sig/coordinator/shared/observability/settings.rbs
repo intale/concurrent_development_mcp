@@ -1,0 +1,20 @@
+module Coordinator
+  module Shared
+    module Observability
+      class Settings < Value
+        ROLES: Array[String]
+        attr_reader enabled: bool
+        attr_reader mode: String
+        attr_reader environment: String
+        attr_reader service_name: String
+        attr_reader service_version: String
+        attr_reader role: String
+        attr_reader traces_endpoint: String
+        attr_reader metrics_endpoint: String
+        attr_reader export_interval_ms: Integer
+        attr_reader export_timeout_ms: Integer
+        attr_reader trace_sample_ratio: Float
+      end
+    end
+  end
+end

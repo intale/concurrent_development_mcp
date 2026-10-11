@@ -31,6 +31,15 @@ Dir[Rails.root.join("spec/support/**/*.rb")].sort.each { require(_1) }
 
 RSpec.configure do |config|
   config.include FactoryBot::Syntax::Methods
+  config.include ObservabilityTestHelpers, observability: true
+
+  config.around(:each, observability: true) do |example|
+    Coordinator::Shared::Observability::Runtime.shutdown
+    start_test_observability
+    example.run
+  ensure
+    Coordinator::Shared::Observability::Runtime.shutdown
+  end
 
   # rspec-expectations config goes here. You can use an alternate
   # assertion/expectation library such as wrong or the stdlib/minitest

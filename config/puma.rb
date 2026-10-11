@@ -40,3 +40,13 @@ plugin :solid_queue if ENV["SOLID_QUEUE_IN_PUMA"]
 # Specify the PID file. Defaults to tmp/pids/server.pid in development.
 # In other environments, only set the PID file if requested.
 pidfile ENV["PIDFILE"] if ENV["PIDFILE"]
+
+# Stop exporter threads before a preloaded master forks, then create independent
+# providers/resources in each worker. Non-preloaded workers boot the initializer.
+before_fork do
+  Coordinator::Shared::Observability::Runtime.shutdown if defined?(Coordinator::Shared::Observability::Runtime)
+end
+
+on_worker_boot do
+  Coordinator::Shared::Observability::Runtime.after_fork if defined?(Coordinator::Shared::Observability::Runtime)
+end

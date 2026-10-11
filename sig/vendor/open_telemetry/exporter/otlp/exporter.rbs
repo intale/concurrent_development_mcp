@@ -1,0 +1,10 @@
+module OpenTelemetry
+  module Exporter
+    module OTLP
+      class Exporter
+        def initialize: (*untyped, **untyped) -> void
+        def shutdown: (*untyped, **untyped) -> untyped
+      end
+    end
+  end
+end

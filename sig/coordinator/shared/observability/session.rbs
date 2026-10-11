@@ -1,0 +1,31 @@
+module Coordinator
+  module Shared
+    module Observability
+      class Session
+        SCOPE: String
+        CARDINALITY_LIMIT: Integer
+        attr_reader settings: Settings
+        attr_reader pid: Integer
+        attr_reader instance_id: String
+        attr_reader tracer_provider: OpenTelemetry::SDK::Trace::TracerProvider
+        attr_reader meter_provider: OpenTelemetry::SDK::Metrics::MeterProvider
+        attr_reader span_exporter: OpenTelemetry::SDK::Trace::Export::InMemorySpanExporter | OpenTelemetry::Exporter::OTLP::Exporter
+        attr_reader metric_reader: OpenTelemetry::SDK::Metrics::Export::InMemoryMetricPullExporter | OpenTelemetry::SDK::Metrics::Export::PeriodicMetricReader
+        attr_reader tracer: OpenTelemetry::SDK::Trace::Tracer
+        def initialize: (settings: Settings, ?instance_id: String) -> void
+        def record: (Symbol key, Numeric value, attributes: Hash[String, String]) -> void
+        def register_observer: (Symbol key, attributes: Hash[String, String]) { () -> Numeric } -> void
+        def force_flush: () -> void
+        def shutdown: () -> void
+
+        private
+        def memory?: () -> bool
+        def timeout: () -> Float
+        def resource_attributes: () -> Hash[String, String]
+        def build_tracing: (OpenTelemetry::SDK::Resources::Resource resource) -> void
+        def build_metrics: (OpenTelemetry::SDK::Resources::Resource resource) -> void
+        def aggregation: (MetricDefinition definition) -> (OpenTelemetry::SDK::Metrics::Aggregation::Sum | OpenTelemetry::SDK::Metrics::Aggregation::ExplicitBucketHistogram | OpenTelemetry::SDK::Metrics::Aggregation::LastValue)
+      end
+    end
+  end
+end

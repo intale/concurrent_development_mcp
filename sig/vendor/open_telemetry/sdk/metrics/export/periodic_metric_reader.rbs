@@ -1,0 +1,12 @@
+module OpenTelemetry
+  module SDK
+    module Metrics
+      module Export
+        class PeriodicMetricReader
+          def initialize: (*untyped, **untyped) -> void
+          def shutdown: (*untyped, **untyped) -> untyped
+        end
+      end
+    end
+  end
+end

@@ -1,0 +1,10 @@
+module Coordinator
+  module Shared
+    module Observability
+      class SettingsLoader
+        def initialize: (?contract: SettingsContract) -> void
+        def call: (environment: String, ?env: Hash[String, String]) -> Settings
+      end
+    end
+  end
+end

@@ -1,0 +1,14 @@
+module OpenTelemetry
+  module SDK
+    module Metrics
+      class MeterProvider
+        def initialize: (*untyped, **untyped) -> void
+        def add_metric_reader: (*untyped, **untyped) -> untyped
+        def meter: (*untyped, **untyped) -> untyped
+        def add_view: (*untyped, **untyped) -> untyped
+        def force_flush: (*untyped, **untyped) -> untyped
+        def shutdown: (*untyped, **untyped) -> untyped
+      end
+    end
+  end
+end

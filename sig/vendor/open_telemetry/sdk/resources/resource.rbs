@@ -1,0 +1,9 @@
+module OpenTelemetry
+  module SDK
+    module Resources
+      class Resource
+        def self.create: (*untyped, **untyped) -> untyped
+      end
+    end
+  end
+end

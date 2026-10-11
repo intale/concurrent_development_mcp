@@ -1,0 +1,13 @@
+module OpenTelemetry
+  module SDK
+    module Trace
+      class TracerProvider
+        def initialize: (*untyped, **untyped) -> void
+        def add_span_processor: (*untyped, **untyped) -> untyped
+        def tracer: (*untyped, **untyped) -> untyped
+        def force_flush: (*untyped, **untyped) -> untyped
+        def shutdown: (*untyped, **untyped) -> untyped
+      end
+    end
+  end
+end

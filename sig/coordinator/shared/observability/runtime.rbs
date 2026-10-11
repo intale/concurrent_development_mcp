@@ -1,0 +1,18 @@
+module Coordinator
+  module Shared
+    module Observability
+      module Runtime
+        def self.configure: (environment: String, ?env: Hash[String, String]) -> Session?
+        def self.start: (Settings settings) -> Session?
+        def self.current: () -> Session?
+        def self.shutdown: () -> void
+        def self.after_fork: () -> void
+        def self.safely: [T] (Symbol operation) { () -> T } -> T?
+
+        private
+        def self.report: (Symbol operation, StandardError error) -> void
+        def self.reset_providers: () -> void
+      end
+    end
+  end
+end
