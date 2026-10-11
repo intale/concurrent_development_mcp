@@ -1,0 +1,12 @@
+module Coordinator
+  module Shared
+    module Observability
+      class InFlight
+        def initialize: () -> void
+        def enter: (Hash[String, String] attributes) -> Object
+        def leave: (Hash[String, String] attributes, Object token) -> void
+        def oldest_age: (Hash[String, String] attributes) -> Float
+      end
+    end
+  end
+end

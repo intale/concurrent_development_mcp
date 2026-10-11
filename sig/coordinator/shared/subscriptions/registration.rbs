@@ -3,6 +3,7 @@ module Coordinator
     module Subscriptions
       class Registration
         attr_reader definition: _SubscriptionDefinition
+        attr_reader handler: _SubscriptionHandler
 
         def initialize: (definition: _SubscriptionDefinition, handler: _SubscriptionHandler, ?pull_interval: Integer | Float) -> void
         def register: (PgEventstore::SubscriptionsManager manager) -> bool

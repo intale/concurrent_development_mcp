@@ -34,7 +34,9 @@ module Coordinator::Shared
 
       def start
         @started_at = Runtime.safely(:invocation_clock) { Process.clock_gettime(Process::CLOCK_MONOTONIC) }
-        @span = Runtime.safely(:span_start) { @session.tracer.start_span(@name, attributes: @attributes.dup) }
+        @span = Runtime.safely(:span_start) do
+          @session.tracer.start_span(@name, kind: @prefix == :mcp ? :server : :consumer, attributes: @attributes.dup)
+        end
         @context_token = Runtime.safely(:span_context) do
           OpenTelemetry::Context.attach(OpenTelemetry::Trace.context_with_span(@span)) if @span
         end
