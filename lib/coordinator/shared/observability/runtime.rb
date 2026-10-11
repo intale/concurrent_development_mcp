@@ -39,6 +39,13 @@ module Coordinator::Shared
           @session
         end
 
+        # Queue children inherit providers but not the exporting threads.
+        # Threaded workers keep sharing the current process's providers.
+        def ensure_process
+          after_fork if @session && @session.pid != Process.pid
+          nil
+        end
+
         def shutdown
           @mutex.synchronize do
             session = @session

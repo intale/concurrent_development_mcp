@@ -90,7 +90,7 @@ module Coordinator::Shared
       private
 
       def memory?
-        settings.environment == "test" || settings.mode == "in_memory"
+        ENV["RAILS_ENV"] == "test" || settings.environment == "test" || settings.mode == "in_memory"
       end
 
       def timeout

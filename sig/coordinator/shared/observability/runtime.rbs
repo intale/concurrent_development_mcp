@@ -5,6 +5,7 @@ module Coordinator
         def self.configure: (environment: String, ?env: Hash[String, String]) -> Session?
         def self.start: (Settings settings) -> Session?
         def self.current: () -> Session?
+        def self.ensure_process: () -> void
         def self.shutdown: () -> void
         def self.after_fork: () -> void
         def self.safely: [T] (Symbol operation) { () -> T } -> T?

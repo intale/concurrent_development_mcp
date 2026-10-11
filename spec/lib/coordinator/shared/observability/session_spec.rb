@@ -13,6 +13,17 @@ RSpec.describe Coordinator::Shared::Observability::Session, observability: true 
     )
   end
 
+  it "cannot start network exporters in the test process even with production settings" do
+    production_session = Coordinator::Shared::Observability::Runtime.configure(
+      environment: "production", env: { "COORDINATOR_OBSERVABILITY_ENABLED" => "true" }
+    )
+    expect(production_session.settings.mode).to eq("otlp")
+    expect(production_session.span_exporter).to be_a(OpenTelemetry::SDK::Trace::Export::InMemorySpanExporter)
+    expect(production_session.metric_reader).to be_a(OpenTelemetry::SDK::Metrics::Export::InMemoryMetricPullExporter)
+    production_session.tracer.start_span("test-only").finish
+    expect(telemetry_spans.map(&:name)).to eq([ "test-only" ])
+  end
+
   it "records real SDK spans and cumulative metrics with only allowed dimensions" do
     span = session.tracer.start_span("mcp tools/list", attributes: { "rpc.method" => "tools/list" })
     labels = { "rpc.method" => "tools/list", "mcp.tool.name" => "none", "payload" => "private" }.freeze

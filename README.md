@@ -250,6 +250,19 @@ backend durability. To inspect backends after an authorized deployment:
 docker compose --env-file .env.production -f docker-compose.production.yml logs --tail 100 prometheus tempo grafana
 ```
 
+Solid Queue's public worker/dispatcher/scheduler lifecycle hooks rebuild providers
+after fork and flush on child shutdown. Threaded workers share the process's
+providers. Tests cannot use network exporters even when inspecting production
+settings. For an isolated adapter-overhead sample (no other test suites running):
+
+```sh
+OBSERVABILITY_OVERHEAD_REPORT=1 bundle exec rspec spec/lib/coordinator/shared/observability/overhead_spec.rb
+```
+
+This reports five alternating warm-path samples per mode for a real MCP read,
+two-item batch and artifact title projection. It excludes fixture/provider setup,
+uses no timing pass/fail threshold and does not estimate network/backend overhead.
+
 See [Prometheus OTLP configuration](https://prometheus.io/docs/guides/opentelemetry/)
 and [Grafana Tempo provisioning](https://grafana.com/docs/grafana/latest/datasources/tempo/configure-tempo-data-source/provision/)
 for the upstream receiver, translation and correlation conventions.

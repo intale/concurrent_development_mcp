@@ -54,4 +54,20 @@ RSpec.describe Coordinator::Shared::Observability::Invocation, observability: tr
     expect(telemetry_spans.first.attributes.fetch("outcome")).to eq("unknown")
     expect(OpenTelemetry::Trace.current_span.context.valid?).to be(false)
   end
+
+  it "preserves work and its exception when the official exporter rejects spans" do
+    session.span_exporter.shutdown
+    result = Object.new
+    calls = 0
+    expect(invocation.call(outcome: ->(_value) { "ok" }) { calls += 1; result }).to equal(result)
+    error = RuntimeError.new("private business failure")
+    expect do
+      invocation.call(outcome: ->(_value) { "ok" }) { calls += 1; raise error }
+    end.to raise_error { expect(_1).to equal(error) }
+    expect(calls).to eq(2)
+    expect(telemetry_spans).to be_empty
+    gauge = telemetry_metrics.find { _1.name == "coordinator.mcp.in.flight" }
+    expect(gauge.data_points.first.value).to eq(0)
+    expect(OpenTelemetry::Trace.current_span.context.valid?).to be(false)
+  end
 end

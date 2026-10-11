@@ -14,8 +14,16 @@ RSpec.describe Coordinator::Shared::Observability::Runtime, observability: true 
 
   it "can be disabled without affecting the process" do
     described_class.configure(environment: "test", env: {})
+    expect(described_class.ensure_process).to be_nil
     expect(described_class.current).to be_nil
     expect(OpenTelemetry.tracer_provider).to be_a(OpenTelemetry::Trace::TracerProvider)
+  end
+
+  it "keeps one provider identity for threaded workers in the same process" do
+    session = described_class.current
+    thread = Thread.new { described_class.ensure_process }
+    expect(thread.value).to be_nil
+    expect(described_class.current).to equal(session)
   end
 
   it "fails open on invalid configuration without exposing values" do
@@ -44,10 +52,12 @@ RSpec.describe Coordinator::Shared::Observability::Runtime, observability: true 
     reader, writer = IO.pipe
     pid = fork do
       reader.close
-      described_class.after_fork
+      described_class.ensure_process
       child = described_class.current
+      described_class.ensure_process
       child.tracer.start_span("child").finish
-      writer.write(JSON.generate(instance_id: child.instance_id, pid: child.pid, spans: child.span_exporter.finished_spans.map(&:name)))
+      writer.write(JSON.generate(instance_id: child.instance_id, pid: child.pid,
+        reused: described_class.current.equal?(child), spans: child.span_exporter.finished_spans.map(&:name)))
       writer.close
       described_class.shutdown
       exit! 0
@@ -57,7 +67,7 @@ RSpec.describe Coordinator::Shared::Observability::Runtime, observability: true 
     reader.close
     Process.wait(pid)
 
-    expect(data).to include("pid" => pid, "spans" => [ "child" ])
+    expect(data).to include("pid" => pid, "reused" => true, "spans" => [ "child" ])
     expect(data.fetch("instance_id")).not_to eq(parent.instance_id)
     expect(parent.span_exporter.finished_spans).to be_empty
     expect(described_class.current).to equal(parent)
