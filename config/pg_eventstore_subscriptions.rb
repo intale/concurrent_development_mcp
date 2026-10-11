@@ -1,4 +1,5 @@
 # frozen_string_literal: true
+
 ENV['COORDINATOR_OBSERVABILITY_ROLE'] = 'subscriptions'
 
 Coordinator::Container["subscription_sets.process_managers"].start
