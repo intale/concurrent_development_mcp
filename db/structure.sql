@@ -95,110 +95,9 @@ WHERE source_table = 'coordinator_contexts' AND work_item.value ->> 'work_item_i
 $$;
 
 
---
--- Name: coordinator_search_strings(jsonb, text[]); Type: FUNCTION; Schema: public; Owner: -
---
-
-CREATE FUNCTION public.coordinator_search_strings(input jsonb, root_path text[]) RETURNS TABLE(value_path text[], value text)
-    LANGUAGE sql IMMUTABLE PARALLEL SAFE
-    AS $$
-  WITH RECURSIVE nodes(node, path) AS (
-    SELECT input, root_path
-    UNION ALL
-    SELECT child.node, nodes.path || child.key
-    FROM nodes
-    CROSS JOIN LATERAL (
-      SELECT item.value AS node, (item.ordinality - 1)::text AS key
-      FROM jsonb_array_elements(CASE WHEN jsonb_typeof(nodes.node) = 'array'
-        THEN nodes.node ELSE '[]'::jsonb END) WITH ORDINALITY AS item(value, ordinality)
-      UNION ALL
-      SELECT item.value, item.key
-      FROM jsonb_each(CASE WHEN jsonb_typeof(nodes.node) = 'object'
-        THEN nodes.node ELSE '{}'::jsonb END) AS item(key, value)
-    ) AS child
-  )
-  SELECT path, node #>> '{}' FROM nodes WHERE jsonb_typeof(node) = 'string'
-$$;
-
-
---
--- Name: coordinator_search_values_changed(); Type: FUNCTION; Schema: public; Owner: -
---
-
-CREATE FUNCTION public.coordinator_search_values_changed() RETURNS trigger
-    LANGUAGE plpgsql
-    AS $$
-BEGIN
-  IF TG_OP = 'TRUNCATE' THEN
-    DELETE FROM coordinator_search_values WHERE source_table = TG_TABLE_NAME;
-    RETURN NULL;
-  END IF;
-  IF TG_OP = 'DELETE' THEN
-    DELETE FROM coordinator_search_values
-    WHERE source_table = TG_TABLE_NAME AND source_id = to_jsonb(OLD) ->> TG_ARGV[0];
-  ELSIF TG_OP = 'UPDATE' THEN
-    IF (to_jsonb(OLD) ->> TG_ARGV[0]) IS DISTINCT FROM (to_jsonb(NEW) ->> TG_ARGV[0]) THEN
-      DELETE FROM coordinator_search_values
-      WHERE source_table = TG_TABLE_NAME AND source_id = to_jsonb(OLD) ->> TG_ARGV[0];
-    END IF;
-  END IF;
-  IF TG_OP <> 'DELETE' THEN
-    PERFORM coordinator_sync_search_values(TG_TABLE_NAME, to_jsonb(NEW) ->> TG_ARGV[0], to_jsonb(NEW));
-  END IF;
-  RETURN NULL;
-END
-$$;
-
-
---
--- Name: coordinator_sync_search_values(text, text, jsonb); Type: FUNCTION; Schema: public; Owner: -
---
-
-CREATE FUNCTION public.coordinator_sync_search_values(owner_table text, owner_id text, source jsonb) RETURNS void
-    LANGUAGE plpgsql
-    AS $$
-BEGIN
-  DELETE FROM coordinator_search_values WHERE source_table = owner_table AND source_id = owner_id;
-  INSERT INTO coordinator_search_values(source_table, source_id, document_id, field, value_path, value, updated_at)
-  SELECT owner_table, owner_id, leaf.document_id, leaf.field, leaf.value_path, leaf.value,
-    (source ->> 'updated_at')::timestamp
-  FROM coordinator_extract_search_values(owner_table, source) AS leaf;
-END
-$$;
-
-
 SET default_tablespace = '';
 
 SET default_table_access_method = heap;
-
---
--- Name: agent_choice_impacts; Type: TABLE; Schema: public; Owner: -
---
-
-CREATE TABLE public.agent_choice_impacts (
-    assessment_id character varying NOT NULL,
-    accepted_choice jsonb NOT NULL,
-    assessed_at_domain timestamp(6) without time zone NOT NULL,
-    assessed_at_store timestamp(6) without time zone NOT NULL,
-    assessment jsonb NOT NULL,
-    assessment_actor jsonb NOT NULL,
-    assessment_event jsonb NOT NULL,
-    attempt_id character varying NOT NULL,
-    causation_id character varying,
-    choice_id character varying NOT NULL,
-    correlation_id character varying,
-    created_at timestamp(6) without time zone NOT NULL,
-    decision_change jsonb NOT NULL,
-    event_global_position bigint NOT NULL,
-    markers jsonb DEFAULT '[]'::jsonb NOT NULL,
-    metadata jsonb DEFAULT '{}'::jsonb NOT NULL,
-    outcome character varying NOT NULL,
-    policy_version character varying NOT NULL,
-    reason character varying NOT NULL,
-    source_actor jsonb NOT NULL,
-    updated_at timestamp(6) without time zone NOT NULL
-);
-
 
 --
 -- Name: agent_choices; Type: TABLE; Schema: public; Owner: -
@@ -241,6 +140,376 @@ CREATE TABLE public.agent_choices (
     recorded_markers jsonb DEFAULT '[]'::jsonb NOT NULL,
     recorded_metadata jsonb DEFAULT '{}'::jsonb NOT NULL,
     selected jsonb NOT NULL,
+    updated_at timestamp(6) without time zone NOT NULL
+);
+
+
+--
+-- Name: coordinator_search_input(public.agent_choices); Type: FUNCTION; Schema: public; Owner: -
+--
+
+CREATE FUNCTION public.coordinator_search_input(source public.agent_choices) RETURNS jsonb
+    LANGUAGE sql IMMUTABLE PARALLEL SAFE
+    AS $$
+  SELECT jsonb_build_object('choice_id', (source).choice_id, 'updated_at', (source).updated_at,
+    'assessment', jsonb_build_object('warnings', (source).assessment -> 'warnings'),
+'alternatives', COALESCE((
+  SELECT jsonb_agg(jsonb_build_object('summary', item.value -> 'summary') ORDER BY item.ordinality)
+  FROM jsonb_array_elements(CASE WHEN jsonb_typeof((source).alternatives) = 'array'
+    THEN (source).alternatives ELSE '[]'::jsonb END) WITH ORDINALITY AS item(value, ordinality)
+), '[]'::jsonb)
+)
+$$;
+
+
+--
+-- Name: coordinator_contexts; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.coordinator_contexts (
+    change_set_id character varying NOT NULL,
+    created_at timestamp(6) without time zone NOT NULL,
+    document jsonb DEFAULT '{}'::jsonb NOT NULL,
+    last_processed_at timestamp(6) without time zone NOT NULL,
+    projection_version integer NOT NULL,
+    source_positions jsonb DEFAULT '[]'::jsonb NOT NULL,
+    updated_at timestamp(6) without time zone NOT NULL
+);
+
+
+--
+-- Name: coordinator_search_input(public.coordinator_contexts); Type: FUNCTION; Schema: public; Owner: -
+--
+
+CREATE FUNCTION public.coordinator_search_input(source public.coordinator_contexts) RETURNS jsonb
+    LANGUAGE sql IMMUTABLE PARALLEL SAFE
+    AS $$
+  SELECT jsonb_build_object('change_set_id', (source).change_set_id, 'updated_at', (source).updated_at,
+    'document', jsonb_build_object('work_items', COALESCE((
+  SELECT jsonb_agg(jsonb_build_object(
+    'work_item_id', item.value -> 'work_item_id',
+    'goal', item.value -> 'goal',
+    'acceptance_criteria', item.value -> 'acceptance_criteria'
+  ) ORDER BY item.ordinality)
+  FROM jsonb_array_elements(CASE WHEN jsonb_typeof((source).document -> 'work_items') = 'array'
+    THEN (source).document -> 'work_items' ELSE '[]'::jsonb END)
+    WITH ORDINALITY AS item(value, ordinality)
+), '[]'::jsonb))
+)
+$$;
+
+
+--
+-- Name: decision_definitions; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.decision_definitions (
+    decision_id character varying NOT NULL,
+    acceptance_event jsonb NOT NULL,
+    activated_actor jsonb,
+    activated_at_domain timestamp(6) without time zone,
+    activated_at_store timestamp(6) without time zone,
+    activated_causation_id character varying,
+    activated_correlation_id character varying,
+    activated_event jsonb,
+    activated_markers jsonb,
+    activated_metadata jsonb,
+    classifier jsonb NOT NULL,
+    corrected_actor jsonb,
+    corrected_at_domain timestamp(6) without time zone,
+    corrected_at_store timestamp(6) without time zone,
+    corrected_causation_id character varying,
+    corrected_correlation_id character varying,
+    corrected_event jsonb,
+    corrected_markers jsonb DEFAULT '[]'::jsonb NOT NULL,
+    corrected_metadata jsonb DEFAULT '{}'::jsonb NOT NULL,
+    correction_count integer DEFAULT 0 NOT NULL,
+    correction_rationale jsonb,
+    created_at timestamp(6) without time zone NOT NULL,
+    definition jsonb NOT NULL,
+    definition_digest character varying NOT NULL,
+    interpretation_id character varying NOT NULL,
+    partitions jsonb DEFAULT '[]'::jsonb NOT NULL,
+    policy_status character varying NOT NULL,
+    previous_definition_digest character varying,
+    proposal_event jsonb NOT NULL,
+    rationale jsonb,
+    recorded_actor jsonb NOT NULL,
+    recorded_at_domain timestamp(6) without time zone NOT NULL,
+    recorded_at_store timestamp(6) without time zone NOT NULL,
+    recorded_causation_id character varying,
+    recorded_correlation_id character varying,
+    recorded_event jsonb NOT NULL,
+    recorded_markers jsonb DEFAULT '[]'::jsonb NOT NULL,
+    recorded_metadata jsonb DEFAULT '{}'::jsonb NOT NULL,
+    scope_provenance jsonb NOT NULL,
+    slot jsonb,
+    source_event jsonb NOT NULL,
+    source_message_id character varying NOT NULL,
+    updated_at timestamp(6) without time zone NOT NULL
+);
+
+
+--
+-- Name: coordinator_search_input(public.decision_definitions); Type: FUNCTION; Schema: public; Owner: -
+--
+
+CREATE FUNCTION public.coordinator_search_input(source public.decision_definitions) RETURNS jsonb
+    LANGUAGE sql IMMUTABLE PARALLEL SAFE
+    AS $$
+  SELECT jsonb_build_object('decision_id', (source).decision_id, 'updated_at', (source).updated_at,
+    'definition', jsonb_build_object('document', jsonb_build_object(
+  'topic', jsonb_build_object('aliases', (source).definition #> '{document,topic,aliases}'),
+  'value', jsonb_build_object('items', (source).definition #> '{document,value,items}'),
+  'scope', (source).definition #> '{document,scope}',
+  'conditions', (source).definition #> '{document,conditions}'
+))
+)
+$$;
+
+
+--
+-- Name: development_artifact_observations; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.development_artifact_observations (
+    observation_id character varying NOT NULL,
+    artifact_id character varying,
+    classification_reason text,
+    classification_revision integer DEFAULT 1 CONSTRAINT development_artifact_observati_classification_revision_not_null NOT NULL,
+    classified_actor jsonb,
+    classified_at_domain timestamp(6) without time zone,
+    classified_at_store timestamp(6) without time zone,
+    classified_causation_id character varying,
+    classified_correlation_id character varying,
+    classified_event jsonb,
+    classified_global_position bigint,
+    classified_markers jsonb DEFAULT '[]'::jsonb NOT NULL,
+    classified_metadata jsonb DEFAULT '{}'::jsonb NOT NULL,
+    created_at timestamp(6) without time zone NOT NULL,
+    current_global_position bigint CONSTRAINT development_artifact_observati_current_global_position_not_null NOT NULL,
+    kind character varying,
+    labels jsonb DEFAULT '[]'::jsonb NOT NULL,
+    observed_actor jsonb,
+    observed_at_domain timestamp(6) without time zone,
+    observed_at_store timestamp(6) without time zone,
+    observed_causation_id character varying,
+    observed_correlation_id character varying,
+    observed_event jsonb,
+    observed_global_position bigint,
+    observed_markers jsonb DEFAULT '[]'::jsonb NOT NULL,
+    observed_metadata jsonb DEFAULT '{}'::jsonb NOT NULL,
+    observed_sequence bigint NOT NULL,
+    scope text,
+    source_collector character varying,
+    source_kind character varying,
+    source_locator text,
+    source_observed_at timestamp(6) without time zone,
+    source_revision text,
+    title text,
+    updated_at timestamp(6) without time zone NOT NULL,
+    content_encoding character varying,
+    content_media_type character varying,
+    content_text text,
+    content_base64 text,
+    content_sha256 character varying,
+    content_byte_size bigint
+);
+
+
+--
+-- Name: coordinator_search_input(public.development_artifact_observations); Type: FUNCTION; Schema: public; Owner: -
+--
+
+CREATE FUNCTION public.coordinator_search_input(source public.development_artifact_observations) RETURNS jsonb
+    LANGUAGE sql IMMUTABLE PARALLEL SAFE
+    AS $$
+  SELECT jsonb_build_object('observation_id', (source).observation_id, 'updated_at', (source).updated_at,
+    'labels', (source).labels)
+$$;
+
+
+--
+-- Name: development_artifacts; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.development_artifacts (
+    artifact_id character varying NOT NULL,
+    captured_actor jsonb,
+    captured_at_domain timestamp(6) without time zone,
+    captured_at_store timestamp(6) without time zone,
+    captured_causation_id character varying,
+    captured_correlation_id character varying,
+    captured_event jsonb,
+    captured_global_position bigint,
+    captured_markers jsonb DEFAULT '[]'::jsonb NOT NULL,
+    captured_metadata jsonb DEFAULT '{}'::jsonb NOT NULL,
+    content_base64 text,
+    content_byte_size bigint,
+    content_encoding character varying,
+    content_media_type character varying,
+    content_sha256 character varying,
+    content_text text,
+    created_at timestamp(6) without time zone NOT NULL,
+    kind character varying,
+    labels jsonb DEFAULT '[]'::jsonb NOT NULL,
+    observed_sequence bigint NOT NULL,
+    scope text,
+    source_collector character varying,
+    source_kind character varying,
+    source_locator text,
+    source_observed_at timestamp(6) without time zone,
+    source_revision text,
+    title text,
+    updated_at timestamp(6) without time zone NOT NULL,
+    stream_revision bigint DEFAULT 0 NOT NULL
+);
+
+
+--
+-- Name: coordinator_search_input(public.development_artifacts); Type: FUNCTION; Schema: public; Owner: -
+--
+
+CREATE FUNCTION public.coordinator_search_input(source public.development_artifacts) RETURNS jsonb
+    LANGUAGE sql IMMUTABLE PARALLEL SAFE
+    AS $$
+  SELECT jsonb_build_object('artifact_id', (source).artifact_id, 'updated_at', (source).updated_at,
+    'labels', (source).labels)
+$$;
+
+
+--
+-- Name: coordinator_search_strings(jsonb, text[]); Type: FUNCTION; Schema: public; Owner: -
+--
+
+CREATE FUNCTION public.coordinator_search_strings(input jsonb, root_path text[]) RETURNS TABLE(value_path text[], value text)
+    LANGUAGE sql IMMUTABLE PARALLEL SAFE
+    AS $$
+  WITH RECURSIVE nodes(node, path) AS (
+    SELECT input, root_path
+    UNION ALL
+    SELECT child.node, nodes.path || child.key
+    FROM nodes
+    CROSS JOIN LATERAL (
+      SELECT item.value AS node, (item.ordinality - 1)::text AS key
+      FROM jsonb_array_elements(CASE WHEN jsonb_typeof(nodes.node) = 'array'
+        THEN nodes.node ELSE '[]'::jsonb END) WITH ORDINALITY AS item(value, ordinality)
+      UNION ALL
+      SELECT item.value, item.key
+      FROM jsonb_each(CASE WHEN jsonb_typeof(nodes.node) = 'object'
+        THEN nodes.node ELSE '{}'::jsonb END) AS item(key, value)
+    ) AS child
+  )
+  SELECT path, node #>> '{}' FROM nodes WHERE jsonb_typeof(node) = 'string'
+$$;
+
+
+--
+-- Name: coordinator_search_values_changed(); Type: FUNCTION; Schema: public; Owner: -
+--
+
+CREATE FUNCTION public.coordinator_search_values_changed() RETURNS trigger
+    LANGUAGE plpgsql
+    AS $$
+DECLARE
+  old_input jsonb;
+  new_input jsonb;
+  old_id text;
+  new_id text;
+  source_time timestamp;
+BEGIN
+  IF TG_OP = 'TRUNCATE' THEN
+    DELETE FROM coordinator_search_values WHERE source_table = TG_TABLE_NAME;
+    RETURN NULL;
+  END IF;
+  IF TG_OP = 'DELETE' THEN
+    CASE TG_TABLE_NAME
+      WHEN 'development_artifacts' THEN old_id := OLD.artifact_id;
+WHEN 'development_artifact_observations' THEN old_id := OLD.observation_id;
+WHEN 'agent_choices' THEN old_id := OLD.choice_id;
+WHEN 'decision_definitions' THEN old_id := OLD.decision_id;
+WHEN 'coordinator_contexts' THEN old_id := OLD.change_set_id;
+    END CASE;
+    DELETE FROM coordinator_search_values
+    WHERE source_table = TG_TABLE_NAME AND source_id = old_id;
+    RETURN NULL;
+  END IF;
+
+  new_input := coordinator_search_input(NEW);
+  new_id := new_input ->> TG_ARGV[0];
+  source_time := (new_input ->> 'updated_at')::timestamp;
+  IF TG_OP = 'UPDATE' THEN
+    old_input := coordinator_search_input(OLD);
+    old_id := old_input ->> TG_ARGV[0];
+    IF old_id IS DISTINCT FROM new_id THEN
+      DELETE FROM coordinator_search_values
+      WHERE source_table = TG_TABLE_NAME AND source_id = old_id;
+    ELSIF (old_input - 'updated_at') IS NOT DISTINCT FROM (new_input - 'updated_at') THEN
+      UPDATE coordinator_search_values SET updated_at = source_time
+      WHERE source_table = TG_TABLE_NAME AND source_id = new_id
+        AND updated_at IS DISTINCT FROM source_time;
+      RETURN NULL;
+    END IF;
+  END IF;
+  PERFORM coordinator_sync_search_values(TG_TABLE_NAME, new_id, new_input);
+  RETURN NULL;
+END
+$$;
+
+
+--
+-- Name: coordinator_sync_search_values(text, text, jsonb); Type: FUNCTION; Schema: public; Owner: -
+--
+
+CREATE FUNCTION public.coordinator_sync_search_values(owner_table text, owner_id text, source jsonb) RETURNS void
+    LANGUAGE plpgsql
+    AS $$
+BEGIN
+  DELETE FROM coordinator_search_values AS stored
+  WHERE stored.source_table = owner_table AND stored.source_id = owner_id
+    AND NOT EXISTS (
+      SELECT 1 FROM coordinator_extract_search_values(owner_table, source) AS desired
+      WHERE desired.field = stored.field AND desired.value_path = stored.value_path
+    );
+
+  INSERT INTO coordinator_search_values AS stored
+    (source_table, source_id, document_id, field, value_path, value, updated_at)
+  SELECT owner_table, owner_id, leaf.document_id, leaf.field, leaf.value_path, leaf.value,
+    (source ->> 'updated_at')::timestamp
+  FROM coordinator_extract_search_values(owner_table, source) AS leaf
+  ON CONFLICT (source_table, source_id, field, value_path) DO UPDATE
+    SET document_id = EXCLUDED.document_id, value = EXCLUDED.value, updated_at = EXCLUDED.updated_at
+    WHERE (stored.document_id, stored.value, stored.updated_at)
+      IS DISTINCT FROM (EXCLUDED.document_id, EXCLUDED.value, EXCLUDED.updated_at);
+END
+$$;
+
+
+--
+-- Name: agent_choice_impacts; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.agent_choice_impacts (
+    assessment_id character varying NOT NULL,
+    accepted_choice jsonb NOT NULL,
+    assessed_at_domain timestamp(6) without time zone NOT NULL,
+    assessed_at_store timestamp(6) without time zone NOT NULL,
+    assessment jsonb NOT NULL,
+    assessment_actor jsonb NOT NULL,
+    assessment_event jsonb NOT NULL,
+    attempt_id character varying NOT NULL,
+    causation_id character varying,
+    choice_id character varying NOT NULL,
+    correlation_id character varying,
+    created_at timestamp(6) without time zone NOT NULL,
+    decision_change jsonb NOT NULL,
+    event_global_position bigint NOT NULL,
+    markers jsonb DEFAULT '[]'::jsonb NOT NULL,
+    metadata jsonb DEFAULT '{}'::jsonb NOT NULL,
+    outcome character varying NOT NULL,
+    policy_version character varying NOT NULL,
+    reason character varying NOT NULL,
+    source_actor jsonb NOT NULL,
     updated_at timestamp(6) without time zone NOT NULL
 );
 
@@ -426,21 +695,6 @@ CREATE TABLE public.command_receipts (
 
 
 --
--- Name: coordinator_contexts; Type: TABLE; Schema: public; Owner: -
---
-
-CREATE TABLE public.coordinator_contexts (
-    change_set_id character varying NOT NULL,
-    created_at timestamp(6) without time zone NOT NULL,
-    document jsonb DEFAULT '{}'::jsonb NOT NULL,
-    last_processed_at timestamp(6) without time zone NOT NULL,
-    projection_version integer NOT NULL,
-    source_positions jsonb DEFAULT '[]'::jsonb NOT NULL,
-    updated_at timestamp(6) without time zone NOT NULL
-);
-
-
---
 -- Name: coordination_dashboard_work_items; Type: VIEW; Schema: public; Owner: -
 --
 
@@ -567,57 +821,6 @@ CREATE SEQUENCE public.coordinator_search_values_id_seq
 --
 
 ALTER SEQUENCE public.coordinator_search_values_id_seq OWNED BY public.coordinator_search_values.id;
-
-
---
--- Name: decision_definitions; Type: TABLE; Schema: public; Owner: -
---
-
-CREATE TABLE public.decision_definitions (
-    decision_id character varying NOT NULL,
-    acceptance_event jsonb NOT NULL,
-    activated_actor jsonb,
-    activated_at_domain timestamp(6) without time zone,
-    activated_at_store timestamp(6) without time zone,
-    activated_causation_id character varying,
-    activated_correlation_id character varying,
-    activated_event jsonb,
-    activated_markers jsonb,
-    activated_metadata jsonb,
-    classifier jsonb NOT NULL,
-    corrected_actor jsonb,
-    corrected_at_domain timestamp(6) without time zone,
-    corrected_at_store timestamp(6) without time zone,
-    corrected_causation_id character varying,
-    corrected_correlation_id character varying,
-    corrected_event jsonb,
-    corrected_markers jsonb DEFAULT '[]'::jsonb NOT NULL,
-    corrected_metadata jsonb DEFAULT '{}'::jsonb NOT NULL,
-    correction_count integer DEFAULT 0 NOT NULL,
-    correction_rationale jsonb,
-    created_at timestamp(6) without time zone NOT NULL,
-    definition jsonb NOT NULL,
-    definition_digest character varying NOT NULL,
-    interpretation_id character varying NOT NULL,
-    partitions jsonb DEFAULT '[]'::jsonb NOT NULL,
-    policy_status character varying NOT NULL,
-    previous_definition_digest character varying,
-    proposal_event jsonb NOT NULL,
-    rationale jsonb,
-    recorded_actor jsonb NOT NULL,
-    recorded_at_domain timestamp(6) without time zone NOT NULL,
-    recorded_at_store timestamp(6) without time zone NOT NULL,
-    recorded_causation_id character varying,
-    recorded_correlation_id character varying,
-    recorded_event jsonb NOT NULL,
-    recorded_markers jsonb DEFAULT '[]'::jsonb NOT NULL,
-    recorded_metadata jsonb DEFAULT '{}'::jsonb NOT NULL,
-    scope_provenance jsonb NOT NULL,
-    slot jsonb,
-    source_event jsonb NOT NULL,
-    source_message_id character varying NOT NULL,
-    updated_at timestamp(6) without time zone NOT NULL
-);
 
 
 --
@@ -777,55 +980,6 @@ CREATE TABLE public.development_artifact_observation_fact_links (
 
 
 --
--- Name: development_artifact_observations; Type: TABLE; Schema: public; Owner: -
---
-
-CREATE TABLE public.development_artifact_observations (
-    observation_id character varying NOT NULL,
-    artifact_id character varying,
-    classification_reason text,
-    classification_revision integer DEFAULT 1 CONSTRAINT development_artifact_observati_classification_revision_not_null NOT NULL,
-    classified_actor jsonb,
-    classified_at_domain timestamp(6) without time zone,
-    classified_at_store timestamp(6) without time zone,
-    classified_causation_id character varying,
-    classified_correlation_id character varying,
-    classified_event jsonb,
-    classified_global_position bigint,
-    classified_markers jsonb DEFAULT '[]'::jsonb NOT NULL,
-    classified_metadata jsonb DEFAULT '{}'::jsonb NOT NULL,
-    created_at timestamp(6) without time zone NOT NULL,
-    current_global_position bigint CONSTRAINT development_artifact_observati_current_global_position_not_null NOT NULL,
-    kind character varying,
-    labels jsonb DEFAULT '[]'::jsonb NOT NULL,
-    observed_actor jsonb,
-    observed_at_domain timestamp(6) without time zone,
-    observed_at_store timestamp(6) without time zone,
-    observed_causation_id character varying,
-    observed_correlation_id character varying,
-    observed_event jsonb,
-    observed_global_position bigint,
-    observed_markers jsonb DEFAULT '[]'::jsonb NOT NULL,
-    observed_metadata jsonb DEFAULT '{}'::jsonb NOT NULL,
-    observed_sequence bigint NOT NULL,
-    scope text,
-    source_collector character varying,
-    source_kind character varying,
-    source_locator text,
-    source_observed_at timestamp(6) without time zone,
-    source_revision text,
-    title text,
-    updated_at timestamp(6) without time zone NOT NULL,
-    content_encoding character varying,
-    content_media_type character varying,
-    content_text text,
-    content_base64 text,
-    content_sha256 character varying,
-    content_byte_size bigint
-);
-
-
---
 -- Name: development_artifact_observations_observed_sequence_seq; Type: SEQUENCE; Schema: public; Owner: -
 --
 
@@ -935,43 +1089,6 @@ CREATE SEQUENCE public.development_artifact_relations_observed_sequence_seq
 --
 
 ALTER SEQUENCE public.development_artifact_relations_observed_sequence_seq OWNED BY public.development_artifact_relations.observed_sequence;
-
-
---
--- Name: development_artifacts; Type: TABLE; Schema: public; Owner: -
---
-
-CREATE TABLE public.development_artifacts (
-    artifact_id character varying NOT NULL,
-    captured_actor jsonb,
-    captured_at_domain timestamp(6) without time zone,
-    captured_at_store timestamp(6) without time zone,
-    captured_causation_id character varying,
-    captured_correlation_id character varying,
-    captured_event jsonb,
-    captured_global_position bigint,
-    captured_markers jsonb DEFAULT '[]'::jsonb NOT NULL,
-    captured_metadata jsonb DEFAULT '{}'::jsonb NOT NULL,
-    content_base64 text,
-    content_byte_size bigint,
-    content_encoding character varying,
-    content_media_type character varying,
-    content_sha256 character varying,
-    content_text text,
-    created_at timestamp(6) without time zone NOT NULL,
-    kind character varying,
-    labels jsonb DEFAULT '[]'::jsonb NOT NULL,
-    observed_sequence bigint NOT NULL,
-    scope text,
-    source_collector character varying,
-    source_kind character varying,
-    source_locator text,
-    source_observed_at timestamp(6) without time zone,
-    source_revision text,
-    title text,
-    updated_at timestamp(6) without time zone NOT NULL,
-    stream_revision bigint DEFAULT 0 NOT NULL
-);
 
 
 --
@@ -3242,6 +3359,7 @@ ALTER TABLE ONLY public.operation_batch_outcomes
 SET search_path TO "$user", public;
 
 INSERT INTO "schema_migrations" (version) VALUES
+('20261011053000'),
 ('20261010105000'),
 ('20261010081200'),
 ('20261010081130'),

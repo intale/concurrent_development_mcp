@@ -33,6 +33,15 @@ Feature: Development Artifact repository
 
   Rule: Artifact properties evolve through cohesive facts under one stable identity
 
+    @artifact-projection-performance @event-contract
+    Scenario: Replayed classification corrections preserve a large body and provenance
+      Given a large passive Artifact and its original observation have reached the read side
+      When the agent corrects only its title and labels and replays the same MCP command
+      And the changed Artifact observation reaches the read side after a subscription restart
+      Then one metadata update Task and one command lifecycle exist
+      And its body and original provenance remain byte-exact
+      And search exposes the current labels and their native update timestamp
+
     @CONTENT-BINARY-01 @event-contract
     Scenario: A binary profile changes content and provenance without changing identity
       Given the agent has captured and projected a binary profile

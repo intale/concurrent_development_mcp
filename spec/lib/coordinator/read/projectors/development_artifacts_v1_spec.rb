@@ -231,6 +231,132 @@ RSpec.describe Coordinator::Read::Projectors::DevelopmentArtifactsV1, :read_mode
     expect(classified.retrieval_actions.first.arguments.observation_id).to eq(second_observation.observation_id)
   end
 
+  it "loads only the changed property and guards while preserving large bodies and provenance" do
+    body = "large passive evidence\n" * 50_000
+    timestamp = Time.utc(2026, 1, 1)
+    artifact = create(:coordinator_read_development_artifact,
+      content_text: body, content_byte_size: body.bytesize, updated_at: timestamp)
+    observation = create(:coordinator_read_development_artifact_observation, artifact:, updated_at: timestamp)
+    original_artifact = artifact.attributes.slice("content_text", "source_locator", "captured_metadata")
+    original_observation = observation.attributes.slice("content_text", "source_locator", "observed_metadata")
+    fact = append_facts(streams.development_artifact(artifact.artifact_id), [
+      Coordinator::Write::Events::DevelopmentArtifactTitleChangedV1.new(
+        artifact_id: artifact.artifact_id, title: "Changed title only"
+      )
+    ]).sole
+    link = link_facts([ fact ], observation.observation_id, artifact.artifact_id).sole
+    queries = []
+    capture = ->(_name, _start, _finish, _id, payload) { queries << payload.fetch(:sql) }
+
+    ActiveSupport::Notifications.subscribed(capture, "sql.active_record") do
+      projector.call(fact)
+      projector.call(link)
+    end
+
+    projections = queries.grep(/\ASELECT.*FROM "development_artifact(?:s|_observations|_observation_fact_links)"/)
+    expect(projections.length).to eq(3)
+    expect(projections.join("\n")).not_to include('.*', '"content_text"', '"content_base64"', '"observed_fact_data"')
+    expect(artifact.reload.attributes.slice(*original_artifact.keys)).to eq(original_artifact)
+    expect(observation.reload.attributes.slice(*original_observation.keys)).to eq(original_observation)
+    expect(artifact).to have_attributes(title: "Changed title only", updated_at: fact.created_at)
+    expect(observation).to have_attributes(title: "Changed title only", updated_at: link.created_at)
+  end
+
+  it "resolves an immutable linked fact before opening the projection transaction and skips its redelivery" do
+    artifact = create(:coordinator_read_development_artifact)
+    observation = create(:coordinator_read_development_artifact_observation, artifact:)
+    fact = append_facts(streams.development_artifact(artifact.artifact_id), [
+      Coordinator::Write::Events::DevelopmentArtifactTitleChangedV1.new(artifact_id: artifact.artifact_id, title: "Linked title")
+    ]).sole
+    link = link_facts([ fact ], observation.observation_id, artifact.artifact_id).sole
+    reads = []
+    store = event_store
+    transaction_depth = ApplicationRecord.connection.open_transactions
+    trace = TracePoint.new(:call) do |point|
+      if point.defined_class == Coordinator::Write::EventStore && point.method_id == :read_at && point.self.equal?(store)
+        reads << ApplicationRecord.connection.open_transactions
+      end
+    end
+
+    trace.enable { 2.times { projector.call(link) } }
+
+    expect(reads).to eq([ transaction_depth ])
+    expect(processed_events.where(event_id: link.id).count).to eq(1)
+    expect(Coordinator::Read::DevelopmentArtifactObservationFactLink.where(link_event_id: link.id).count).to eq(1)
+    expect(observation.reload.title).to eq("Linked title")
+  end
+
+  it "rejects an invalid immutable reference before claiming or changing projections" do
+    artifact = create(:coordinator_read_development_artifact)
+    observation = create(:coordinator_read_development_artifact_observation, artifact:)
+    reference = Coordinator::Write::EventReference.new(
+      event_id: SecureRandom.uuid_v7, type: "DevelopmentArtifactTitleChanged",
+      stream_context: "DevelopmentMemory", stream_name: "DevelopmentArtifact",
+      stream_id: artifact.artifact_id, stream_revision: 0
+    )
+    link = observation_stream_event(
+      Coordinator::Write::Events::DevelopmentArtifactObservationFactLinkedV1.new(
+        observation_id: observation.observation_id, artifact_id: artifact.artifact_id, role: "title", observed_fact: reference
+      ), observation_id: observation.observation_id, revision: 1, position: 1
+    )
+    original = observation.attributes
+
+    expect { projector.call(link) }.to raise_error(Coordinator::Read::InvalidProjectionSource, /could not be resolved/)
+    expect(processed_events.where(event_id: link.id)).not_to exist
+    expect(Coordinator::Read::DevelopmentArtifactObservationFactLink.where(link_event_id: link.id)).not_to exist
+    expect(observation.reload.attributes).to eq(original)
+  end
+
+  it "rolls back the claim and all link mutations if the observation identity is inconsistent" do
+    artifact = create(:coordinator_read_development_artifact)
+    observation = create(:coordinator_read_development_artifact_observation)
+    fact = append_facts(streams.development_artifact(artifact.artifact_id), [
+      Coordinator::Write::Events::DevelopmentArtifactTitleChangedV1.new(artifact_id: artifact.artifact_id, title: "Wrong identity")
+    ]).sole
+    link = link_facts([ fact ], observation.observation_id, artifact.artifact_id).sole
+    original = observation.attributes
+
+    expect { projector.call(link) }.to raise_error(Coordinator::Read::ProjectionStateError, /changed identity/)
+    expect(processed_events.where(event_id: link.id)).not_to exist
+    expect(Coordinator::Read::DevelopmentArtifactObservationFactLink.where(link_event_id: link.id)).not_to exist
+    expect(observation.reload.attributes).to eq(original)
+  end
+
+  it "atomically folds one link when two first deliveries race after resolving the fact" do
+    artifact = create(:coordinator_read_development_artifact)
+    observation = create(:coordinator_read_development_artifact_observation, artifact:)
+    fact = append_facts(streams.development_artifact(artifact.artifact_id), [
+      Coordinator::Write::Events::DevelopmentArtifactLabelAddedV1.new(artifact_id: artifact.artifact_id, label: "concurrent")
+    ]).sole
+    link = link_facts([ fact ], observation.observation_id, artifact.artifact_id).sole
+    shared_projector = projector
+    entered = Queue.new
+    release = Queue.new
+    trace = TracePoint.new(:call) do |point|
+      if point.defined_class == Coordinator::Read::Repositories::ProcessedProjectionEvents && point.method_id == :claim
+        entered << true
+        release.pop
+      end
+    end
+    workers = []
+    trace.enable
+    workers = 2.times.map do
+      Thread.new { ApplicationRecord.connection_pool.with_connection { shared_projector.call(link) } }
+    end
+    Timeout.timeout(5) { 2.times { entered.pop } }
+    2.times { release << true }
+    workers.each(&:value)
+    trace.disable
+
+    expect(processed_events.where(event_id: link.id).count).to eq(1)
+    expect(Coordinator::Read::DevelopmentArtifactObservationFactLink.where(link_event_id: link.id).count).to eq(1)
+    expect(observation.reload.labels.count("concurrent")).to eq(1)
+  ensure
+    trace&.disable
+    2.times { release << true } if release
+    workers&.each { _1.join(5) }
+  end
+
   it "rejects superseded relation schema before claiming or writing a projection" do
     payload = relation_payload(source: SecureRandom.uuid_v7, target: SecureRandom.uuid_v7)
     event = relation_event(payload, revision: 0, position: 1)

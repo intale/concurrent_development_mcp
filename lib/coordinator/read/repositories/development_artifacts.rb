@@ -11,6 +11,8 @@ module Coordinator::Read
         "GREATEST(#{RELATION_OBSERVED_SEQUENCE_SQL}, " \
         "COALESCE(#{SUPERSESSION_OBSERVED_SEQUENCE_SQL}, 0))"
       OBSERVATION_TABLE_SQL = "development_artifact_observations"
+      ARTIFACT_PROJECTION_COLUMNS = %i[artifact_id stream_revision updated_at].freeze
+      OBSERVATION_PROJECTION_COLUMNS = %i[observation_id artifact_id current_global_position updated_at].freeze
 
       def initialize(
         relation_registry: Coordinator::Shared::DevelopmentArtifactRelationRegistry.new,
@@ -36,9 +38,7 @@ module Coordinator::Read
       # The write-side event data remains cohesive; this repository is the
       # read-side adapter that folds those facts into the current view.
       def store_created(event:, created:)
-        record = Coordinator::Read::DevelopmentArtifact.find_or_initialize_by(
-          artifact_id: created.artifact_id
-        )
+        record = artifact_projection(created.artifact_id, :captured_event)
         return record if record.persisted? && record.captured_event.present?
 
         record.assign_attributes(
@@ -58,7 +58,7 @@ module Coordinator::Read
       end
 
       def store_property(event:, fact:)
-        record = Coordinator::Read::DevelopmentArtifact.find_or_initialize_by(artifact_id: fact.artifact_id)
+        record = artifact_projection(fact.artifact_id, *property_columns(fact))
         attributes = case fact
         when Coordinator::Write::Events::DevelopmentArtifactScopeChangedV1
           { scope: fact.scope }
@@ -98,8 +98,8 @@ module Coordinator::Read
       end
 
       def store_observation_recorded(event:, recorded:)
-        record = Coordinator::Read::DevelopmentArtifactObservation.find_or_initialize_by(
-          observation_id: recorded.observation_id
+        record = observation_projection(
+          recorded.observation_id, :observed_event, :classified_event, :classification_revision
         )
         return record if record.observed_event&.fetch("event_id", nil) == event.id
 
@@ -123,8 +123,8 @@ module Coordinator::Read
         observation_id = correction.observation_id
         return unless observation_id
 
-        record = Coordinator::Read::DevelopmentArtifactObservation.find_or_initialize_by(
-          observation_id:
+        record = observation_projection(
+          observation_id, :classification_revision, :classified_event, :classification_reason
         )
         if record.artifact_id && record.artifact_id != correction.artifact_id
           raise ProjectionStateError, "Artifact classification changed observation identity"
@@ -152,16 +152,13 @@ module Coordinator::Read
       end
 
       def store_observation_fact_link(event:, link:, observed_fact_event:, observed_fact:)
-        record = Coordinator::Read::DevelopmentArtifactObservation.find_or_initialize_by(
-          observation_id: link.observation_id
-        )
+        record = observation_projection(link.observation_id, *property_columns(observed_fact))
         if record.artifact_id && record.artifact_id != link.artifact_id
           raise ProjectionStateError, "Artifact observation changed identity"
         end
 
-        link_record = Coordinator::Read::DevelopmentArtifactObservationFactLink.find_or_initialize_by(
-          link_event_id: event.id
-        )
+        link_record = Coordinator::Read::DevelopmentArtifactObservationFactLink
+          .select(:link_event_id).find_or_initialize_by(link_event_id: event.id)
         return record if link_record.persisted?
 
         link_record.assign_attributes(
@@ -573,6 +570,39 @@ module Coordinator::Read
 
       def observed_evidence_attributes(event, occurred_at:)
         evidence_attributes(event, prefix: "observed", occurred_at:)
+      end
+
+      # Projection mutations load guards and the property they change, not
+      # unrelated content or provenance. Reading the changed property retains
+      # dirty tracking (especially for an unchanged large content fact).
+      def artifact_projection(artifact_id, *columns)
+        Coordinator::Read::DevelopmentArtifact.select(*ARTIFACT_PROJECTION_COLUMNS, *columns)
+          .find_or_initialize_by(artifact_id:)
+      end
+
+      def observation_projection(observation_id, *columns)
+        Coordinator::Read::DevelopmentArtifactObservation.select(*OBSERVATION_PROJECTION_COLUMNS, *columns)
+          .find_or_initialize_by(observation_id:)
+      end
+
+      def property_columns(fact)
+        case fact
+        when Coordinator::Write::Events::DevelopmentArtifactScopeChangedV1
+          %i[scope]
+        when Coordinator::Write::Events::DevelopmentArtifactTitleChangedV1
+          %i[title]
+        when Coordinator::Write::Events::DevelopmentArtifactKindChangedV1
+          %i[kind]
+        when Coordinator::Write::Events::DevelopmentArtifactLabelAddedV1,
+             Coordinator::Write::Events::DevelopmentArtifactLabelRemovedV1
+          %i[labels]
+        when Coordinator::Write::Events::DevelopmentArtifactSourceChangedV1
+          %i[source_kind source_locator source_revision source_observed_at source_collector]
+        when Coordinator::Write::Events::DevelopmentArtifactContentChangedV1
+          %i[content_encoding content_media_type content_text content_base64 content_sha256 content_byte_size]
+        else
+          []
+        end
       end
 
       def classified_evidence_attributes(event, occurred_at:)

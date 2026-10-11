@@ -23,6 +23,14 @@ module Coordinator::Read
         domain_event = load_domain_event(event)
         verify_stream_identity!(event, domain_event)
         identity = ProjectionEventIdentity.from_event(event)
+        observed_fact = nil
+        if domain_event.is_a?(Coordinator::Write::Events::DevelopmentArtifactObservationFactLinkedV1)
+          # A read-only duplicate fast path avoids fetching the immutable fact
+          # again. The claim inside the transaction still arbitrates races.
+          return if @processed_events.claimed?(definition: PROJECTION, identity:)
+
+          observed_fact = resolve_observed_fact(domain_event)
+        end
 
         ApplicationRecord.transaction do
           next unless @processed_events.claim(
@@ -31,7 +39,7 @@ module Coordinator::Read
             processed_at: event.created_at
           )
 
-          project(event, domain_event)
+          project(event, domain_event, observed_fact:)
         end
 
         nil
@@ -89,7 +97,7 @@ module Coordinator::Read
         raise InvalidProjectionSource, "Artifact payload does not match its source stream"
       end
 
-      def project(event, domain_event)
+      def project(event, domain_event, observed_fact:)
         case domain_event
         when Coordinator::Write::Events::DevelopmentArtifactCreatedV1
             @artifacts.store_created(event:, created: domain_event)
@@ -104,7 +112,7 @@ module Coordinator::Read
         when Coordinator::Write::Events::DevelopmentArtifactObservationRecordedV1
             @artifacts.store_observation_recorded(event:, recorded: domain_event)
         when Coordinator::Write::Events::DevelopmentArtifactObservationFactLinkedV1
-            fact_event, fact = resolve_observed_fact(domain_event)
+            fact_event, fact = observed_fact
             @artifacts.store_observation_fact_link(
               event:,
               link: domain_event,

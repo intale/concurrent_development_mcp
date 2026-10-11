@@ -32,7 +32,7 @@ module Coordinator::Read::Repositories
           )
           unless locked_ids.empty?
             connection.execute(<<~SQL)
-              SELECT coordinator_sync_search_values('#{table}', #{key}, to_jsonb(source))
+              SELECT coordinator_sync_search_values('#{table}', #{key}, coordinator_search_input(source))
               FROM #{table} AS source
               WHERE #{key} IN (#{locked_ids.map { connection.quote(_1) }.join(',')})
               ORDER BY #{key}

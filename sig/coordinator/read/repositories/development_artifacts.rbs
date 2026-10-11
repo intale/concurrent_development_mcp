@@ -2,7 +2,10 @@ module Coordinator
   module Read
     module Repositories
       class DevelopmentArtifacts
-        def initialize: (?relation_registry: Shared::DevelopmentArtifactRelationRegistry, ?follow_action: DevelopmentArtifactRelationFollowAction) -> void
+        ARTIFACT_PROJECTION_COLUMNS: Array[Symbol]
+        OBSERVATION_PROJECTION_COLUMNS: Array[Symbol]
+
+        def initialize: (?relation_registry: Shared::DevelopmentArtifactRelationRegistry, ?follow_action: DevelopmentArtifactRelationFollowAction, ?projection_timestamp: ProjectionTimestamp) -> void
         def fetch: (String artifact_id, ?observation_id: String?) -> DevelopmentArtifactViewV1?
         def fetch_content: (String artifact_id, ?observation_id: String?) -> (DevelopmentArtifactTextContentViewV2 | DevelopmentArtifactBinaryContentViewV2)?
         def page: (DevelopmentArtifactListQueryV1 query) -> DevelopmentArtifactPageV1
@@ -20,6 +23,12 @@ module Coordinator
         ) -> DevelopmentArtifactObservation
         def store_relation_v2: (event: PgEventstore::Event, declaration: Write::Events::DevelopmentArtifactRelationDeclaredV2) -> DevelopmentArtifactRelation
         def store_supersession_v2: (event: PgEventstore::Event, supersession: Write::Events::DevelopmentArtifactRelationSupersededV2) -> DevelopmentArtifactRelationSupersession?
+
+        private
+
+        def artifact_projection: (String artifact_id, *Symbol columns) -> DevelopmentArtifact
+        def observation_projection: (String observation_id, *Symbol columns) -> DevelopmentArtifactObservation
+        def property_columns: (Write::Events::Base fact) -> Array[Symbol]
       end
     end
   end

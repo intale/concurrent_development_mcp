@@ -26,6 +26,14 @@ module Coordinator::Read
         barriers.reject { processed?(definition:, barrier: _1) }.freeze
       end
 
+      def claimed?(definition:, identity:)
+        Coordinator::Read::ProcessedProjectionEvent.exists?(
+          projection_name: definition.name,
+          projection_version: definition.version,
+          event_id: identity.event_id
+        )
+      end
+
       def processed?(definition:, barrier:)
         Coordinator::Read::ProcessedProjectionEvent.exists?(
           projection_name: definition.name,
