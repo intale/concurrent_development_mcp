@@ -1,0 +1,12 @@
+# OTLP push only; no app scrape endpoint or Collector is required.
+global:
+  evaluation_interval: 15s
+otlp:
+  translation_strategy: UnderscoreEscapingWithSuffixes
+  promote_resource_attributes:
+    - service.name
+    - service.instance.id
+    - service.version
+    - deployment.environment.name
+    - coordinator.process.role
+scrape_configs: []

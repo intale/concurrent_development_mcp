@@ -4,6 +4,7 @@ set -euo pipefail
 cd "$(dirname "$0")/.."
 production_env_file="${PRODUCTION_ENV_FILE:-.env.production}"
 production_project="${PRODUCTION_COMPOSE_PROJECT:-concurrent-development-mcp-production}"
+production_start_observability="${PRODUCTION_START_OBSERVABILITY:-1}"
 
 if [ ! -r "$production_env_file" ]; then
   echo "Create a readable $production_env_file from config/production.env.example first" >&2
@@ -11,6 +12,10 @@ if [ ! -r "$production_env_file" ]; then
 fi
 if ! [[ "$production_project" =~ ^[a-z0-9][a-z0-9_-]*$ ]]; then
   echo "PRODUCTION_COMPOSE_PROJECT must be a valid lowercase Compose project name" >&2
+  exit 64
+fi
+if ! [[ "$production_start_observability" =~ ^[01]$ ]]; then
+  echo "PRODUCTION_START_OBSERVABILITY must be 0 or 1" >&2
   exit 64
 fi
 
@@ -41,3 +46,12 @@ trap 'exit 143' TERM
 # already exited successfully. Any failure exits before consumers are started.
 "${production_compose[@]}" run --rm --no-deps prepare
 "${production_compose[@]}" up -d --no-deps --force-recreate --wait --wait-timeout 120 "${production_compose_services[@]}"
+
+# Backend outages must not gate Rails availability. Recreate these services too
+# so edited retention/credentials are loaded on every deploy. Tests skip startup
+# explicitly; they observe the SDK adapters instead of contacting real sinks.
+if [ "$production_start_observability" = "1" ]; then
+  if ! "${production_compose[@]}" up -d --no-deps --force-recreate --wait --wait-timeout 60 prometheus tempo grafana; then
+    echo "Application deployed; observability backend startup failed. Inspect Compose logs and retry those services." >&2
+  fi
+fi

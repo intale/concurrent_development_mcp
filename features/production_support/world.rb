@@ -31,7 +31,9 @@ module ProductionDeploymentWorld
       "QUEUE_DATABASE_NAME" => "concurrent_development_mcp_production_queue",
       "PG_EVENTSTORE_DATABASE_NAME" => "eventstore_production",
       "POSTGRES_HOST_PORT" => "16435", "PGBOUNCER_HOST_PORT" => "16436", "MCP_HOST_PORT" => "18088",
-      "COORDINATOR_IMAGE" => "concurrent-development-mcp:production-acceptance"
+      "COORDINATOR_IMAGE" => "concurrent-development-mcp:production-acceptance",
+      "PRODUCTION_START_OBSERVABILITY" => "0", "COORDINATOR_OBSERVABILITY_ENABLED" => "false",
+      "GRAFANA_ADMIN_PASSWORD" => "adapter-only-production-fixture"
     }
     @production_request_sequence = 0
     @production_actor = { kind: "agent", id: @production_project }
@@ -55,6 +57,7 @@ module ProductionDeploymentWorld
   end
 
   def production_write_settings(settings)
+    settings = settings.merge("COORDINATOR_OBSERVABILITY_ENABLED" => "false")
     @production_environment_file.rewind
     @production_environment_file.truncate(0)
     @production_environment_file.write(settings.map { |key, value| "#{key}=#{value}\n" }.join)

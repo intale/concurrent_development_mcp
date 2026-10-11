@@ -25,6 +25,11 @@ x-application: &application
     PG_EVENTSTORE_POOL: ${PG_EVENTSTORE_POOL:-15}
     RAILS_MAX_THREADS: ${RAILS_MAX_THREADS:-3}
     JOB_CONCURRENCY: ${JOB_CONCURRENCY:-1}
+    COORDINATOR_OBSERVABILITY_ENABLED: ${COORDINATOR_OBSERVABILITY_ENABLED:-true}
+    OTEL_SERVICE_NAME: ${OTEL_SERVICE_NAME:-concurrent-development-coordinator}
+    COORDINATOR_SERVICE_VERSION: ${COORDINATOR_SERVICE_VERSION:-production}
+    OTEL_EXPORTER_OTLP_TRACES_ENDPOINT: ${OTEL_EXPORTER_OTLP_TRACES_ENDPOINT:-http://tempo:4318/v1/traces}
+    OTEL_EXPORTER_OTLP_METRICS_ENDPOINT: ${OTEL_EXPORTER_OTLP_METRICS_ENDPOINT:-http://prometheus:9090/api/v1/otlp/v1/metrics}
   depends_on:
     pgbouncer:
       condition: service_healthy
@@ -107,10 +112,16 @@ services:
       dockerfile: Dockerfile
     restart: "no"
     command: ["./bin/prepare-production"]
+    environment:
+      <<: *application-environment
+      COORDINATOR_OBSERVABILITY_ENABLED: "false"
 
   web:
     <<: *consumer
     command: ["./bin/thrust", "./bin/rails", "server", "-b", "0.0.0.0"]
+    environment:
+      <<: *application-environment
+      COORDINATOR_OBSERVABILITY_ROLE: web
     ports:
       - "127.0.0.1:${MCP_HOST_PORT:-8088}:80"
     healthcheck:
@@ -122,6 +133,9 @@ services:
 
   subscription-process-managers:
     <<: *consumer
+    environment:
+      <<: *application-environment
+      COORDINATOR_OBSERVABILITY_ROLE: process_managers
     command:
       - bundle
       - exec
@@ -135,6 +149,9 @@ services:
 
   subscription-task-results:
     <<: *consumer
+    environment:
+      <<: *application-environment
+      COORDINATOR_OBSERVABILITY_ROLE: task_results
     command:
       - bundle
       - exec
@@ -148,6 +165,9 @@ services:
 
   subscription-read-models:
     <<: *consumer
+    environment:
+      <<: *application-environment
+      COORDINATOR_OBSERVABILITY_ROLE: read_models
     command:
       - bundle
       - exec
@@ -162,3 +182,52 @@ services:
   jobs:
     <<: *consumer
     command: ["./bin/jobs"]
+    environment:
+      <<: *application-environment
+      COORDINATOR_OBSERVABILITY_ROLE: jobs
+
+  prometheus:
+    image: prom/prometheus:v3.13.4
+    restart: unless-stopped
+    command:
+      - --config.file=/etc/prometheus/prometheus.yml
+      - --storage.tsdb.path=/prometheus
+      - --web.enable-otlp-receiver
+      - --storage.tsdb.retention.time=${PROMETHEUS_RETENTION_TIME:-15d}
+      - --storage.tsdb.retention.size=${PROMETHEUS_RETENTION_SIZE:-10GB}
+    volumes:
+      - ./config/observability/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - prometheus_data:/prometheus
+
+  tempo:
+    image: grafana/tempo:3.1.0
+    restart: unless-stopped
+    stop_grace_period: 60s
+    command: ["-config.file=/etc/tempo/tempo.yml", "-config.expand-env=true", "-target=all"]
+    environment:
+      TEMPO_RETENTION: ${TEMPO_RETENTION:-168h}
+    volumes:
+      - ./config/observability/tempo.yml:/etc/tempo/tempo.yml:ro
+      - tempo_data:/var/tempo
+
+  grafana:
+    image: grafana/grafana:13.2.3
+    restart: unless-stopped
+    environment:
+      GF_SECURITY_ADMIN_USER: ${GRAFANA_ADMIN_USER:-admin}
+      GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_ADMIN_PASSWORD:?Set GRAFANA_ADMIN_PASSWORD in the production environment file}
+      GF_AUTH_ANONYMOUS_ENABLED: "false"
+      GF_USERS_ALLOW_SIGN_UP: "false"
+      GF_ANALYTICS_REPORTING_ENABLED: "false"
+      GF_ANALYTICS_CHECK_FOR_UPDATES: "false"
+    ports:
+      - "127.0.0.1:${GRAFANA_HOST_PORT:-8089}:3000"
+    volumes:
+      - grafana_data:/var/lib/grafana
+      - ./config/observability/grafana/provisioning:/etc/grafana/provisioning:ro
+      - ./config/observability/grafana/dashboards:/var/lib/grafana/coordinator-dashboards:ro
+
+volumes:
+  prometheus_data:
+  tempo_data:
+  grafana_data:

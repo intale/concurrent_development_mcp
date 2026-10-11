@@ -25,3 +25,50 @@ services:
       - 6432:5432
     depends_on:
       - postgres
+  prometheus:
+    image: prom/prometheus:v3.13.4
+    restart: unless-stopped
+    command:
+      - --config.file=/etc/prometheus/prometheus.yml
+      - --storage.tsdb.path=/prometheus
+      - --web.enable-otlp-receiver
+      - --storage.tsdb.retention.time=${PROMETHEUS_RETENTION_TIME:-15d}
+      - --storage.tsdb.retention.size=${PROMETHEUS_RETENTION_SIZE:-10GB}
+    ports:
+      - "${PROMETHEUS_HOST_PORT:-9090}:9090"
+    volumes:
+      - ./config/observability/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - prometheus_data:/prometheus
+  tempo:
+    image: grafana/tempo:3.1.0
+    restart: unless-stopped
+    stop_grace_period: 60s
+    command: ["-config.file=/etc/tempo/tempo.yml", "-config.expand-env=true", "-target=all"]
+    environment:
+      TEMPO_RETENTION: ${TEMPO_RETENTION:-168h}
+    ports:
+      - "${TEMPO_OTLP_HOST_PORT:-4318}:4318"
+    volumes:
+      - ./config/observability/tempo.yml:/etc/tempo/tempo.yml:ro
+      - tempo_data:/var/tempo
+  grafana:
+    image: grafana/grafana:13.2.3
+    restart: unless-stopped
+    environment:
+      GF_SECURITY_ADMIN_USER: ${GRAFANA_ADMIN_USER:-admin}
+      GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_ADMIN_PASSWORD:-admin}
+      GF_AUTH_ANONYMOUS_ENABLED: "false"
+      GF_USERS_ALLOW_SIGN_UP: "false"
+      GF_ANALYTICS_REPORTING_ENABLED: "false"
+      GF_ANALYTICS_CHECK_FOR_UPDATES: "false"
+    ports:
+      - "127.0.0.1:${GRAFANA_HOST_PORT:-1089}:3000"
+    volumes:
+      - grafana_data:/var/lib/grafana
+      - ./config/observability/grafana/provisioning:/etc/grafana/provisioning:ro
+      - ./config/observability/grafana/dashboards:/var/lib/grafana/coordinator-dashboards:ro
+
+volumes:
+  prometheus_data:
+  tempo_data:
+  grafana_data:

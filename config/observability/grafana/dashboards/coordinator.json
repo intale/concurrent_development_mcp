@@ -1,0 +1,448 @@
+{
+  "uid": "coordinator-observability",
+  "title": "Coordinator observability",
+  "description": "MCP dispatch, all subscription handlers, and actual Rails SQL. Acceptance is not completion; handler success is technical; delivery age includes replay.",
+  "schemaVersion": 41,
+  "version": 1,
+  "editable": false,
+  "tags": [
+    "coordinator",
+    "opentelemetry"
+  ],
+  "timezone": "browser",
+  "refresh": "10s",
+  "time": {
+    "from": "now-1h",
+    "to": "now"
+  },
+  "templating": {
+    "list": [
+      {
+        "name": "environment",
+        "type": "query",
+        "datasource": {
+          "type": "prometheus",
+          "uid": "coordinator-prometheus"
+        },
+        "query": "label_values({__name__=~\"coordinator_.*\"}, deployment_environment_name)",
+        "refresh": 1,
+        "multi": true,
+        "includeAll": true,
+        "allValue": ".*",
+        "current": {
+          "text": "All",
+          "value": "$__all"
+        }
+      },
+      {
+        "name": "role",
+        "type": "query",
+        "datasource": {
+          "type": "prometheus",
+          "uid": "coordinator-prometheus"
+        },
+        "query": "label_values({__name__=~\"coordinator_.*\"}, coordinator_process_role)",
+        "refresh": 1,
+        "multi": true,
+        "includeAll": true,
+        "allValue": ".*",
+        "current": {
+          "text": "All",
+          "value": "$__all"
+        }
+      }
+    ]
+  },
+  "panels": [
+    {
+      "id": 1,
+      "type": "timeseries",
+      "title": "MCP completions / second",
+      "description": "Async acceptance is distinct from later command execution.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "coordinator-prometheus"
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 0
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "ops",
+          "min": 0
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "table",
+          "placement": "bottom"
+        },
+        "tooltip": {
+          "mode": "multi"
+        }
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sum by (rpc_method, mcp_tool_name, outcome) (rate(coordinator_mcp_completed_total{deployment_environment_name=~\"$environment\",coordinator_process_role=~\"$role\"}[$__rate_interval]))",
+          "legendFormat": "{{rpc_method}} / {{mcp_tool_name}} / {{outcome}}"
+        }
+      ]
+    },
+    {
+      "id": 2,
+      "type": "timeseries",
+      "title": "MCP runtime p95",
+      "description": "Actual synchronous dispatch runtime; not the full Saga duration.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "coordinator-prometheus"
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 12,
+        "y": 0
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "s",
+          "min": 0
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "table",
+          "placement": "bottom"
+        },
+        "tooltip": {
+          "mode": "multi"
+        }
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "histogram_quantile(0.95, sum by (le, rpc_method, mcp_tool_name) (rate(coordinator_mcp_duration_seconds_bucket{deployment_environment_name=~\"$environment\",coordinator_process_role=~\"$role\"}[$__rate_interval])))",
+          "legendFormat": "{{rpc_method}} / {{mcp_tool_name}}"
+        }
+      ]
+    },
+    {
+      "id": 3,
+      "type": "timeseries",
+      "title": "MCP in flight",
+      "description": "Invocations currently executing.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "coordinator-prometheus"
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 8
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "min": 0
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "table",
+          "placement": "bottom"
+        },
+        "tooltip": {
+          "mode": "multi"
+        }
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sum by (rpc_method, mcp_tool_name) (coordinator_mcp_in_flight{deployment_environment_name=~\"$environment\",coordinator_process_role=~\"$role\"})",
+          "legendFormat": "{{rpc_method}} / {{mcp_tool_name}}"
+        }
+      ]
+    },
+    {
+      "id": 4,
+      "type": "timeseries",
+      "title": "Handler completions / second",
+      "description": "Technical handler success is not command business success. Redelivery counts as another invocation.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "coordinator-prometheus"
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 12,
+        "y": 8
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "ops",
+          "min": 0
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "table",
+          "placement": "bottom"
+        },
+        "tooltip": {
+          "mode": "multi"
+        }
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sum by (subscription_set, subscription_name, outcome) (rate(coordinator_subscription_completed_total{deployment_environment_name=~\"$environment\",coordinator_process_role=~\"$role\"}[$__rate_interval]))",
+          "legendFormat": "{{subscription_set}} / {{subscription_name}} / {{outcome}}"
+        }
+      ]
+    },
+    {
+      "id": 5,
+      "type": "timeseries",
+      "title": "Handler runtime p95",
+      "description": "Actual handler runtime, independent of event delivery age.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "coordinator-prometheus"
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 16
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "s",
+          "min": 0
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "table",
+          "placement": "bottom"
+        },
+        "tooltip": {
+          "mode": "multi"
+        }
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "histogram_quantile(0.95, sum by (le, subscription_set, subscription_name) (rate(coordinator_subscription_duration_seconds_bucket{deployment_environment_name=~\"$environment\",coordinator_process_role=~\"$role\"}[$__rate_interval])))",
+          "legendFormat": "{{subscription_set}} / {{subscription_name}}"
+        }
+      ]
+    },
+    {
+      "id": 6,
+      "type": "timeseries",
+      "title": "Handlers in flight",
+      "description": "Currently executing handlers; idle handlers are not stuck.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "coordinator-prometheus"
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 12,
+        "y": 16
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "min": 0
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "table",
+          "placement": "bottom"
+        },
+        "tooltip": {
+          "mode": "multi"
+        }
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sum by (subscription_set, subscription_name) (coordinator_subscription_in_flight{deployment_environment_name=~\"$environment\",coordinator_process_role=~\"$role\"})",
+          "legendFormat": "{{subscription_set}} / {{subscription_name}}"
+        }
+      ]
+    },
+    {
+      "id": 7,
+      "type": "timeseries",
+      "title": "Oldest unfinished handler",
+      "description": "Monotonic age of a real unfinished invocation. Zero after completion.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "coordinator-prometheus"
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 24
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "s",
+          "min": 0
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "table",
+          "placement": "bottom"
+        },
+        "tooltip": {
+          "mode": "multi"
+        }
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "max by (subscription_set, subscription_name) (coordinator_subscription_oldest_in_flight_seconds{deployment_environment_name=~\"$environment\",coordinator_process_role=~\"$role\"})",
+          "legendFormat": "{{subscription_set}} / {{subscription_name}}"
+        }
+      ]
+    },
+    {
+      "id": 8,
+      "type": "timeseries",
+      "title": "Event delivery age p95",
+      "description": "Creation-to-entry age includes intentional replay; it does not prove a stuck handler.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "coordinator-prometheus"
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 12,
+        "y": 24
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "s",
+          "min": 0
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "table",
+          "placement": "bottom"
+        },
+        "tooltip": {
+          "mode": "multi"
+        }
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "histogram_quantile(0.95, sum by (le, subscription_set, subscription_name) (rate(coordinator_subscription_delivery_age_seconds_bucket{deployment_environment_name=~\"$environment\",coordinator_process_role=~\"$role\"}[$__rate_interval])))",
+          "legendFormat": "{{subscription_set}} / {{subscription_name}}"
+        }
+      ]
+    },
+    {
+      "id": 9,
+      "type": "timeseries",
+      "title": "Rails SQL queries / second",
+      "description": "Physical Rails SQL only. Cache hits, schema housekeeping and direct pg_eventstore queries are excluded.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "coordinator-prometheus"
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 32
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "ops",
+          "min": 0
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "table",
+          "placement": "bottom"
+        },
+        "tooltip": {
+          "mode": "multi"
+        }
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sum by (db_operation_name, outcome) (rate(coordinator_sql_completed_total{deployment_environment_name=~\"$environment\",coordinator_process_role=~\"$role\"}[$__rate_interval]))",
+          "legendFormat": "{{db_operation_name}} / {{outcome}}"
+        }
+      ]
+    },
+    {
+      "id": 10,
+      "type": "timeseries",
+      "title": "Rails SQL runtime p95",
+      "description": "Actual query runtime. Sanitized statement text is available only on sampled Tempo spans.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "coordinator-prometheus"
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 12,
+        "y": 32
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "s",
+          "min": 0
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "table",
+          "placement": "bottom"
+        },
+        "tooltip": {
+          "mode": "multi"
+        }
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "histogram_quantile(0.95, sum by (le, db_operation_name) (rate(coordinator_sql_duration_seconds_bucket{deployment_environment_name=~\"$environment\",coordinator_process_role=~\"$role\"}[$__rate_interval])))",
+          "legendFormat": "{{db_operation_name}}"
+        }
+      ]
+    }
+  ]
+}

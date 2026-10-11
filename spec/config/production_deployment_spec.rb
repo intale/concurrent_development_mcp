@@ -14,4 +14,12 @@ RSpec.describe "production deployment preflight" do
     expect(status.exitstatus).to eq(64)
     expect(error).to include("valid lowercase Compose project name")
   end
+
+  it "rejects invalid observability startup overrides before invoking Compose" do
+    environment = { "PRODUCTION_ENV_FILE" => "/dev/null", "PRODUCTION_COMPOSE_PROJECT" => "observability-preflight-spec",
+                    "PRODUCTION_START_OBSERVABILITY" => "sometimes" }
+    _, error, status = Open3.capture3(environment, Rails.root.join("bin/deploy-production").to_s)
+    expect(status.exitstatus).to eq(64)
+    expect(error).to include("PRODUCTION_START_OBSERVABILITY must be 0 or 1")
+  end
 end

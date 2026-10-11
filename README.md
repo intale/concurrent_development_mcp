@@ -34,7 +34,7 @@ the standalone compiled React UI, three subscription processes, and a dedicated
 Solid Queue worker. There is no Node.js server in production.
 
 1. Copy `config/production.env.example` to `.env.production` and set
-   `POSTGRES_PASSWORD` and `SECRET_KEY_BASE` to independent random secrets.
+   `POSTGRES_PASSWORD`, `SECRET_KEY_BASE`, and `GRAFANA_ADMIN_PASSWORD` to independent random secrets.
    For example, `openssl rand -hex 32` generates a database password and
    `openssl rand -hex 64` generates a Rails secret. Keep this ignored file private
    (`chmod 600 .env.production`). Compose reads it directly; dotenv is not required.
@@ -93,6 +93,7 @@ credentials in an existing cluster; handle password changes explicitly.
 | UI | `http://127.0.0.1:8088/` |
 | MCP | `http://127.0.0.1:8088/mcp` |
 | Event-store administration | `http://127.0.0.1:8088/eventstore` |
+| Grafana administration and dashboards | `http://127.0.0.1:8089/` |
 | PostgreSQL | `127.0.0.1:6435` |
 | PgBouncer | `127.0.0.1:6436` |
 
@@ -134,6 +135,124 @@ not used. It checks preparation, pooled connections, assets, asynchronous MCP
 execution/projection, environment refresh, delayed expiry, failed deploy recovery,
 and data survival across redeployment/container recreation. This topology test runs serially;
 the ordinary application test suites retain their fifteen parallel workers.
+It explicitly disables telemetry and skips backend startup: tests never use real
+Prometheus, Grafana, or Tempo services.
+
+### Observability
+
+The application sends OTLP metrics directly to Prometheus and execution traces
+directly to Tempo; there is no Collector. Self-hosted Grafana queries both and
+requires no Grafana Cloud account. The pinned backends are Prometheus 3.13.4,
+Tempo 3.1.0 (monolithic), and Grafana 13.2.3. The Ruby metrics SDK is still alpha;
+backend/library upgrades should rerun the adapter and configuration checks.
+
+For host-run development:
+
+```sh
+cp config/development.env.example .env.development
+docker compose --env-file .env.development up -d postgres pgbouncer prometheus tempo grafana
+set -a
+source .env.development
+set +a
+bin/rails server
+```
+
+Export the same file in a separate shell before starting subscriptions:
+
+```sh
+set -a
+source .env.development
+set +a
+COORDINATOR_OBSERVABILITY_ROLE=subscriptions bundle exec pg-eventstore subscriptions start -r ./config/environment.rb -r ./config/pg_eventstore_subscriptions.rb
+```
+
+Rails does not implicitly load this file. Restart the host-run server and
+subscription process after changing their exported settings. If development
+ingestion ports are overridden, change the host OTLP endpoint URLs too.
+Development Grafana is `http://127.0.0.1:1089/`, initially `admin` / `admin` unless
+overridden; change that password on first login. Development also publishes
+Prometheus on port 9090 and Tempo's OTLP HTTP receiver on 4318 without additional
+network guarding. Do not reuse that exposure policy for untrusted environments.
+
+Production `bin/deploy-production` starts/recreates the three backends after
+deploying the app, rereading `.env.production` for both app and backend settings.
+Prometheus and Tempo publish no host ports; Grafana alone uses loopback 8089.
+Use `GRAFANA_ADMIN_USER` / `GRAFANA_ADMIN_PASSWORD` for its initial local account.
+The bootstrap password does **not** rotate an account in an existing Grafana
+volume; change it through Grafana's supported account administration.
+Application processes have separate finite roles (`web`, `process_managers`,
+`task_results`, `read_models`, `jobs`); preparation disables telemetry.
+
+Consumers never depend on backend health. If backend startup fails, deployment
+warns after the application is up; inspect/retry those services separately.
+The SDK uses bounded queues and fail-open guards. An unavailable sink may lose
+telemetry, but must not change command decisions, handler retries, or read
+availability. `PRODUCTION_START_OBSERVABILITY=0 bin/deploy-production` skips
+backend startup (used by the opt-in deployment tests); it is a CLI-only override
+and does not disable app exports. Set `COORDINATOR_OBSERVABILITY_ENABLED=false`
+in the selected environment file to disable those too.
+
+Settings are in the development/production examples. Endpoint values are full
+HTTP signal URLs, including `/v1/traces` and `/api/v1/otlp/v1/metrics` for these
+Ruby exporters. Export interval defaults to 10 seconds (allowed 1–60 seconds),
+timeout to 3 seconds (0.1–10 seconds), and trace sampling to 1.0 (0–1). Trace
+sampling does not sample metrics. Each process/restart receives a fresh instance
+ID, also attached to metrics; long-running deployments incur instance-series
+churn. Metrics allow only registered tool/method, subscription/event type,
+bounded outcome/SQL operation and process resource labels—never paths,
+task/event/correlation IDs, SQL, binds, or payloads.
+
+Open Grafana's **Coordinator / Coordinator observability** dashboard for MCP
+outcomes/runtime/in-flight counts, handler throughput/runtime/in-flight age,
+delivery age, and Rails SQL throughput/runtime. Builtin Grafana panels and
+provisioned Prometheus/Tempo sources require no extra plugins. Example PromQL:
+
+```promql
+sum by (subscription_name, outcome) (rate(coordinator_subscription_completed_total[5m]))
+histogram_quantile(0.95, sum by (le, subscription_name) (rate(coordinator_subscription_duration_seconds_bucket[5m])))
+max by (subscription_name) (coordinator_subscription_oldest_in_flight_seconds)
+```
+
+MCP `accepted` is synchronous Task acceptance, not successful async execution.
+Handler `ok` is technical delivery success, even when the command it runs records
+a business denial. Redelivery counts as another invocation. Delivery age measures
+event creation to handler entry and includes intentional replay; a high value or
+an idle heartbeat does not prove a stuck handler. Unfinished-handler age instead
+measures an actual active invocation with a monotonic clock.
+
+In **Explore / Coordinator Tempo**, TraceQL examples are
+`{ name = "mcp tools/call" }` and `{ span.outcome = "error" }`.
+SQL spans contain actual start/end times and sanitized `db.query.text` (up to
+2048 characters), parented under MCP/handler spans where context exists. Bind
+values, raw error messages and event/domain payloads are not exported. Unsafe,
+dollar-quoted, malformed or oversized statements omit text but retain timing.
+Query-cache hits and `SCHEMA` notifications are excluded; transaction statements
+are included. Direct pg_eventstore SQL is not traced. Trace-to-metrics links
+filter by process resource attributes; full cross-process Saga trace propagation
+and metric exemplars are not promised by this implementation.
+
+Data uses three independent Compose named volumes. Prometheus retains at most
+`PROMETHEUS_RETENTION_TIME` (15 days) or `PROMETHEUS_RETENTION_SIZE` (10 GB),
+whichever limit applies first; Tempo uses `TEMPO_RETENTION` (168 hours). Retention
+is not an instantaneous disk quota: WAL/live traces and housekeeping need extra
+space. Volumes survive ordinary container removal, not `down --volumes`, host
+disk loss, or a missing backup. This is a minimal single-node filesystem stack,
+not HA. [Tempo recommends object storage for production workloads](https://grafana.com/docs/tempo/latest/configuration/);
+distributed storage/services need a separately approved deployment plan.
+
+Telemetry tests use the official OpenTelemetry in-memory span/metric adapters
+with real application databases and public subscription execution. Static
+Compose/provisioning checks do not start the backends. These tests verify
+app-generated telemetry, **not** wire ingestion, live Grafana rendering, or
+backend durability. To inspect backends after an authorized deployment:
+
+```sh
+docker compose --env-file .env.production -f docker-compose.production.yml logs --tail 100 prometheus tempo grafana
+```
+
+See [Prometheus OTLP configuration](https://prometheus.io/docs/guides/opentelemetry/)
+and [Grafana Tempo provisioning](https://grafana.com/docs/grafana/latest/datasources/tempo/configure-tempo-data-source/provision/)
+for the upstream receiver, translation and correlation conventions.
 
 ### Import your development environment
 

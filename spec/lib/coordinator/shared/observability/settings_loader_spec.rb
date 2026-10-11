@@ -53,4 +53,9 @@ RSpec.describe Coordinator::Shared::Observability::SettingsLoader do
       })
     end.to raise_error(ArgumentError, /Invalid observability settings/)
   end
+
+  it "accepts the dedicated Rails queue-worker role without an unbounded label" do
+    settings = loader.call(environment: "production", env: { "COORDINATOR_OBSERVABILITY_ROLE" => "jobs" })
+    expect(settings.role).to eq("jobs")
+  end
 end

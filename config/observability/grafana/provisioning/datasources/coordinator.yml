@@ -1,0 +1,38 @@
+apiVersion: 1
+datasources:
+  - name: Coordinator Prometheus
+    uid: coordinator-prometheus
+    type: prometheus
+    access: proxy
+    url: http://prometheus:9090
+    isDefault: true
+    editable: false
+    jsonData:
+      httpMethod: POST
+      timeInterval: 10s
+  - name: Coordinator Tempo
+    uid: coordinator-tempo
+    type: tempo
+    access: proxy
+    url: http://tempo:3200
+    editable: false
+    jsonData:
+      search:
+        hide: false
+      streamingEnabled:
+        search: true
+      tracesToMetrics:
+        datasourceUid: coordinator-prometheus
+        spanStartTimeShift: '-2m'
+        spanEndTimeShift: '2m'
+        tags:
+          - { key: 'service.name', value: 'service_name' }
+          - { key: 'service.instance.id', value: 'service_instance_id' }
+          - { key: 'coordinator.process.role', value: 'coordinator_process_role' }
+        queries:
+          - name: MCP completions in this process
+            query: 'sum by (mcp_tool_name, outcome) (rate(coordinator_mcp_completed_total{$$__tags}[5m]))'
+          - name: Subscription completions in this process
+            query: 'sum by (subscription_name, outcome) (rate(coordinator_subscription_completed_total{$$__tags}[5m]))'
+          - name: Rails SQL in this process
+            query: 'sum by (db_operation_name, outcome) (rate(coordinator_sql_completed_total{$$__tags}[5m]))'

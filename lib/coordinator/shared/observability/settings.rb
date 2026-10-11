@@ -3,7 +3,7 @@
 module Coordinator::Shared
   module Observability
     class Settings < Value
-      ROLES = %w[web subscriptions process_managers task_results read_models console].freeze
+      ROLES = %w[web subscriptions process_managers task_results read_models jobs console].freeze
 
       attribute :enabled, Types::Bool
       attribute :mode, Types::String.enum("otlp", "in_memory")

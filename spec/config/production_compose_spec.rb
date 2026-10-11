@@ -4,6 +4,7 @@ RSpec.describe "production Compose configuration" do
   def compose_configuration(overrides = {}, environment_file: "/dev/null")
     environment = {
       "POSTGRES_PASSWORD" => "compose-configuration-spec", "SECRET_KEY_BASE" => "compose-configuration-spec",
+      "GRAFANA_ADMIN_PASSWORD" => "compose-configuration-spec",
       "POSTGRES_USER" => nil, "PG_HOST_DATA_DIR" => nil, "PRODUCTION_ENV_FILE" => environment_file,
       "POSTGRES_HOST_PORT" => nil, "PGBOUNCER_HOST_PORT" => nil, "MCP_HOST_PORT" => nil
     }.merge(overrides)
@@ -37,15 +38,17 @@ RSpec.describe "production Compose configuration" do
 
   it "rereads edited file settings and removes settings omitted from the next configuration" do
     Tempfile.create([ "production-compose-", ".env" ], Rails.root.join("tmp")) do |file|
-      file.write("MCP_ALLOWED_HOSTS=first.example.com\nCOORDINATOR_DEPLOYMENT_SAMPLE=first\n")
+      file.write("MCP_ALLOWED_HOSTS=first.example.com\nCOORDINATOR_DEPLOYMENT_SAMPLE=first\nCOORDINATOR_OBSERVABILITY_ENABLED=false\nTEMPO_RETENTION=48h\n")
       file.flush
       status, output, error = compose_configuration({}, environment_file: file.path)
       expect(status).to be_success, error
       expect(JSON.parse(output).dig("services", "web", "environment", "MCP_ALLOWED_HOSTS")).to eq("first.example.com")
+      expect(JSON.parse(output).dig("services", "web", "environment", "COORDINATOR_OBSERVABILITY_ENABLED")).to eq("false")
+      expect(JSON.parse(output).dig("services", "tempo", "environment", "TEMPO_RETENTION")).to eq("48h")
 
       file.rewind
       file.truncate(0)
-      file.write("MCP_ALLOWED_HOSTS=second.example.com\n")
+      file.write("MCP_ALLOWED_HOSTS=second.example.com\nCOORDINATOR_OBSERVABILITY_ENABLED=true\nTEMPO_RETENTION=24h\n")
       file.flush
       status, output, error = compose_configuration({}, environment_file: file.path)
       expect(status).to be_success, error
@@ -54,6 +57,8 @@ RSpec.describe "production Compose configuration" do
         expect(environment.fetch("MCP_ALLOWED_HOSTS")).to eq("second.example.com")
         expect(environment).not_to have_key("COORDINATOR_DEPLOYMENT_SAMPLE")
       end
+      expect(JSON.parse(output).dig("services", "web", "environment", "COORDINATOR_OBSERVABILITY_ENABLED")).to eq("true")
+      expect(JSON.parse(output).dig("services", "tempo", "environment", "TEMPO_RETENTION")).to eq("24h")
     end
   end
 
@@ -88,7 +93,7 @@ RSpec.describe "production Compose configuration" do
     expect(services.dig("prepare", "command")).to eq([ "./bin/prepare-production" ])
   end
 
-  %w[POSTGRES_PASSWORD SECRET_KEY_BASE].each do |variable|
+  %w[POSTGRES_PASSWORD SECRET_KEY_BASE GRAFANA_ADMIN_PASSWORD].each do |variable|
     it "rejects deployment configuration without #{variable}" do
       status, _, error = compose_configuration({ variable => nil })
       expect(status).not_to be_success
