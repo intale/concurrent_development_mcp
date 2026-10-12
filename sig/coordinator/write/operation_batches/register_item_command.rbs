@@ -1,0 +1,5 @@
+module Coordinator::Write::OperationBatches
+  class RegisterItemCommand
+    def call: (item: ItemV2) -> Coordinator::Write::Events::CommandRegisteredV1
+  end
+end

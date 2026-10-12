@@ -1,0 +1,5 @@
+class Coordinator::Write::Events::OptimisticSagas::WorkIntentionRenewalCompletedV1 < Coordinator::Write::Events::Base
+  def renewal_id: () -> String
+  def intention_id: () -> String
+  def renewal_event: () -> Coordinator::Write::EventReference?
+end

@@ -7,7 +7,7 @@ module Coordinator::Read
       attribute :request_id, Types::RequestId
       attribute :tool_name, Types::CoordinationToolName
       attribute :canonical_input_digest, Types::Sha256Digest
-      attribute :status, Types::String.enum("registered", "succeeded", "rejected")
+      attribute :status, Types::String.enum("registered", "succeeded", "rejected", "failed")
 
       def self.reduce(events:, payloads:, contract: Coordinator::Write::Contracts::CommandHistory.new)
         validation = contract.call(events: payloads)
@@ -18,6 +18,7 @@ module Coordinator::Read
         status = case terminal
         when Coordinator::Write::Events::CommandSucceededV1 then "succeeded"
         when Coordinator::Write::Events::CommandRejectedV2 then "rejected"
+        when Coordinator::Write::Events::OptimisticSagas::CommandExecutionFailedV1 then "failed"
         else "registered"
         end
         new(
@@ -35,6 +36,10 @@ module Coordinator::Read
 
       def rejected?
         status == "rejected"
+      end
+
+      def failed?
+        status == "failed"
       end
     end
   end

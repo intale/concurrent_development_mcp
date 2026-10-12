@@ -22,7 +22,7 @@ RSpec.describe Coordinator::Write::Tasks::TargetContractRegistry do
 
   it "binds every target document to a real builder and every command to a real executor" do
     builder = Coordinator::Write::Tasks::TargetCommandBuilder.new
-    executor = Coordinator::Write::Tasks::TargetExecutor.new(
+    executor = Coordinator::Processes::TargetCommandExecutor.new(
       event_store: Coordinator::Write::EventStore.new(client: PgEventstore.client)
     )
 

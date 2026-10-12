@@ -32,6 +32,7 @@ module Coordinator
         "development_artifact_relation_list" => [ Coordinator::Read::QueryResultV1::DevelopmentArtifactRelationPageData ],
         "development_artifact_locator_resolve" => [ Coordinator::Read::QueryResultV1::DevelopmentArtifactLocatorPageData ],
         "operation_batch_get" => [ Coordinator::Read::QueryResultV1::OperationBatchData ],
+        "work_intention_renewal_get" => [ Coordinator::Read::QueryResultV1::WorkIntentionRenewalData ],
         "verification_obligations_list" => [ Coordinator::Read::QueryResultV1::VerificationObligationPageData ],
         "merge_snapshot_get" => [ Coordinator::Read::QueryResultV1::MergeSnapshotData ],
         "release_set_get" => [ Coordinator::Read::QueryResultV1::ReleaseSetData ]

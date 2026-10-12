@@ -1,0 +1,10 @@
+module Coordinator
+  module Processes
+    module OperationBatches
+      class ItemRegistrar
+        def initialize: (event_store: Write::_EventStore, ?loader: Write::OperationBatches::Loader, ?registration: Write::Operations::ExecuteRegisterOperationBatchItemCommand, ?assignment: Write::Operations::ExecuteAssignOperationBatchItemCommand) -> void
+        def call_command: (Write::Commands::AssignOperationBatchItemCommand command, caused_by: PgEventstore::Event) -> Dry::Monads::Result
+      end
+    end
+  end
+end

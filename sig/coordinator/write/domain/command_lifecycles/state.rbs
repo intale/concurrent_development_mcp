@@ -14,10 +14,12 @@ module Coordinator
           def rejection_code: () -> String?
           def rejection_reason: () -> String?
           def rejection_retryable: () -> bool?
+          def execution_failure: () -> Write::Tasks::ExecutionFailureV1?
           def absent?: () -> bool
           def terminal?: () -> bool
           def succeeded?: () -> bool
           def rejected?: () -> bool
+          def failed?: () -> bool
           def apply: (Events::Base event, ?canonical_input_digest: String?) -> State
         end
       end

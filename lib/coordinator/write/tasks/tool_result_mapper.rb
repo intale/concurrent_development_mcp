@@ -4,6 +4,7 @@ module Coordinator::Write
   module Tasks
     class ToolResultMapper
       STATUS_BY_CODE = DomainErrorV1::ERROR_CODES.to_h { [ _1, "denied" ] }.merge(
+        saga_execution_failed: "failed",
         command_id_reused: "command_id_reused",
         repository_already_registered: "conflict",
         repository_identity_conflict: "conflict",

@@ -1,0 +1,33 @@
+module Coordinator
+  module Read
+    class WorkIntentionRenewalViewV1 < Shared::Value
+      class Failure < Shared::Value
+        def reason_code: () -> String
+        def reason: () -> String
+        def retryable: () -> bool
+        def attempts: () -> Integer
+      end
+
+      class Member < Shared::Value
+        def position: () -> Integer
+        def intention_id: () -> String
+        def resource_id: () -> String
+        def fencing_token: () -> Integer
+        def status: () -> String
+        def renewal_event: () -> Write::EventReference?
+        def failure: () -> Failure?
+      end
+
+      def renewal_id: () -> String
+      def task_id: () -> String?
+      def intention_set_id: () -> String
+      def attempt_id: () -> String
+      def status: () -> String
+      def expires_at: () -> String
+      def actor: () -> AttributedActorV1
+      def correlation_id: () -> String
+      def members: () -> Array[Member]
+      def updated_at: () -> String
+    end
+  end
+end

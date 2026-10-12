@@ -6,6 +6,7 @@ module Coordinator::Write
       Creation = Types.Instance(Events::OperationBatchCreatedV2)
       TargetSelection = Types.Instance(Events::OperationBatchTargetSelectedV1)
       Outcome = Types.Instance(Events::OperationBatchItemSucceededV2) |
+                Types.Instance(Events::OptimisticSagas::OperationBatchItemFailedV1) |
                 Types.Instance(Events::OperationBatchItemRejectedV2) |
                 Types.Instance(Events::OperationBatchItemRegistrationRejectedV1)
       CompletionLink = Types.Instance(Events::OperationBatchItemCompletionLinkedV1)
@@ -58,6 +59,7 @@ module Coordinator::Write
           when Events::OperationBatchItemCommandAssignedV1 then assignments << event
           when Events::OperationBatchItemExecutionStartedV1 then starts << event
           when Events::OperationBatchItemSucceededV2, Events::OperationBatchItemRejectedV2,
+               Events::OptimisticSagas::OperationBatchItemFailedV1,
                Events::OperationBatchItemRegistrationRejectedV1
             outcomes << event
           when Events::OperationBatchItemCompletionLinkedV1 then completion_links << event
@@ -118,6 +120,7 @@ module Coordinator::Write
       def rejected_count
         outcomes.count do |event|
           event.is_a?(Events::OperationBatchItemRejectedV2) ||
+            event.is_a?(Events::OptimisticSagas::OperationBatchItemFailedV1) ||
             event.is_a?(Events::OperationBatchItemRegistrationRejectedV1)
         end
       end

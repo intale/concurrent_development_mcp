@@ -1,0 +1,10 @@
+module Coordinator
+  module Write
+    module Operations
+      class ExecuteRenewWorkIntention
+        def initialize: (event_store: _EventStore, ?renewal_loader: WorkIntentionRenewals::Loader, ?intention_loader: WorkIntentionLoader, ?decider: WorkIntentionRenewals::RenewMember, ?stream_factory: StreamFactory, ?event_factory: EventFactory, ?id_generator: Shared::_IdGenerator, ?clock: Shared::_Clock, ?resource_loader: WorkIntentionResourceLoader, ?registration_loader: RepositoryRegistrationLoader, ?marker_builder: RepositoryMarkerBuilder, ?revision_retry: OptimisticRevisionRetry) -> void
+        def call_command: (Commands::RenewWorkIntention command, caused_by: PgEventstore::Event) -> Dry::Monads::Result
+      end
+    end
+  end
+end

@@ -1,0 +1,9 @@
+module Coordinator
+  module Write
+    module WorkIntentionRenewals
+      class Request
+        def call: (command: Commands::RenewWorkIntentionSet, expires_at: String, assignments: Array[Events::OptimisticSagas::WorkIntentionRenewalAssignedV1]) -> Array[Events::Base]
+      end
+    end
+  end
+end

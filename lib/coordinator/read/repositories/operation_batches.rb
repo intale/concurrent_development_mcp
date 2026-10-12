@@ -69,6 +69,8 @@ module Coordinator::Read
           store_outcome(record, event, payload, status: "succeeded")
         when Coordinator::Write::Events::OperationBatchItemRejectedV2
           store_outcome(record, event, payload, status: "rejected")
+        when Coordinator::Write::Events::OptimisticSagas::OperationBatchItemFailedV1
+          store_outcome(record, event, payload, status: "failed")
         when Coordinator::Write::Events::OperationBatchItemRegistrationRejectedV1
           store_outcome(record, event, payload, status: "rejected")
         when Coordinator::Write::Events::OperationBatchItemCompletionLinkedV1
@@ -228,6 +230,10 @@ module Coordinator::Read
       end
 
       def outcome_result(payload)
+        if payload.is_a?(Coordinator::Write::Events::OptimisticSagas::OperationBatchItemFailedV1)
+          return { error: { code: "saga_execution_failed", message: payload.reason,
+            details: payload.to_h.except(:batch_id, :index) } }
+        end
         if payload.is_a?(Coordinator::Write::Events::OperationBatchItemRegistrationRejectedV1)
           return { error: payload.error.to_h }
         end
@@ -237,6 +243,7 @@ module Coordinator::Read
       end
 
       def outcome_command_id(payload)
+        return if payload.is_a?(Coordinator::Write::Events::OptimisticSagas::OperationBatchItemFailedV1)
         payload.command_id unless payload.is_a?(Coordinator::Write::Events::OperationBatchItemRegistrationRejectedV1)
       end
 
@@ -318,7 +325,7 @@ module Coordinator::Read
       def refresh_summary(record, event:)
         statuses = Coordinator::Read::OperationBatchOutcome.where(batch_id: record.batch_id).group(:status).count
         succeeded = statuses.fetch("succeeded", 0)
-        rejected = statuses.fetch("rejected", 0)
+        rejected = statuses.fetch("rejected", 0) + statuses.fetch("failed", 0)
         status = case record.terminal_kind
         when "cancelled" then "cancelled"
         when "completed" then rejected.positive? ? "completed_with_errors" : "completed"
@@ -359,7 +366,7 @@ module Coordinator::Read
 
         error = Coordinator::Write::Tasks::DomainErrorV1::Type[symbolize(outcome.result.fetch("error"))]
         Coordinator::Write::Tasks::StructuredContentV1.new(
-          status: "command_id_reused", summary: error.message, command_id: item.command_id,
+          status: error.code == "saga_execution_failed" ? "failed" : "command_id_reused", summary: error.message, command_id: item.command_id,
           receipt: nil, context_token: nil, data: error, warnings: [], next_actions: []
         )
       end

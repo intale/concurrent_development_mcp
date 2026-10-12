@@ -8,6 +8,24 @@ RSpec.describe Coordinator::Read::Projectors::OperationBatchesV2, :read_model do
   let(:stream) { Coordinator::Write::StreamFactory.new.operation_batch(batch_id) }
   let(:correlation_id) { SecureRandom.uuid_v7 }
 
+  it "serves an exhausted orchestration step as failed without fabricating a canonical completion" do
+    manifest = manifest_events(skill_items.first(1))
+    failed = batch_event(Coordinator::Write::Events::OptimisticSagas::OperationBatchItemFailedV1.new(
+      batch_id:, index: 0, failed_step: "start-item", reason_code: "concurrency_conflict",
+      reason: "Three attempts exhausted; this request may succeed if retried", retryable: true,
+      effects_committed: false, attempts: 3), revision: manifest.length, position: 200, causation_id: manifest.first.id)
+    completed = batch_event(Coordinator::Write::Events::OperationBatchCompletedV2.new(batch_id:),
+      revision: manifest.length + 1, position: 201, causation_id: failed.id)
+    [ *manifest, failed, completed ].each { projector.call(_1) }
+    view = fetch(limit: 100)
+    expect(view).to have_attributes(status: "completed_with_errors", rejected: 1, pending: 0)
+    expect(view.items.sole.status).to eq("failed")
+    expect(view.items.sole.result).to have_attributes(status: "failed")
+    expect(view.items.sole.result.data.code).to eq("saga_execution_failed")
+    expect(view.items.sole.result.data.details).to have_attributes(attempts: 3, retryable: true, effects_committed: false)
+    expect(Coordinator::Read::OperationBatchOutcome.sole.completion_event).to be_nil
+  end
+
   it "converges idempotently under redelivery and serves the immutable manifest in bounded pages" do
     events = completed_events
     created = events.find { _1.type == "OperationBatchCreated" }

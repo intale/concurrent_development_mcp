@@ -1,0 +1,10 @@
+module Coordinator
+  module Write
+    module OperationBatches
+      class RegistrationLoader
+        def initialize: (event_store: _EventStore, ?request_marker: CommandLifecycle::RequestMarker, ?schema_registry: EventSchemaRegistry) -> void
+        def call: (actor: Commands::Actor, request_id: String | Integer) -> RegistrationV1?
+      end
+    end
+  end
+end

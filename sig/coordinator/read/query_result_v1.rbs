@@ -164,7 +164,11 @@ module Coordinator
         def batch: () -> OperationBatchViewV1
       end
 
-      type data = EmptyData | DomainError | OperationData | ContextData | CoordinationPageData | NotModifiedData | GuidanceData | InterpretationPageData | DecisionData | DecisionPageData | DecisionContextData | AgentChoiceData | AgentChoiceImpactPageData | AttemptHistoryPageData | CandidateData | CandidatePageData | CandidateImpactData | VerificationObligationPageData | MergeSnapshotData | ReleaseSetData | SkillData | RepositoryPageData | ResourceData | ResourcePageData | SkillPageData | SearchPageData | SkillAssetData | DevelopmentArtifactData | DevelopmentArtifactContentData | DevelopmentArtifactPageData | DevelopmentArtifactRelationPageData | DevelopmentArtifactLocatorPageData | OperationBatchData
+      class WorkIntentionRenewalData < Shared::Value
+        def renewal: () -> WorkIntentionRenewalViewV1
+      end
+
+      type data = EmptyData | DomainError | OperationData | ContextData | CoordinationPageData | NotModifiedData | GuidanceData | InterpretationPageData | DecisionData | DecisionPageData | DecisionContextData | AgentChoiceData | AgentChoiceImpactPageData | AttemptHistoryPageData | CandidateData | CandidatePageData | CandidateImpactData | VerificationObligationPageData | MergeSnapshotData | ReleaseSetData | SkillData | RepositoryPageData | ResourceData | ResourcePageData | SkillPageData | SearchPageData | SkillAssetData | DevelopmentArtifactData | DevelopmentArtifactContentData | DevelopmentArtifactPageData | DevelopmentArtifactRelationPageData | DevelopmentArtifactLocatorPageData | OperationBatchData | WorkIntentionRenewalData
       type action = Write::NextAction | NextAction
 
       def status: () -> String

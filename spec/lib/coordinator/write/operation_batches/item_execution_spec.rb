@@ -1,12 +1,12 @@
 # frozen_string_literal: true
 
-RSpec.describe Coordinator::Write::OperationBatches::ItemExecutor, :event_store do
+RSpec.describe Coordinator::Processes::OperationBatches::ItemExecutor, :event_store do
   subject(:executor) { described_class.new(event_store:) }
 
   let(:event_store) { Coordinator::Write::EventStore.new(client: PgEventstore.client) }
   let(:streams) { Coordinator::Write::StreamFactory.new }
   let(:loader) { Coordinator::Write::OperationBatches::Loader.new(event_store:) }
-  let(:registrar) { Coordinator::Write::Operations::ExecuteAssignOperationBatchItemCommand.new(event_store:) }
+  let(:registrar) { Coordinator::Processes::OperationBatches::ItemRegistrar.new(event_store:) }
   let(:batch_executor) { Coordinator::Write::Operations::ExecuteOperationBatchCommand.new(event_store:) }
   let(:builder) { Coordinator::Processes::OperationBatches::CommandBuilder.new }
   let(:runner) { Coordinator::Processes::ProcessManagers::OperationBatchRunner.new(event_store:) }

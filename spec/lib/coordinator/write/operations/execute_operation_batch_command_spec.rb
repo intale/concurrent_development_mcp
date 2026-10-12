@@ -66,12 +66,12 @@ RSpec.describe Coordinator::Write::Operations::ExecuteOperationBatchCommand, :ev
     enqueued = events.find { _1.type == "OperationBatchItemEnqueued" }
     source = Coordinator::Processes::OperationBatches::SourceBuilder.new.call(created)
     builder = Coordinator::Processes::OperationBatches::CommandBuilder.new
-    assignment = Coordinator::Write::Operations::ExecuteAssignOperationBatchItemCommand.new(event_store:).call_command(
+    assignment = Coordinator::Processes::OperationBatches::ItemRegistrar.new(event_store:).call_command(
       builder.assign_item(source:, index: 0, command_id: SecureRandom.uuid_v7), caused_by: enqueued
     ).value!
     batch_item = assignment.item
     target = Coordinator::Write::Tasks::TargetCommandBuilder.new.call(batch_item.command_input)
-    execution = Coordinator::Write::Tasks::TargetExecutor.new(event_store:).call(
+    execution = Coordinator::Processes::TargetCommandExecutor.new(event_store:).call(
       target,
       caused_by: enqueued
     ).value!

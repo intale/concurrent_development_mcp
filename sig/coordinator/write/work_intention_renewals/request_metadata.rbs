@@ -1,0 +1,9 @@
+module Coordinator
+  module Write
+    module WorkIntentionRenewals
+      class RequestMetadata < EventMetadata
+        def task_id: () -> String?
+      end
+    end
+  end
+end

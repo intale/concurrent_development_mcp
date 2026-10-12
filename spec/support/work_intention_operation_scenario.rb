@@ -99,4 +99,20 @@ module WorkIntentionOperationScenario
       }
     end
   end
+
+  # A concrete lifecycle fact for expiry-focused tests; renewal Saga behavior is
+  # exercised independently, not coupled to the timer fixture setup.
+  def renewal_event(event_store:, reference:, duration:)
+    stream = Coordinator::Write::StreamFactory.new.resource_work_intention(reference.intention_id)
+    parent = event_store.read_grouped(stream, Coordinator::Write::EventQueries::WORK_INTENTION_STATE).first
+    expires_at = (Time.now.utc + duration).iso8601(6)
+    physical = Coordinator::Write::EventFactory.new.build!(
+      event: Coordinator::Write::Events::ResourceWorkIntentionRenewedV1.new(
+        intention_id: reference.intention_id, resource_id: reference.resource_id,
+        fencing_token: reference.fencing_token, expires_at:), event_id: SecureRandom.uuid_v7,
+      metadata: Coordinator::Write::EventMetadata.new(command_id: SecureRandom.uuid_v7,
+        actor_kind: "agent", actor_id: "agent-a", recorded_by: "coordinator", policy_version: Coordinator::Write::WorkIntentionPolicyV1::VERSION),
+      markers: [ "work-intention:#{reference.intention_id}" ], caused_by: parent)
+    event_store.append(stream, [ physical ], expected_revision: parent.stream_revision).sole
+  end
 end

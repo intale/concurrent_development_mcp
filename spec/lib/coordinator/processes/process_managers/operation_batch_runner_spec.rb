@@ -86,13 +86,13 @@ RSpec.describe Coordinator::Processes::ProcessManagers::OperationBatchRunner, :e
     expect(batch_executor.call_command(unrelated_command)).to be_success
     unrelated_created = batch_events(unrelated_command.batch_id).find { _1.type == "OperationBatchCreated" }
     source = Coordinator::Processes::OperationBatches::SourceBuilder.new.call(created)
-    assignment = Coordinator::Write::Operations::ExecuteAssignOperationBatchItemCommand.new(event_store:).call_command(
+    assignment = Coordinator::Processes::OperationBatches::ItemRegistrar.new(event_store:).call_command(
       Coordinator::Processes::OperationBatches::CommandBuilder.new.assign_item(source:, index: 0, command_id: SecureRandom.uuid_v7),
       caused_by: created
     ).value!
     item = assignment.item
     target = Coordinator::Write::Tasks::TargetCommandBuilder.new.call(item.command_input)
-    target_executor = Coordinator::Write::Tasks::TargetExecutor.new(event_store:)
+    target_executor = Coordinator::Processes::TargetCommandExecutor.new(event_store:)
 
     expect(target_executor.call(target, caused_by: unrelated_created)).to be_success
     target_terminal = command_events(target.command_id).last
@@ -153,6 +153,85 @@ RSpec.describe Coordinator::Processes::ProcessManagers::OperationBatchRunner, :e
         ]
       }
     )
+  end
+
+  it "records exhausted start races as an item failure and completes the batch without inventing target effects" do
+    command = preparer.call(input(items: [ item ])).value!
+    batch_executor.call_command(command).value!
+    created = batch_events(command.batch_id).first
+    competitor = Coordinator::Write::Operations::ExecuteOperationBatchCommand.new(
+      event_store: Coordinator::Write::EventStore.new(client: PgEventstore.client))
+    conflicts = 0
+    trace = TracePoint.new(:call) do |frame|
+      next unless frame.self.equal?(event_store) && frame.defined_class == Coordinator::Write::EventStore && frame.method_id == :append
+      events = frame.binding.local_variable_get(:events)
+      next unless events.first.type == "OperationBatchItemExecutionStarted" && conflicts < 3
+      conflicts += 1
+      competitor.call_command(Coordinator::Write::Commands::RequestOperationBatchContinuation.new(
+        command_id: SecureRandom.uuid_v7, actor: Coordinator::Processes::OperationBatches::CommandBuilder::SYSTEM_ACTOR,
+        batch_id: command.batch_id, page_start: 0, page_end: 0), caused_by: created).value!
+    end
+    trace.enable { runner.call(created) }
+    events = batch_events(command.batch_id)
+    expect(conflicts).to eq(3)
+    expect(events.map(&:type)).to include("OperationBatchItemFailed", "OperationBatchCompleted")
+    expect(events.map(&:type)).not_to include("OperationBatchItemExecutionStarted", "OperationBatchItemSucceeded", "OperationBatchItemCompletionLinked")
+    expect(events.find { _1.type == "OperationBatchItemFailed" }.data).to include(
+      "failed_step" => "start-or-finalize-item", "reason_code" => "concurrency_conflict",
+      "attempts" => 3, "retryable" => true, "effects_committed" => false)
+    expect(skill_events).to be_empty
+    ids = events.map(&:id)
+    runner.call(created)
+    expect(batch_events(command.batch_id).map(&:id)).to eq(ids)
+  ensure
+    trace&.disable
+  end
+
+  it "does not acknowledge an exhausted continuation and resumes from the committed items on redelivery" do
+    command = preparer.call(input(items: 51.times.map { item(command_id: "item-#{_1}", name: "review-#{_1}") })).value!
+    batch_executor.call_command(command).value!
+    created = batch_events(command.batch_id).first
+    failure_executor = Coordinator::Write::Operations::ExecuteRecordOperationBatchItemFailure.new(event_store:)
+    50.times do |index|
+      failure_executor.call_command(Coordinator::Write::Commands::RecordOperationBatchItemFailure.new(
+        command_id: SecureRandom.uuid_v7, actor: Coordinator::Processes::OperationBatches::CommandBuilder::SYSTEM_ACTOR,
+        batch_id: command.batch_id, index:,
+        failure: Coordinator::Write::Tasks::ExecutionFailureV1.new(failed_step: "assign-item",
+          reason_code: "concurrency_conflict", reason: "Prior page exhausted its attempts", retryable: true,
+          effects_committed: false, attempts: 3)), caused_by: created).value!
+    end
+    competitor = Coordinator::Write::Operations::ExecuteOperationBatchCommand.new(
+      event_store: Coordinator::Write::EventStore.new(client: PgEventstore.client))
+    conflicts = 0
+    trace = TracePoint.new(:call) do |frame|
+      next unless frame.self.equal?(event_store) && frame.defined_class == Coordinator::Write::EventStore && frame.method_id == :append
+      events = frame.binding.local_variable_get(:events)
+      next unless events.first.type == "OperationBatchContinuationRequested" && conflicts < 3
+      conflicts += 1
+      competitor.call_command(Coordinator::Write::Commands::RequestOperationBatchContinuation.new(
+        command_id: SecureRandom.uuid_v7, actor: Coordinator::Processes::OperationBatches::CommandBuilder::SYSTEM_ACTOR,
+        batch_id: command.batch_id, page_start: 50, page_end: 50), caused_by: created).value!
+    end
+    expect { trace.enable { runner.call(created) } }.to raise_error(Coordinator::Processes::OperationBatchProcessRejected, /changed concurrently/)
+    expect(conflicts).to eq(3)
+    continuation_step = ProcessStepExamples.event(event_store:, source_event: created,
+      process_name: "operation-batch-runner", step_name: "request-page-continuation",
+      subject_kind: "operation-batch-page", subject_id: "#{command.batch_id}:50")
+    failure = event_store.read(streams.process_step(continuation_step.data.fetch("process_step_id")),
+      Coordinator::Write::EventReadCriteria.new(event_types: [ "ProcessStepDispatchFailed" ], maximum_count: 1, direction: :asc)).sole
+    expect(failure.data).to include("code" => "concurrency_conflict", "retryable" => true)
+    expect(batch_events(command.batch_id).map(&:type)).not_to include("OperationBatchCompleted")
+
+    runner.call(created)
+    continuation = batch_events(command.batch_id).last
+    expect(continuation.type).to eq("OperationBatchContinuationRequested")
+    runner.call(continuation)
+    finished = batch_events(command.batch_id)
+    expect(finished.last.type).to eq("OperationBatchCompleted")
+    expect(finished.count { _1.type == "OperationBatchItemFailed" }).to eq(50)
+    expect(finished.count { _1.type == "OperationBatchItemSucceeded" }).to eq(1)
+  ensure
+    trace&.disable
   end
 
   def input(**overrides)

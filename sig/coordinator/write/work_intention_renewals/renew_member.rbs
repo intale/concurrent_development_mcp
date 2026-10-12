@@ -1,0 +1,9 @@
+module Coordinator
+  module Write
+    module WorkIntentionRenewals
+      class RenewMember
+        def call: (state: Domain::WorkIntentions::State, assignment: Events::OptimisticSagas::WorkIntentionRenewalAssignedV1?, request: Events::OptimisticSagas::WorkIntentionSetRenewalRequestedV1?, command: Commands::RenewWorkIntention, now: String) -> Dry::Monads::Result
+      end
+    end
+  end
+end

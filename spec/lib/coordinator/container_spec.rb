@@ -216,7 +216,8 @@ RSpec.describe Coordinator::Container do
         "release-set-lifecycle-v1",
         "resource-boundary-maintenance-v2",
         "verification-evidence-outcome-v1",
-        "verification-obligation-validity-v1"
+        "verification-obligation-validity-v1",
+        "work-intention-set-renewal-v1"
       ]
     )
     expect(read_model_manager).to be_a(PgEventstore::SubscriptionsManager)
@@ -237,7 +238,8 @@ RSpec.describe Coordinator::Container do
         "resources-v1",
         "skills-v3",
         "user-utterances-v1",
-        "verification-obligations-v1"
+        "verification-obligations-v1",
+        "work-intention-renewals-v1"
       ]
     )
     expect(task_result_manager).to be_a(PgEventstore::SubscriptionsManager)

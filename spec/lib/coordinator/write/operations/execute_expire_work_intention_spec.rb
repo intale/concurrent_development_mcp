@@ -49,16 +49,7 @@ RSpec.describe Coordinator::Write::Operations::ExecuteExpireWorkIntention, :even
     reference = reservation.receipt.intentions.sole
     source = read_intention(reference.intention_id).sole
     Timecop.freeze(Time.utc(2026, 8, 22, 10, 0, 10)) do
-      Coordinator::Write::Operations::ExecuteRenewWorkIntentionSet.new(event_store:).call(
-        command_id: "cmd-renew-before-expiry",
-        actor: { kind: "agent", id: "agent-a" },
-        change_set_id: "CS-LSE",
-        work_item_id: "W-LSE-A",
-        attempt_id: "A-LSE-A",
-        intention_set_id: reservation.receipt.intention_set_id,
-        intentions: WorkIntentionOperationScenario.work_intention_inputs(reservation.receipt),
-        ttl_seconds: 60
-      ).value!
+      WorkIntentionOperationScenario.renewal_event(event_store:, reference:, duration: 60)
     end
 
     result = Timecop.freeze(Time.utc(2026, 8, 22, 10, 0, 30)) do

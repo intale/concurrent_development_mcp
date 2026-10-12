@@ -34,6 +34,7 @@ module Coordinator
           Tools::DevelopmentArtifactLocatorResolve,
           Tools::DevelopmentArtifactList,
           Tools::OperationBatchGet,
+          Tools::WorkIntentionRenewalGet,
           Tools::VerificationObligationsList,
           Tools::MergeSnapshotGet,
           Tools::RepositoryRegister,

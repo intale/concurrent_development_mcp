@@ -40,6 +40,9 @@ module Coordinator::Read
         return unless command_input
 
         persisted_events = load_persisted_events(event)
+        if command_state.tool_name == "work_intention_set_renew"
+          persisted_events += load_renewal_effects(event)
+        end
         Source.new(
           terminal_event: event,
           command_state:,
@@ -50,6 +53,29 @@ module Coordinator::Read
       end
 
       private
+
+      def load_renewal_effects(terminal)
+        saga_events = @event_store.read(@stream_factory.work_intention_set_renewal(terminal.stream.stream_id),
+          Coordinator::Write::EventQueries::WORK_INTENTION_RENEWAL_HISTORY)
+        saga_events = saga_events.select { _1.global_position <= terminal.global_position }
+        assignments = saga_events.select { _1.type == "WorkIntentionRenewalAssigned" }.map { load_payload(_1) }
+        saga_events.select { _1.type == "WorkIntentionRenewalCompleted" }.filter_map do |outcome|
+          completed = load_payload(outcome)
+          reference = completed.renewal_event
+          next unless reference
+
+          assignment = assignments.find { _1.intention_id == completed.intention_id }
+          physical = @event_store.read(@stream_factory.resource_work_intention(completed.intention_id),
+            Coordinator::Write::EventReadCriteria.new(event_types: [ "ResourceWorkIntentionRenewed" ], maximum_count: 1,
+              direction: :asc, from_revision: reference.stream_revision, to_revision: reference.stream_revision)).first
+          matches = assignment && physical && physical.id == reference.event_id && physical.type == reference.type &&
+            physical.stream.context == reference.stream_context && physical.stream.stream_name == reference.stream_name &&
+            physical.stream.stream_id == reference.stream_id && physical.metadata["command_id"] == assignment.renew_command_id &&
+            physical.metadata["renewal_id"] == terminal.stream.stream_id && physical.correlation_id == outcome.correlation_id
+          raise InvalidProjectionSource, "Renewal receipt references a foreign child effect" unless matches
+          physical
+        end
+      end
 
       def validate_terminal!(event)
         result = @contract.call(

@@ -1,0 +1,4 @@
+class Coordinator::Write::Commands::FailCommand < Coordinator::Shared::Value
+  def command_id: () -> String
+  def failure: () -> Coordinator::Write::Tasks::ExecutionFailureV1
+end

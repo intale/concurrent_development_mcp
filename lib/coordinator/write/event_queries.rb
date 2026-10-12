@@ -123,9 +123,16 @@ module Coordinator::Write
     )
 
     COMMAND_HISTORY = EventReadCriteria.new(
-      event_types: [ "CommandRegistered", "CommandSucceeded", "CommandRejected" ],
+      event_types: [ "CommandRegistered", "CommandSucceeded", "CommandRejected", "CommandExecutionFailed" ],
       maximum_count: 2,
       direction: :asc
+    )
+
+    WORK_INTENTION_RENEWAL_HISTORY = EventReadCriteria.new(
+      event_types: %w[WorkIntentionSetRenewalRequested WorkIntentionRenewalAssigned
+        WorkIntentionRenewalCompleted WorkIntentionRenewalFailed
+        WorkIntentionSetRenewalCompleted WorkIntentionSetRenewalFailed],
+      maximum_count: 66, direction: :asc
     )
 
     REPOSITORY_REGISTRATION = EventReadCriteria.new(
@@ -176,6 +183,7 @@ module Coordinator::Write
         "OperationBatchItemRegistrationRejected",
         "OperationBatchItemSucceeded",
         "OperationBatchItemRejected",
+        "OperationBatchItemFailed",
         "OperationBatchItemCompletionLinked",
         "OperationBatchContinuationRequested",
         "OperationBatchCancellationRequested",
@@ -192,6 +200,10 @@ module Coordinator::Write
       direction: :asc
     )
 
+    OPERATION_BATCH_STREAM_REVISION = LatestEventReadCriteria.new(
+      event_types: OPERATION_BATCH_HISTORY.event_types
+    )
+
     OPERATION_BATCH_CONTROL = GroupedEventReadCriteria.new(
       event_types: %w[
         OperationBatchCreated OperationBatchTargetSelected OperationBatchContinuationRequested
@@ -203,7 +215,7 @@ module Coordinator::Write
     OPERATION_BATCH_PROGRESS = EventReadCriteria.new(
       event_types: %w[
         OperationBatchItemExecutionStarted OperationBatchItemSucceeded OperationBatchItemRejected
-        OperationBatchItemRegistrationRejected OperationBatchItemCompletionLinked
+        OperationBatchItemRegistrationRejected OperationBatchItemCompletionLinked OperationBatchItemFailed
       ],
       maximum_count: Types::OPERATION_BATCH_MAXIMUM_ITEMS * 3,
       direction: :asc

@@ -105,6 +105,7 @@ module McpWalkingSliceSpec
       "work_intention_set_declare",
       "work_intention_set_expand",
       "work_intention_set_renew",
+      "work_intention_renewal_get",
       "work_intention_set_withdraw",
       "guidance_record",
       "decision_interpretation_propose"

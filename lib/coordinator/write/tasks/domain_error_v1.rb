@@ -3,6 +3,15 @@
 module Coordinator::Write
   module Tasks
     module DomainErrorV1
+      class SagaExecutionFailureDetails < ExecutionFailureV1
+      end
+
+      class SagaExecutionFailedError < Value
+        attribute :code, Types::String.enum("saga_execution_failed")
+        attribute :message, Types::String
+        attribute :details, SagaExecutionFailureDetails
+      end
+
       class HistoricalCommandRejectionDetails < Value
         attribute :original_code, Types::Identifier
       end

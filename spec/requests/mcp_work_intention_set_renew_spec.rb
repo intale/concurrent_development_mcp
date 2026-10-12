@@ -59,7 +59,10 @@ RSpec.describe "MCP work_intention_set_renew Task boundary", :event_store do
 
     expect(started.causation_id).to eq(submitted.id)
     expect(target_events.map(&:causation_id).uniq).to eq([ started.id ])
-    expect(command_terminal.causation_id).to eq(target_events.last.id)
+    root_id = command_terminal.stream.stream_id
+    saga = event_store.read(streams.work_intention_set_renewal(root_id), Coordinator::Write::EventQueries::WORK_INTENTION_RENEWAL_HISTORY)
+    expect(command_terminal.causation_id).to eq(saga.last.id)
+    expect(saga.map(&:type)).to include("WorkIntentionRenewalCompleted", "WorkIntentionSetRenewalCompleted")
     expect(task_completed.causation_id).to eq(command_terminal.id)
     expect(([ submitted, started, command_terminal, task_completed ] + target_events).map(&:correlation_id).uniq).to eq(
       [ submitted.correlation_id ]
@@ -189,6 +192,9 @@ RSpec.describe "MCP work_intention_set_renew Task boundary", :event_store do
     collector = ReportedErrorCollector.new
     Rails.error.subscribe(collector)
     Coordinator::Container["process_managers.coordination_task_executor"].call(submitted)
+    task = Coordinator::Write::Tasks::Loader.new(event_store:).call(task_id).state
+    request = event_store.read(streams.work_intention_set_renewal(task.command_id), Coordinator::Write::EventQueries::WORK_INTENTION_RENEWAL_HISTORY).first
+    Coordinator::Processes::ProcessManagers::WorkIntentionSetRenewal.new(event_store:).call(request) if request
     raise collector.errors.first if collector.errors.any?
     CommandResultFixture.project(task_id, event_store:)
   ensure

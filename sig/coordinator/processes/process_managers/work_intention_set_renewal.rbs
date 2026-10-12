@@ -1,0 +1,10 @@
+module Coordinator
+  module Processes
+    module ProcessManagers
+      class WorkIntentionSetRenewal
+        def initialize: (event_store: Write::_EventStore, ?loader: Write::WorkIntentionRenewals::Loader, ?set_loader: Write::WorkIntentionSetLoader, ?member_executor: Write::Operations::ExecuteRenewWorkIntention, ?outcome_executor: Write::Operations::ExecuteRecordWorkIntentionRenewalOutcome, ?command_transition: Write::Operations::ApplyCommandTransition, ?command_loader: Write::CommandLifecycle::Loader, ?task_outcome: Write::Operations::RecordCoordinationTaskOutcome, ?stream_factory: Write::StreamFactory, ?source_contract: Contracts::WorkIntentionRenewalSourceEvent) -> void
+        def call: (PgEventstore::Event event) -> nil
+      end
+    end
+  end
+end

@@ -1,0 +1,19 @@
+module Coordinator
+  module Write
+    module WorkIntentionRenewals
+      class State < Shared::Value
+        def request: () -> Events::OptimisticSagas::WorkIntentionSetRenewalRequestedV1?
+        def assignments: () -> Array[Events::OptimisticSagas::WorkIntentionRenewalAssignedV1]
+        def outcomes: () -> Array[Events::OptimisticSagas::WorkIntentionRenewalCompletedV1 | Events::OptimisticSagas::WorkIntentionRenewalFailedV1]
+        def terminal: () -> (Events::OptimisticSagas::WorkIntentionSetRenewalCompletedV1 | Events::OptimisticSagas::WorkIntentionSetRenewalFailedV1)?
+
+        def self.reduce: (Array[Events::Base] events) -> State
+        def apply: (Events::Base event) -> State
+        def outcome: (String intention_id) -> (Events::OptimisticSagas::WorkIntentionRenewalCompletedV1 | Events::OptimisticSagas::WorkIntentionRenewalFailedV1)?
+        def pending: () -> Array[Events::OptimisticSagas::WorkIntentionRenewalAssignedV1]
+        def failed_member: () -> Events::OptimisticSagas::WorkIntentionRenewalFailedV1?
+        def effects_committed?: () -> bool
+      end
+    end
+  end
+end

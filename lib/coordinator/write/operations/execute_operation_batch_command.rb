@@ -10,7 +10,8 @@ module Coordinator::Write
         stream_factory: StreamFactory.new, completion_builder: CommandResultBuilder.new,
         outcome_contract: Contracts::OperationBatchItemOutcome.new,
         command_loader: CommandLifecycle::Loader.new(event_store:),
-        manifest_builder: OperationBatches::ManifestBuilder.new
+        manifest_builder: OperationBatches::ManifestBuilder.new,
+        revision_retry: OptimisticRevisionRetry.new
       )
         @event_store = event_store
         @loader = loader
@@ -23,6 +24,7 @@ module Coordinator::Write
         @outcome_contract = outcome_contract
         @command_loader = command_loader
         @manifest_builder = manifest_builder
+        @revision_retry = revision_retry
       end
 
       def prepare(command, caused_by: nil)
@@ -58,13 +60,31 @@ module Coordinator::Write
 
       def call_prepared_command(command, preparation:, caused_by: nil)
         steps do
-          step @event_store.multiple { execute_attempt(command:, preparation:, caused_by:) }
+          step @revision_retry.call { execute_attempt(command:, preparation:, caused_by:) }
         end
+      rescue PgEventstore::WrongExpectedRevisionError
+        Failure(OutcomeError.new(code: :concurrency_conflict,
+          message: "Batch changed concurrently; the request may succeed if retried",
+          details: { command_id: command.command_id }))
       end
 
       private
 
       def execute_attempt(command:, preparation:, caused_by:)
+        if command.is_a?(Commands::RequestOperationBatchContinuation)
+          prior = @event_store.read_marked(@stream_factory.operation_batch(command.batch_id),
+            MarkedEventReadCriteria.new(event_type: "OperationBatchContinuationRequested",
+              marker: "command:#{command.command_id}", maximum_count: 1, direction: :asc)).first
+          if prior
+            payload = Events::OperationBatchContinuationRequestedV2.new(prior.data.deep_symbolize_keys)
+            return Success(build_completion(command:, event: payload, input_digest: preparation.input_digest,
+              persisted_events: [ prior ], completed_at: prior.created_at.utc.iso8601(6)))
+          end
+        end
+        # Capture revision before state, so a concurrent fact never makes stale
+        # selected state pass a newer optimistic lock.
+        latest = @event_store.read_latest(@stream_factory.operation_batch(command.batch_id), EventQueries::OPERATION_BATCH_STREAM_REVISION)
+        expected_revision = latest&.stream_revision || :no_stream
         snapshot = case command
         when Commands::CreateOperationBatch, Commands::CancelOperationBatch
                      @loader.control(command.batch_id)
@@ -77,7 +97,7 @@ module Coordinator::Write
         return decision if decision.failure?
 
         verify_outcome!(snapshot.state, command) if command.is_a?(Commands::RecordOperationBatchItemOutcome)
-        batch_events = persist_domain(decision.value!, command:, preparation:, caused_by:)
+        batch_events = persist_domain(decision.value!, command:, preparation:, caused_by:, expected_revision:)
         Success(build_completion(
           command:, event: decision.value!.events.first,
           input_digest: preparation.input_digest, persisted_events: batch_events,
@@ -97,7 +117,7 @@ module Coordinator::Write
         raise InvalidOperationBatchItemOutcome, result.errors.to_h.inspect
       end
 
-      def persist_domain(plan, command:, preparation:, caused_by:)
+      def persist_domain(plan, command:, preparation:, caused_by:, expected_revision:)
         stream = @stream_factory.operation_batch(command.batch_id)
         unless plan.writes.all? { _1.stream == stream } && plan.writes.length == preparation.domain_event_ids.length
           raise InvalidOperationBatchEventPlan, "Batch command must emit its complete plan to its own static stream"
@@ -111,7 +131,7 @@ module Coordinator::Write
             correlation_id: preparation.correlation_id
           )
         end
-        @event_store.append(stream, events)
+        @event_store.append(stream, events, expected_revision:)
       end
 
       def build_completion(command:, event:, input_digest:, persisted_events:, completed_at:)

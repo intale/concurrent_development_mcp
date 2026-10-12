@@ -1,0 +1,12 @@
+module Coordinator
+  module Write
+    module WorkIntentionRenewals
+      class MemberFailureV1 < Shared::Value
+        def reason_code: () -> String
+        def reason: () -> String
+        def retryable: () -> bool
+        def attempts: () -> Integer
+      end
+    end
+  end
+end

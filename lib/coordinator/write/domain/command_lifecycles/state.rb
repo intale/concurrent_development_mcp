@@ -8,10 +8,11 @@ module Coordinator::Write
         attribute :request_id, Types::RequestId.optional
         attribute :tool_name, Types::CoordinationToolName.optional
         attribute :canonical_input_digest, Types::Sha256Digest.optional
-        attribute :status, Types::String.enum("absent", "registered", "succeeded", "rejected")
+        attribute :status, Types::String.enum("absent", "registered", "succeeded", "rejected", "failed")
         attribute :rejection_code, Types::Identifier.optional
         attribute :rejection_reason, Types::String.optional
         attribute :rejection_retryable, Types::Strict::Bool.optional
+        attribute :execution_failure, Types.Instance(Tasks::ExecutionFailureV1).optional.default(nil)
 
         def self.initial
           new(
@@ -40,7 +41,7 @@ module Coordinator::Write
         end
 
         def terminal?
-          %w[succeeded rejected].include?(status)
+          %w[succeeded rejected failed].include?(status)
         end
 
         def succeeded?
@@ -49,6 +50,10 @@ module Coordinator::Write
 
         def rejected?
           status == "rejected"
+        end
+
+        def failed?
+          status == "failed"
         end
 
         def apply(event, canonical_input_digest: nil)
@@ -69,6 +74,11 @@ module Coordinator::Write
                            rejection_code: event.error.code,
                            rejection_reason: event.error.message,
                            rejection_retryable: event.retryable
+                         }
+          when Events::OptimisticSagas::CommandExecutionFailedV1
+                         {
+                           status: "failed",
+                           execution_failure: Tasks::ExecutionFailureV1.new(event.to_h.except(:command_id))
                          }
           end
 

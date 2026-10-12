@@ -9,7 +9,7 @@ module Coordinator::Write
         def call(state:, command:)
           return Failure(command_not_found(command.command_id)) if state.absent?
           return Success(nil) if state.succeeded?
-          return Failure(terminal_conflict(state)) if state.rejected?
+          return Failure(terminal_conflict(state)) if state.terminal?
 
           Success(Events::CommandSucceededV1.new(command_id: command.command_id))
         end
@@ -27,7 +27,7 @@ module Coordinator::Write
         def terminal_conflict(state)
           OutcomeError.new(
             code: :command_terminal,
-            message: "Command is already rejected",
+            message: "Command already has another terminal outcome",
             details: { command_id: state.command_id, status: state.status }
           )
         end

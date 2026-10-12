@@ -1,0 +1,9 @@
+module Coordinator
+  module Processes
+    module Contracts
+      class WorkIntentionRenewalSourceEvent < Dry::Validation::Contract
+        def call: (Hash[Symbol | String, untyped] input) -> Dry::Validation::Result
+      end
+    end
+  end
+end

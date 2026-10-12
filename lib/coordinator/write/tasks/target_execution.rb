@@ -4,7 +4,7 @@ module Coordinator::Write
   module Tasks
     class TargetExecution < Value
       attribute :command_state, Types.Instance(Domain::CommandLifecycles::State)
-      attribute :terminal_event, Types.Instance(PgEventstore::Event)
+      attribute :terminal_event, Types.Instance(PgEventstore::Event).optional
     end
   end
 end

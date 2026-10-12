@@ -3,242 +3,63 @@
 module Coordinator::Write
   module Operations
     class ExecuteRenewWorkIntentionSet < Dry::Operation
-      TOOL_NAME = "work_intention_set_renew"
-
-      def initialize(
-        event_store:,
-        preparer: PrepareRenewWorkIntentionSet.new,
-        decider: Domain::WorkIntentions::RenewSet.new,
-        input_digest: CommandInputDigest.new,
-        clock: SystemClock.new,
-        id_generator: IdGenerator.new,
-        event_factory: EventFactory.new,
-        schema_registry: EventSchemaRegistry.new,
-        stream_factory: StreamFactory.new,
-        completion_builder: CommandResultBuilder.new,
-        repository_registration_loader: RepositoryRegistrationLoader.new(event_store:),
-        repository_marker_builder: RepositoryMarkerBuilder.new,
-        resource_loader: WorkIntentionResourceLoader.new(event_store:),
-        set_loader: WorkIntentionSetLoader.new(event_store:),
-        intention_loader: WorkIntentionLoader.new(event_store:)
-      )
-        @event_store = event_store
-        @preparer = preparer
-        @decider = decider
-        @input_digest = input_digest
-        @clock = clock
-        @id_generator = id_generator
-        @event_factory = event_factory
-        @schema_registry = schema_registry
-        @stream_factory = stream_factory
-        @completion_builder = completion_builder
-        @repository_registration_loader = repository_registration_loader
-        @repository_marker_builder = repository_marker_builder
-        @resource_loader = resource_loader
-        @set_loader = set_loader
-        @intention_loader = intention_loader
-      end
-
-      def call(input)
-        command = step @preparer.call(input)
-        step call_command(command)
+      def initialize(event_store:,
+        decider: WorkIntentionRenewals::ValidateRequest.new, clock: SystemClock.new, id_generator: IdGenerator.new,
+        event_factory: EventFactory.new, schema_registry: EventSchemaRegistry.new, stream_factory: StreamFactory.new,
+        set_loader: WorkIntentionSetLoader.new(event_store:), intention_loader: WorkIntentionLoader.new(event_store:),
+        renewal_loader: WorkIntentionRenewals::Loader.new(event_store:), request_decider: WorkIntentionRenewals::Request.new,
+        revision_retry: OptimisticRevisionRetry.new)
+        @event_store, @decider = event_store, decider
+        @clock, @id_generator, @event_factory = clock, id_generator, event_factory
+        @schema_registry, @stream_factory, @set_loader = schema_registry, stream_factory, set_loader
+        @intention_loader, @renewal_loader, @request_decider = intention_loader, renewal_loader, request_decider
+        @revision_retry = revision_retry
       end
 
       def call_command(command, caused_by: nil)
-        prepared = prepare_logical_values(command)
-        steps do
-          step @event_store.multiple { execute_attempt(command:, prepared:, caused_by:) }
+        requested_at = @clock.now
+        expires_at = (Time.iso8601(requested_at) + command.ttl_seconds).utc.iso8601(6)
+        assignments = command.intentions.each_with_index.map do |reference, position|
+          Events::OptimisticSagas::WorkIntentionRenewalAssignedV1.new(
+            renewal_id: command.command_id, position:, **reference.to_h,
+            renew_command_id: @id_generator.uuid_v7, outcome_command_id: @id_generator.uuid_v7)
         end
+        event_ids = Array.new(assignments.length + 1) { @id_generator.uuid_v7 }
+        correlation_id = caused_by&.correlation_id || @id_generator.uuid_v7
+        @revision_retry.call do
+          snapshot = @renewal_loader.call(command.command_id)
+          next Success(snapshot.events.first) if snapshot.state.request
+
+          attempt = @event_store.read(@stream_factory.attempt(command.attempt_id), EventQueries::ATTEMPT_FOR_WORK_INTENTIONS)
+          attempt_state = Domain::Attempts::State.reduce(attempt.map { load_event(_1) })
+          set_state = @set_loader.call(command.intention_set_id)
+          member_states = set_state.members.map { @intention_loader.call(_1.intention_id).state }
+          validation = @decider.call(attempt_state:, set_state:, member_states:, command:,
+            renewed_at: requested_at)
+          next validation if validation.failure?
+
+          events = @request_decider.call(command:, expires_at:, assignments:).zip(event_ids).map do |payload, event_id|
+            @event_factory.build!(event: payload, event_id:,
+              metadata: WorkIntentionRenewals::RequestMetadata.new(command_id: command.command_id, actor_kind: command.actor.kind,
+                actor_id: command.actor.id, recorded_by: "coordinator", policy_version: "work-intention-renewal/v1",
+                task_id: caused_by&.data&.fetch("task_id", nil)),
+              markers: [ "command:#{command.command_id}", "renewal:#{command.command_id}",
+                "work-intention-set:#{command.intention_set_id}", "attempt:#{command.attempt_id}" ], caused_by:, correlation_id:)
+          end
+          persisted = @event_store.append(@stream_factory.work_intention_set_renewal(command.command_id),
+            events, expected_revision: snapshot.latest_revision)
+          Success(persisted.first)
+        end
+      rescue PgEventstore::WrongExpectedRevisionError
+        Failure(OutcomeError.new(code: :concurrency_conflict,
+          message: "Renewal request changed concurrently; the request may succeed if retried",
+          details: { command_id: command.command_id }))
       end
 
       private
 
-      def prepare_logical_values(command)
-        renewed_at = @clock.now
-        expires_at = (Time.iso8601(renewed_at) + command.ttl_seconds).utc.iso8601(6)
-        PreparedWorkIntentionSetRenewal.new(
-          renewed_at:,
-          expires_at:,
-          input_digest: @input_digest.work_intention_set_renew(command),
-          renewals: command.intentions.map do |reference|
-            PreparedWorkIntentionRenewalV1.new(reference:, event_id: @id_generator.uuid_v7)
-          end
-        )
-      end
-
-      def execute_attempt(command:, prepared:, caused_by:)
-        attempt_state = load_attempt_state(command.attempt_id)
-        set_state = @set_loader.call(command.intention_set_id)
-        member_states = set_state.members.map { @intention_loader.call(_1.intention_id).state }
-        decision = @decider.call(
-          attempt_state:,
-          set_state:,
-          member_states:,
-          command:,
-          renewed_at: prepared.renewed_at,
-          expires_at: prepared.expires_at
-        )
-        return decision if decision.failure?
-
-        resources = load_resources(member_states, repository_id: set_state.repository_id)
-        return resources if resources.failure?
-        registration = @repository_registration_loader.call(set_state.repository_id)
-        return repository_not_registered(set_state.repository_id) unless registration
-
-        outcome = decision.value!
-        persisted = if outcome.write?
-                      persist_domain_plan(
-                        outcome.plan,
-                        command:,
-                        prepared:,
-                        member_states:,
-                        resources: resources.value!,
-                        repository_registration: registration,
-                        caused_by:
-                      )
-        else
-                      []
-        end
-        receipt = renewal_receipt(
-          set_state:,
-          member_states:,
-          resources: resources.value!,
-          prepared:
-        )
-        Success(
-          @completion_builder.work_intention_set_renew(
-            command:,
-            renewal: receipt,
-            input_digest: prepared.input_digest,
-            persisted_events: persisted,
-            completed_at: prepared.renewed_at
-          )
-        )
-      end
-
-      def load_attempt_state(attempt_id)
-        events = @event_store.read(
-          @stream_factory.attempt(attempt_id),
-          EventQueries::ATTEMPT_FOR_WORK_INTENTIONS
-        ).map { deserialize(_1) }
-        Domain::Attempts::State.reduce(events)
-      end
-
-      def load_resources(states, repository_id:)
-        resources = states.map do |state|
-          target = WorkIntentionTargetV1.new(
-            resource_id: state.resource_id,
-            base_blob_oid: state.base_blob_oid
-          )
-          result = @resource_loader.call(target, repository_id:)
-          return result if result.failure?
-
-          result.value!
-        end
-        Success(resources)
-      end
-
-      def persist_domain_plan(
-        plan,
-        command:,
-        prepared:,
-        member_states:,
-        resources:,
-        repository_registration:,
-        caused_by:
-      )
-        plan.writes.map do |write|
-          event = write.event
-          state = member_states.find { _1.intention_id == event.intention_id }
-          resource = resources.find { _1.resource_id == event.resource_id }
-          event_id = prepared.renewals.find { _1.reference.intention_id == event.intention_id }.event_id
-          physical = @event_factory.build!(
-            event:,
-            event_id:,
-            metadata: command_metadata(command),
-            markers: lifecycle_markers(
-              command,
-              state:,
-              resource:,
-              repository_registration:
-            ),
-            caused_by:
-          )
-          @event_store.append(write.stream, [ physical ]).fetch(0)
-        end
-      end
-
-      def lifecycle_markers(command, state:, resource:, repository_registration:)
-        [
-          "change-set:#{state.change_set_id}",
-          "work-item:#{state.work_item_id}",
-          "attempt:#{state.attempt_id}",
-          "command:#{command.command_id}",
-          "work-intention-set:#{state.set_id}",
-          "work-intention:#{state.intention_id}",
-          "resource:#{state.resource_id}",
-          "resource-kind:#{resource.kind}",
-          *@repository_marker_builder.call(repository_registration),
-          *@repository_marker_builder.work_intention_event_markers(
-            repository_id: state.repository_id,
-            resource_path: resource.path
-          )
-        ]
-      end
-
-      def renewal_receipt(set_state:, member_states:, resources:, prepared:)
-        references = member_states.map do |state|
-          resource = resources.find { _1.resource_id == state.resource_id }
-          WorkIntentionReceiptReferenceV1.new(
-            intention_id: state.intention_id,
-            resource_id: state.resource_id,
-            resource_kind: resource.kind,
-            resource_path: resource.path,
-            base_blob_oid: state.base_blob_oid,
-            mode: state.mode,
-            purpose: state.purpose,
-            context: state.context,
-            fencing_token: state.fencing_token
-          )
-        end
-        WorkIntentionSetRenewalReceiptV1.new(
-          intention_set_id: set_state.set_id,
-          repository_id: set_state.repository_id,
-          policy_version: WorkIntentionPolicyV1::VERSION,
-          intentions: references,
-          intention_count: references.length,
-          renewed_at: prepared.renewed_at,
-          previous_expires_at: member_states.map(&:expires_at).min,
-          expires_at: member_states.map { [ _1.expires_at, prepared.expires_at ].max }.min
-        )
-      end
-
-      def deserialize(event)
-        @schema_registry.load(
-          type: event.type,
-          schema_version: event.metadata.fetch("schema_version"),
-          data: event.data
-        )
-      end
-
-      def command_metadata(command)
-        EventMetadata.new(
-          command_id: command.command_id,
-          actor_kind: command.actor.kind,
-          actor_id: command.actor.id,
-          recorded_by: "coordinator",
-          policy_version: WorkIntentionPolicyV1::VERSION
-        )
-      end
-
-      def repository_not_registered(repository_id)
-        Failure(
-          OutcomeError.new(
-            code: :repository_not_registered,
-            message: "Repository is not registered",
-            details: { repository_id: }
-          )
-        )
+      def load_event(event)
+        @schema_registry.load(type: event.type, schema_version: event.metadata.fetch("schema_version"), data: event.data)
       end
     end
   end

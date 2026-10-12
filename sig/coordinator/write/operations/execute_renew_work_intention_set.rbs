@@ -2,9 +2,7 @@ module Coordinator
   module Write
     module Operations
       class ExecuteRenewWorkIntentionSet
-        def initialize: (event_store: _EventStore, ?preparer: PrepareRenewWorkIntentionSet, ?decider: Domain::WorkIntentions::RenewSet, ?input_digest: CommandInputDigest, ?clock: Shared::_Clock, ?id_generator: Shared::_IdGenerator, ?event_factory: EventFactory, ?schema_registry: EventSchemaRegistry, ?stream_factory: StreamFactory, ?completion_builder: CommandResultBuilder, ?repository_registration_loader: RepositoryRegistrationLoader, ?repository_marker_builder: RepositoryMarkerBuilder, ?resource_loader: WorkIntentionResourceLoader, ?set_loader: WorkIntentionSetLoader, ?intention_loader: WorkIntentionLoader) -> void
-        %a{rbs:test:skip}
-        def call: (command_input input) -> Dry::Monads::Result
+        def initialize: (event_store: _EventStore, ?decider: WorkIntentionRenewals::ValidateRequest, ?clock: Shared::_Clock, ?id_generator: Shared::_IdGenerator, ?event_factory: EventFactory, ?schema_registry: EventSchemaRegistry, ?stream_factory: StreamFactory, ?set_loader: WorkIntentionSetLoader, ?intention_loader: WorkIntentionLoader, ?renewal_loader: WorkIntentionRenewals::Loader, ?request_decider: WorkIntentionRenewals::Request, ?revision_retry: OptimisticRevisionRetry) -> void
         def call_command: (Commands::RenewWorkIntentionSet command, ?caused_by: PgEventstore::Event?) -> Dry::Monads::Result
       end
     end

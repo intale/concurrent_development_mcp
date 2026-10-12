@@ -824,6 +824,49 @@ ALTER SEQUENCE public.coordinator_search_values_id_seq OWNED BY public.coordinat
 
 
 --
+-- Name: coordinator_work_intention_renewals; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.coordinator_work_intention_renewals (
+    id bigint NOT NULL,
+    renewal_id uuid NOT NULL,
+    task_id uuid,
+    intention_set_id uuid,
+    attempt_id character varying,
+    actor_kind character varying,
+    actor_id character varying,
+    status character varying DEFAULT 'requested'::character varying NOT NULL,
+    expires_at timestamp(6) without time zone,
+    members jsonb DEFAULT '[]'::jsonb NOT NULL,
+    failure jsonb,
+    request_event jsonb,
+    terminal_event jsonb,
+    correlation_id uuid,
+    created_at timestamp(6) without time zone NOT NULL,
+    updated_at timestamp(6) without time zone NOT NULL
+);
+
+
+--
+-- Name: coordinator_work_intention_renewals_id_seq; Type: SEQUENCE; Schema: public; Owner: -
+--
+
+CREATE SEQUENCE public.coordinator_work_intention_renewals_id_seq
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1;
+
+
+--
+-- Name: coordinator_work_intention_renewals_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: -
+--
+
+ALTER SEQUENCE public.coordinator_work_intention_renewals_id_seq OWNED BY public.coordinator_work_intention_renewals.id;
+
+
+--
 -- Name: decision_interpretations; Type: TABLE; Schema: public; Owner: -
 --
 
@@ -1693,6 +1736,13 @@ ALTER TABLE ONLY public.coordinator_search_values ALTER COLUMN id SET DEFAULT ne
 
 
 --
+-- Name: coordinator_work_intention_renewals id; Type: DEFAULT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.coordinator_work_intention_renewals ALTER COLUMN id SET DEFAULT nextval('public.coordinator_work_intention_renewals_id_seq'::regclass);
+
+
+--
 -- Name: development_artifact_observations observed_sequence; Type: DEFAULT; Schema: public; Owner: -
 --
 
@@ -1810,6 +1860,14 @@ ALTER TABLE ONLY public.coordinator_contexts
 
 ALTER TABLE ONLY public.coordinator_search_values
     ADD CONSTRAINT coordinator_search_values_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: coordinator_work_intention_renewals coordinator_work_intention_renewals_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.coordinator_work_intention_renewals
+    ADD CONSTRAINT coordinator_work_intention_renewals_pkey PRIMARY KEY (id);
 
 
 --
@@ -2254,6 +2312,13 @@ CREATE INDEX idx_on_current_global_position_ed0086fb2b ON public.development_art
 --
 
 CREATE INDEX idx_on_declared_global_position_66c5eb75e9 ON public.development_artifact_relations USING btree (declared_global_position);
+
+
+--
+-- Name: idx_on_intention_set_id_updated_at_renewal_id_5078f2ad5d; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_on_intention_set_id_updated_at_renewal_id_5078f2ad5d ON public.coordinator_work_intention_renewals USING btree (intention_set_id, updated_at, renewal_id);
 
 
 --
@@ -2887,6 +2952,20 @@ CREATE INDEX index_coordinator_context_scopes_on_change_set_id ON public.coordin
 
 
 --
+-- Name: index_coordinator_work_intention_renewals_on_renewal_id; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE UNIQUE INDEX index_coordinator_work_intention_renewals_on_renewal_id ON public.coordinator_work_intention_renewals USING btree (renewal_id);
+
+
+--
+-- Name: index_coordinator_work_intention_renewals_on_task_id; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE UNIQUE INDEX index_coordinator_work_intention_renewals_on_task_id ON public.coordinator_work_intention_renewals USING btree (task_id);
+
+
+--
 -- Name: index_decision_definitions_on_definition_digest; Type: INDEX; Schema: public; Owner: -
 --
 
@@ -3359,6 +3438,7 @@ ALTER TABLE ONLY public.operation_batch_outcomes
 SET search_path TO "$user", public;
 
 INSERT INTO "schema_migrations" (version) VALUES
+('20261012111000'),
 ('20261011053000'),
 ('20261010105000'),
 ('20261010081200'),

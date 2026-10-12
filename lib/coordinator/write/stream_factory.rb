@@ -42,6 +42,10 @@ module Coordinator::Write
       )
     end
 
+    def work_intention_set_renewal(renewal_id)
+      StreamReference.new(context: "DevelopmentCoordination", stream_name: "WorkIntentionSetRenewal", stream_id: renewal_id)
+    end
+
     def development_artifact(artifact_id)
       StreamReference.new(
         context: "DevelopmentMemory",

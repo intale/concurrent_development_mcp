@@ -2,8 +2,8 @@ module Coordinator
   module Write
     module Operations
       class ExecuteStartOperationBatchItem
-        def initialize: (event_store: _EventStore, ?loader: OperationBatches::Loader, ?decider: Domain::OperationBatches::StartItem, ?event_factory: EventFactory, ?stream_factory: StreamFactory) -> void
-        def call_in_transaction: (Commands::StartOperationBatchItem command, event_id: String, caused_by: PgEventstore::Event) -> Dry::Monads::Result
+        def initialize: (event_store: _EventStore, ?loader: OperationBatches::Loader, ?decider: Domain::OperationBatches::StartItem, ?event_factory: EventFactory, ?stream_factory: StreamFactory, ?id_generator: Shared::_IdGenerator, ?revision_retry: OptimisticRevisionRetry) -> void
+        def call_command: (Commands::StartOperationBatchItem command, ?event_id: String, caused_by: PgEventstore::Event) -> Dry::Monads::Result
       end
     end
   end

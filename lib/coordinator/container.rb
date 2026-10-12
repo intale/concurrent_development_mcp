@@ -324,8 +324,8 @@ module Coordinator
       Write::Domain::WorkIntentions::ExpandSet.new(stream_factory: self["stream_factory"])
     end
 
-    register("domain.work_intentions.renew", memoize: true) do
-      Write::Domain::WorkIntentions::RenewSet.new(stream_factory: self["stream_factory"])
+    register("work_intention_renewals.validate_request", memoize: true) do
+      Write::WorkIntentionRenewals::ValidateRequest.new
     end
 
     register("domain.work_intentions.withdraw", memoize: true) do
@@ -1469,15 +1469,12 @@ module Coordinator
     register("operations.execute_renew_work_intention_set") do
       Write::Operations::ExecuteRenewWorkIntentionSet.new(
         event_store: self["event_store"],
-        preparer: self["operations.prepare_renew_work_intention_set"],
-        decider: self["domain.work_intentions.renew"],
-        input_digest: self["command_input_digest"],
+        decider: self["work_intention_renewals.validate_request"],
         clock: self["clock"],
         id_generator: self["id_generator"],
         event_factory: self["event_factory"],
         schema_registry: self["event_schema_registry"],
-        stream_factory: self["stream_factory"],
-        completion_builder: self["command_result_builder"]
+        stream_factory: self["stream_factory"]
       )
     end
 
@@ -2112,7 +2109,7 @@ module Coordinator
     end
 
     register("tasks.target_executor", memoize: true) do
-      Write::Tasks::TargetExecutor.new(
+      Processes::TargetCommandExecutor.new(
         event_store: self["event_store"],
         command_loader: self["commands.loader"],
         command_transition: self["operations.apply_command_transition"],
@@ -2818,6 +2815,7 @@ module Coordinator
         self["subscriptions.change_set_readiness"],
         *self["subscriptions.coordination_task_executors"],
         self["subscriptions.operation_batch_runner"],
+        self["subscriptions.work_intention_set_renewal"],
         self["subscriptions.work_intention_expiry_scheduler"],
         self["subscriptions.resource_boundary_maintenance"],
         self["subscriptions.agent_choice_decision_impact"],
@@ -2829,6 +2827,19 @@ module Coordinator
         self["subscriptions.build_progress"]
       ]
       registrations.freeze
+    end
+
+    register("subscriptions.work_intention_set_renewal", memoize: true) do
+      Processes::Subscriptions::WorkIntentionSetRenewal.new(handler:
+        Processes::ProcessManagers::WorkIntentionSetRenewal.new(event_store: self["event_store"]))
+    end
+
+    register("subscriptions.work_intention_renewals", memoize: true) do
+      Read::Subscriptions::WorkIntentionRenewals.new(handler: Read::Projectors::WorkIntentionRenewalsV1.new)
+    end
+
+    register("queries.work_intention_renewal_get") do
+      Read::Queries::WorkIntentionRenewalGet.new
     end
 
     register("subscription_set_factories.process_managers", memoize: true) do
@@ -2890,6 +2901,7 @@ module Coordinator
         self["subscriptions.skills"],
         self["subscriptions.development_artifacts"],
         self["subscriptions.operation_batches"],
+        self["subscriptions.work_intention_renewals"],
         self["subscriptions.verification_obligations"],
         self["subscriptions.merge_snapshots"],
         self["subscriptions.release_sets"]

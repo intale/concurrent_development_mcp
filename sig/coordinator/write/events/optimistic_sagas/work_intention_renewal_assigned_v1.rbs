@@ -1,0 +1,9 @@
+class Coordinator::Write::Events::OptimisticSagas::WorkIntentionRenewalAssignedV1 < Coordinator::Write::Events::Base
+  def renewal_id: () -> String
+  def position: () -> Integer
+  def intention_id: () -> String
+  def resource_id: () -> String
+  def fencing_token: () -> Integer
+  def renew_command_id: () -> String
+  def outcome_command_id: () -> String
+end

@@ -1,0 +1,9 @@
+module Coordinator
+  module Write
+    module WorkIntentionRenewals
+      class RecordOutcome
+        def call: (state: State, command: Commands::RecordWorkIntentionRenewalOutcome) -> Dry::Monads::Result
+      end
+    end
+  end
+end

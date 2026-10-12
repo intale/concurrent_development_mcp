@@ -1,0 +1,4 @@
+class Coordinator::Write::Operations::OptimisticRevisionRetry
+  MAXIMUM_ATTEMPTS: Integer
+  def call: [A] () { () -> A } -> A
+end

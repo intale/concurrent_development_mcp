@@ -12,6 +12,7 @@ module Coordinator::Read
         "OperationBatchItemRegistrationRejected" => 1,
         "OperationBatchItemSucceeded" => 2,
         "OperationBatchItemRejected" => 2,
+        "OperationBatchItemFailed" => 1,
         "OperationBatchItemCompletionLinked" => 1,
         "OperationBatchContinuationRequested" => 2,
         "OperationBatchCancellationRequested" => 2,

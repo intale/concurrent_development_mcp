@@ -16,6 +16,7 @@ module Coordinator::Write
       class DomainRejection < Value
         attribute :kind, Types::String.enum("domain_rejection")
         attribute :status, Types::String.enum(
+          "failed",
           "command_id_reused",
           "denied",
           "conflict",

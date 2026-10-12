@@ -21,6 +21,7 @@ module Coordinator::Read
           OperationBatchItemRegistrationRejected
           OperationBatchItemSucceeded
           OperationBatchItemRejected
+          OperationBatchItemFailed
           OperationBatchItemCompletionLinked
           OperationBatchContinuationRequested
           OperationBatchCancellationRequested

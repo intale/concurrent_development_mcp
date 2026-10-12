@@ -172,6 +172,10 @@ module Coordinator::Read
       attribute :batch, OperationBatchViewV1
     end
 
+    class WorkIntentionRenewalData < Value
+      attribute :renewal, WorkIntentionRenewalViewV1
+    end
+
     Data = EmptyData |
            DomainError |
            OperationData |
@@ -204,11 +208,13 @@ module Coordinator::Read
            DevelopmentArtifactPageData |
            DevelopmentArtifactRelationPageData |
            DevelopmentArtifactLocatorPageData |
-           OperationBatchData
+           OperationBatchData |
+           WorkIntentionRenewalData
     Action = Coordinator::Write::NextAction | NextAction
 
     attribute :status, Types::String.enum(
       "ok",
+      "failed",
       "not_found",
       "invalid",
       "not_modified",

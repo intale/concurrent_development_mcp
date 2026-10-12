@@ -6,7 +6,7 @@ module Coordinator::Write
       ITEM_EVENT_TYPES = %w[
         OperationBatchItemEnqueued OperationBatchItemCommandAssigned OperationBatchItemExecutionStarted
         OperationBatchItemRegistrationRejected OperationBatchItemSucceeded OperationBatchItemRejected
-        OperationBatchItemCompletionLinked
+        OperationBatchItemCompletionLinked OperationBatchItemFailed
       ].freeze
 
       def initialize(

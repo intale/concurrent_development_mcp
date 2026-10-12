@@ -1,0 +1,10 @@
+module Coordinator
+  module Write
+    module Operations
+      class ExecuteRecordWorkIntentionRenewalOutcome
+        def initialize: (event_store: _EventStore, ?loader: WorkIntentionRenewals::Loader, ?decider: WorkIntentionRenewals::RecordOutcome, ?stream_factory: StreamFactory, ?event_factory: EventFactory, ?id_generator: Shared::_IdGenerator, ?revision_retry: OptimisticRevisionRetry) -> void
+        def call_command: (Commands::RecordWorkIntentionRenewalOutcome command, caused_by: PgEventstore::Event) -> Dry::Monads::Result
+      end
+    end
+  end
+end

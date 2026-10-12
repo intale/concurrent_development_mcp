@@ -1,7 +1,7 @@
 module Coordinator
   module Write
     module OperationBatches
-      type outcome = Events::OperationBatchItemSucceededV2 | Events::OperationBatchItemRejectedV2 | Events::OperationBatchItemRegistrationRejectedV1
+      type outcome = Events::OperationBatchItemSucceededV2 | Events::OptimisticSagas::OperationBatchItemFailedV1 | Events::OperationBatchItemRejectedV2 | Events::OperationBatchItemRegistrationRejectedV1
       type item = ItemV2 | ItemIdentityV1
       type completion_link = Events::OperationBatchItemCompletionLinkedV1
       type terminal = Events::OperationBatchCompletedV2 | Events::OperationBatchCancelledV2

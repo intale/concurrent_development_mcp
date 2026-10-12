@@ -1,0 +1,10 @@
+module Coordinator
+  module Read
+    module Repositories
+      class WorkIntentionRenewals
+        def fetch: (?renewal_id: String?, ?task_id: String?) -> WorkIntentionRenewalViewV1?
+        def store: (event: PgEventstore::Event, payload: Write::Events::OptimisticSagas::WorkIntentionSetRenewalRequestedV1 | Write::Events::OptimisticSagas::WorkIntentionRenewalAssignedV1 | Write::Events::OptimisticSagas::WorkIntentionRenewalCompletedV1 | Write::Events::OptimisticSagas::WorkIntentionRenewalFailedV1 | Write::Events::OptimisticSagas::WorkIntentionSetRenewalCompletedV1 | Write::Events::OptimisticSagas::WorkIntentionSetRenewalFailedV1) -> untyped
+      end
+    end
+  end
+end

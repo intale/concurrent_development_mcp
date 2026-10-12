@@ -7,6 +7,7 @@ module Coordinator::Write
 
       attribute :status, Types::String.enum(
         "ok",
+        "failed",
         "invalid",
         "command_id_reused",
         "denied",

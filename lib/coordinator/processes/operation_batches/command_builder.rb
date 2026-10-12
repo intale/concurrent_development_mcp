@@ -23,7 +23,12 @@ module Coordinator::Processes
       end
 
       def record_outcome(source:, item:, execution:, command_id:)
-        rejection = if execution.command_state.rejected?
+        rejection = if execution.command_state.failed?
+                      failure = execution.command_state.execution_failure
+                      Coordinator::Write::OperationBatches::RejectionV1.new(
+                        code: "saga_execution_failed", reason: failure.reason, retryable: failure.retryable
+                      )
+        elsif execution.command_state.rejected?
                       Coordinator::Write::OperationBatches::RejectionV1.new(
                         code: execution.command_state.rejection_code,
                         reason: execution.command_state.rejection_reason,
@@ -36,7 +41,7 @@ module Coordinator::Processes
           batch_id: source.payload.batch_id,
           index: item.index,
           item_command_id: item.command_id,
-          outcome: execution.command_state.status,
+          outcome: execution.command_state.failed? ? "rejected" : execution.command_state.status,
           target_event: event_reference(execution.terminal_event),
           rejection:
         )

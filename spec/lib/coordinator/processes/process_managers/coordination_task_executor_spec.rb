@@ -71,7 +71,7 @@ RSpec.describe Coordinator::Processes::ProcessManagers::CoordinationTaskExecutor
         Coordinator::Write::Operations::StartCoordinationTask.new(transition:).call(task_id:, caused_by: source).value!
         started = task_events(task_id).last
         if status == "completed"
-          execution = Coordinator::Write::Tasks::TargetExecutor.new(event_store:).call(stored_target(task_id), caused_by: started).value!
+          execution = Coordinator::Processes::TargetCommandExecutor.new(event_store:).call(stored_target(task_id), caused_by: started).value!
           outcome = Coordinator::Write::Tasks::OutcomeV3::Completed.new
           parent = execution.terminal_event
         else
@@ -94,7 +94,7 @@ RSpec.describe Coordinator::Processes::ProcessManagers::CoordinationTaskExecutor
     task_id, source = CoordinationTaskReplayFixture.submit(create_change_set_command, event_store:, streams:)
     Coordinator::Write::Operations::StartCoordinationTask.new(transition:).call(task_id:, caused_by: source).value!
     started = task_events(task_id).last
-    execution = Coordinator::Write::Tasks::TargetExecutor.new(event_store:).call(stored_target(task_id), caused_by: started).value!
+    execution = Coordinator::Processes::TargetCommandExecutor.new(event_store:).call(stored_target(task_id), caused_by: started).value!
     target_ids = change_set_events.map(&:id)
     command_ids = command_events(task_id).map(&:id)
 
@@ -165,12 +165,12 @@ RSpec.describe Coordinator::Processes::ProcessManagers::CoordinationTaskExecutor
       end
     end
     execution = trace.enable do
-      Coordinator::Write::Tasks::TargetExecutor.new(event_store:).call(target, caused_by: started).value!
+      Coordinator::Processes::TargetCommandExecutor.new(event_store:).call(target, caused_by: started).value!
     end
     expect(command_reads).not_to be_empty
-    expect(transition_reads).to be_empty
+    expect(transition_reads).not_to be_empty
     expect(terminal_revisions).not_to be_empty
-    expect(terminal_revisions).to all(be_nil)
+    expect(terminal_revisions).to eq([ 0 ])
 
     expect(loader.call(task_id).state.status).to eq("working")
 

@@ -1,0 +1,10 @@
+module Coordinator
+  module Processes
+    module OperationBatches
+      class ItemExecutor
+        def initialize: (event_store: Coordinator::Write::_EventStore, ?target_builder: Coordinator::Write::Tasks::TargetCommandBuilder, ?target_executor: Coordinator::Processes::TargetCommandExecutor, ?start_item: Coordinator::Write::Operations::ExecuteStartOperationBatchItem, ?id_generator: Coordinator::Shared::_IdGenerator) -> void
+        def call: (command: Coordinator::Write::Commands::StartOperationBatchItem, item: Coordinator::Write::OperationBatches::ItemV2, caused_by: PgEventstore::Event) -> Dry::Monads::Result
+      end
+    end
+  end
+end

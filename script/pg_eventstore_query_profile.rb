@@ -1,10 +1,12 @@
 # frozen_string_literal: true
 
 # Load with Rails, not as application code. See the usage comment below.
-# All writes use existing command operations. Only the three subscriptions under
+# All writes use existing command operations. The investigated subscriptions and renewal Saga
 # investigation run; public CLI managers have distinct diagnostic set names.
 #
 #   RAILS_ENV=test TEST_ENV_NUMBER=pgq_<unique_run> \
+#   PG_EVENTSTORE_URI="postgresql://postgres:postgres@localhost:6432/eventstorepgq_<unique_run>_test" \
+#   PG_QUERY_PROFILE_BASE_COMMIT="<verified commit OID>" \
 #   PG_QUERY_PROFILE_DIR="$PWD/tmp/pg_query_profile/<unique_run>" \
 #   COORDINATOR_OBSERVABILITY_ENABLED=false \
 #     bundle exec ruby -r ./spec/support/pg_eventstore_query_profile_safety.rb \
@@ -18,6 +20,9 @@
 # PG_QUERY_PROFILE_MODE=renewal-only and PG_QUERY_PROFILE_RENEWAL_TASK=<task_id>
 # run the same persisted synthetic renewal without concurrent batch traffic; use
 # a new output directory but the matrix's same dedicated test database suffix.
+# Optional PG_QUERY_PROFILE_TRACK_BATCHES is a JSON array of existing
+# {label, batch_id, task_id} entries to resume and observe unfinished batches
+# alongside renewal-only, using their normal persisted subscription positions.
 # SQL logs include synthetic fixture payloads; do not use this on real data.
 
 module PgEventstoreQueryProfile
@@ -74,6 +79,8 @@ module PgEventstoreQueryProfile
       container["subscriptions.coordination_task_executors"].fetch(Integer(role.delete_prefix("lane")))
     when "batch"
       container["subscriptions.operation_batch_runner"]
+    when "renewal"
+      container["subscriptions.work_intention_set_renewal"]
     else
       raise "Unknown consumer role #{role.inspect}"
     end
@@ -174,6 +181,7 @@ module PgEventstoreQueryProfile
       raise "items must be between 1 and 1000" unless (1..1000).cover?(@items)
 
       @timeout = Integer(ENV.fetch("PG_QUERY_PROFILE_TIMEOUT", "480"))
+      @base_commit = ENV.fetch("PG_QUERY_PROFILE_BASE_COMMIT") unless ENV["PG_QUERY_PROFILE_MODE"] == "renewal-only"
     end
 
     def run
@@ -211,8 +219,9 @@ module PgEventstoreQueryProfile
         prior.command_input.input.actor.actor_id == @actor.fetch(:id)
 
       @renewal_input = prior.command_input.input.to_h.except(:actor, :ttl_seconds)
+      tracked_batches = JSON.parse(ENV.fetch("PG_QUERY_PROFILE_TRACK_BATCHES", "[]"), symbolize_names: true)
       start_children
-      phase("renewal-only-warm") { batches([], renewal: "warm") }
+      phase("renewal-only-warm") { batches([], renewal: "warm", observed: tracked_batches) }
       File.write(File.join(PgEventstoreQueryProfile.output, "complete.json"), JSON.pretty_generate(phases: @phases))
     ensure
       stop_children
@@ -284,7 +293,7 @@ module PgEventstoreQueryProfile
       { label:, command:, batch_id: input.fetch(:batch_id) }
     end
 
-    def batches(specifications, renewal: nil)
+    def batches(specifications, renewal: nil, observed: [])
       # Multiple producers use real separate connections. All consumers are
       # already running while each producer submits a complete batch atomically.
       producer_threads = specifications.map do |specification|
@@ -295,7 +304,7 @@ module PgEventstoreQueryProfile
           end
         end
       end
-      submitted = producer_threads.map(&:value)
+      submitted = observed + producer_threads.map(&:value)
       renewal_task = if renewal
         # Let bulk acceptance and the first page begin before issuing renewal.
         sleep(0.25)
@@ -358,7 +367,7 @@ module PgEventstoreQueryProfile
               acceptance_criteria: [ "Renewal remains correct during a concurrent import" ])
       activation = execute("execute_activate_change_set", change_set_id:)
       @container["process_managers.change_set_readiness"].call(activation.terminal_event)
-      base_commit = ENV.fetch("PG_QUERY_PROFILE_BASE_COMMIT")
+      base_commit = @base_commit
       execute("execute_acquire_work_item", change_set_id:, work_item_id:, attempt_id:,
               base_snapshots: [ { repository_id:, commit_oid: base_commit } ])
       resources = 21.times.map do |index|
@@ -381,13 +390,13 @@ module PgEventstoreQueryProfile
     end
 
     def start_children
-      %w[lane0 lane1 batch].each do |role|
+      %w[lane0 lane1 batch renewal].each do |role|
         spawn_child(role, [ "pg-eventstore", "subscriptions", "start", "-p", File.join(PgEventstoreQueryProfile.output, "#{role}.pid"),
                            "-r", "./config/environment.rb", "-r", SAFETY, "-r", SCRIPT ])
       end
       spawn_child("observer", [ "ruby", "-r", SAFETY, "bin/rails", "runner", SCRIPT ])
       deadline = PgEventstoreQueryProfile.monotonic + 60
-      until %w[lane0 lane1 batch].all? { File.exist?(File.join(PgEventstoreQueryProfile.output, "#{_1}.ready.json")) }
+      until %w[lane0 lane1 batch renewal].all? { File.exist?(File.join(PgEventstoreQueryProfile.output, "#{_1}.ready.json")) }
         check_children!
         raise "Consumer startup timed out" if PgEventstoreQueryProfile.monotonic > deadline
 
@@ -450,7 +459,7 @@ module PgEventstoreQueryProfile
   # plans the captured reads but does not execute them or change planner settings.
   def plans
     queries = {}
-    %w[lane0 lane1 batch].each do |role|
+    %w[lane0 lane1 batch renewal].each do |role|
       records(File.join(output, "#{role}.sql.jsonl")) do |record|
         sql = record.fetch("sql")
         next unless record.dig("origin", "kind") == "handler" && /\A\s*SELECT\b/i.match?(sql)
@@ -479,7 +488,7 @@ module PgEventstoreQueryProfile
 
     phases = JSON.parse(File.read(phase_file))
     results = phases.to_h { [ _1.fetch("name"), { elapsed: _1.fetch("elapsed"), roles: {} } ] }
-    %w[lane0 lane1 batch producer].each do |role|
+    %w[lane0 lane1 batch renewal producer].each do |role|
       path = File.join(output, "#{role}.sql.jsonl")
       next unless File.exist?(path)
 
@@ -512,7 +521,7 @@ module PgEventstoreQueryProfile
         end
       end
     end
-    %w[lane0 lane1 batch].each do |role|
+    %w[lane0 lane1 batch renewal].each do |role|
       path = File.join(output, "#{role}.handlers.jsonl")
       next unless File.exist?(path)
 

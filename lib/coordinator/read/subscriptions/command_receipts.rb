@@ -7,7 +7,7 @@ module Coordinator::Read
         set_name: TaskResultSet::SET_NAME,
         subscription_name: "command-receipts-v2",
         streams: [ Coordinator::Shared::Subscriptions::StreamFilter.new(context: "CoordinatorControl", stream_name: "Command") ],
-        event_types: [ "CommandSucceeded", "CommandRejected" ]
+        event_types: [ "CommandSucceeded", "CommandRejected", "CommandExecutionFailed" ]
       )
 
       def initialize(handler:, pull_interval: 1.0)

@@ -1,0 +1,3 @@
+class Coordinator::Write::Domain::CommandLifecycles::Fail
+  def call: (state: Coordinator::Write::Domain::CommandLifecycles::State, command: Coordinator::Write::Commands::FailCommand) -> Dry::Monads::Result
+end

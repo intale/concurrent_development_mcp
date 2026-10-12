@@ -1,0 +1,11 @@
+module Coordinator
+  module Write
+    module WorkIntentionRenewals
+      class Snapshot < Shared::Value
+        def state: () -> State
+        def events: () -> Array[PgEventstore::Event]
+        def latest_revision: () -> (Integer | :no_stream)
+      end
+    end
+  end
+end

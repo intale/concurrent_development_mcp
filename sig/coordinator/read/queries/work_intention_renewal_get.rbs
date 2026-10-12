@@ -1,0 +1,12 @@
+module Coordinator
+  module Read
+    module Queries
+      class WorkIntentionRenewalGet < Dry::Operation
+        def initialize: (?contract: Contracts::WorkIntentionRenewalGet, ?renewals: Repositories::WorkIntentionRenewals) -> void
+        # dry-operation prepends #call; runtime RBS wrapping recursively re-enters that wrapper.
+        %a{rbs:test:skip}
+        def call: (command_input input) -> Dry::Monads::Result
+      end
+    end
+  end
+end

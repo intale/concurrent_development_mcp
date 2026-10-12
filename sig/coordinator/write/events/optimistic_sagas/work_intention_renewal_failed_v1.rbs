@@ -1,0 +1,8 @@
+class Coordinator::Write::Events::OptimisticSagas::WorkIntentionRenewalFailedV1 < Coordinator::Write::Events::Base
+  def renewal_id: () -> String
+  def intention_id: () -> String
+  def reason_code: () -> String
+  def reason: () -> String
+  def retryable: () -> bool
+  def attempts: () -> Integer
+end

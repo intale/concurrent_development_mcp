@@ -651,7 +651,7 @@ module Coordinator::Shared
       "development_artifact_capture",
       "development_artifact_relation_declare"
     )
-    OperationBatchItemStatus = String.enum("pending", "not_run", "succeeded", "rejected")
+    OperationBatchItemStatus = String.enum("pending", "not_run", "succeeded", "rejected", "failed")
     OperationBatchStatus = String.enum("running", "cancelling", "completed", "completed_with_errors", "cancelled")
     Marker = String.constrained(min_size: 1, max_size: COMPOUND_MARKER_MAXIMUM_BYTES)
     MarkerPurpose = String.constrained(format: MARKER_PURPOSE_PATTERN)

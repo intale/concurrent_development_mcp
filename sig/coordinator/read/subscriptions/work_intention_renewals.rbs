@@ -1,0 +1,11 @@
+module Coordinator
+  module Read
+    module Subscriptions
+      class WorkIntentionRenewals < Shared::Subscriptions::Registration
+        DEFINITION: ReadModelDefinition
+
+        def initialize: (handler: Projectors::WorkIntentionRenewalsV1, ?pull_interval: Integer | Float) -> void
+      end
+    end
+  end
+end

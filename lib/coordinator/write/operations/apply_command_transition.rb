@@ -10,22 +10,25 @@ module Coordinator::Write
         loader: CommandLifecycle::Loader.new(event_store:),
         stream_factory: StreamFactory.new,
         event_factory: EventFactory.new,
-        id_generator: IdGenerator.new
+        id_generator: IdGenerator.new,
+        revision_retry: OptimisticRevisionRetry.new
       )
         @event_store = event_store
         @loader = loader
         @stream_factory = stream_factory
         @event_factory = event_factory
         @id_generator = id_generator
+        @revision_retry = revision_retry
       end
 
-      def call(command:, decider:, actor:, tool_name:, caused_by:)
-        snapshot = @loader.call(command.command_id)
-        apply(
-          snapshot:, command:, decider:, actor:, tool_name:, caused_by:,
-          event_id: @id_generator.uuid_v7,
-          expected_revision: snapshot.latest_revision
-        )
+      def call(command:, decider:, actor:, tool_name:, caused_by:, event_id: @id_generator.uuid_v7)
+        @revision_retry.call do
+          snapshot = @loader.call(command.command_id)
+          apply(
+            snapshot:, command:, decider:, actor:, tool_name:, caused_by:, event_id:,
+            expected_revision: snapshot.latest_revision
+          )
+        end
       rescue PgEventstore::WrongExpectedRevisionError
         Failure(
           OutcomeError.new(
@@ -34,11 +37,6 @@ module Coordinator::Write
             details: { command_id: command.command_id }
           )
         )
-      end
-
-      # The caller owns the SERIALIZABLE transaction and supplies its own read.
-      def call_in_transaction(snapshot:, command:, decider:, actor:, tool_name:, caused_by:, event_id:)
-        apply(snapshot:, command:, decider:, actor:, tool_name:, caused_by:, event_id:, expected_revision: nil)
       end
 
       private

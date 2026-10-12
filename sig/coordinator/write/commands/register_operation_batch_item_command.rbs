@@ -1,0 +1,12 @@
+module Coordinator
+  module Write
+    module Commands
+      class RegisterOperationBatchItemCommand < Shared::Value
+        def command_id: () -> String
+        def actor: () -> Actor
+        def batch_id: () -> String
+        def index: () -> Integer
+      end
+    end
+  end
+end

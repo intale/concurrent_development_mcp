@@ -14,20 +14,23 @@ module Coordinator::Processes
         source_builder: OperationBatches::SourceBuilder.new,
         loader: Coordinator::Write::OperationBatches::Loader.new(event_store:),
         target_builder: Coordinator::Write::Tasks::TargetCommandBuilder.new,
-        target_executor: Coordinator::Write::Tasks::TargetExecutor.new(event_store:),
-        item_executor: Coordinator::Write::OperationBatches::ItemExecutor.new(event_store:, target_builder:, target_executor:),
-        item_registrar: Coordinator::Write::Operations::ExecuteAssignOperationBatchItemCommand.new(event_store:),
+        target_executor: Coordinator::Processes::TargetCommandExecutor.new(event_store:),
+        item_executor: Coordinator::Processes::OperationBatches::ItemExecutor.new(event_store:, target_builder:, target_executor:),
+        item_registrar: OperationBatches::ItemRegistrar.new(event_store:),
         command_builder: OperationBatches::CommandBuilder.new,
         process_step_planner: Coordinator::Processes::ProcessStepPlanner.new(event_store:),
-        batch_executor: Coordinator::Write::Operations::ExecuteOperationBatchCommand.new(event_store:)
+        batch_executor: Coordinator::Write::Operations::ExecuteOperationBatchCommand.new(event_store:),
+        item_failure: Coordinator::Write::Operations::ExecuteRecordOperationBatchItemFailure.new(event_store:)
       )
         @source_builder = source_builder
+        @event_store = event_store
         @loader = loader
         @item_executor = item_executor
         @item_registrar = item_registrar
         @command_builder = command_builder
         @process_step_planner = process_step_planner
         @batch_executor = batch_executor
+        @item_failure = item_failure
       end
 
       def call(event)
@@ -55,6 +58,10 @@ module Coordinator::Processes
           result = assign_item(source:, index:)
           if result.failure?
             return progress_after_page(source) if HANDLED_CODES.include?(result.failure.code)
+            if result.failure.code == :concurrency_conflict
+              record_item_failure(source:, index:, failed_step: "assign-item", error: result.failure, effects_committed: false)
+              next
+            end
             raise OperationBatchProcessRejected, result.failure.message
           end
           assignment = result.value!
@@ -98,6 +105,13 @@ module Coordinator::Processes
 
         if target_result.failure?
           @process_step_planner.record_dispatch_failure(process_step: start_step, failure: target_result.failure)
+          if target_result.failure.code == :concurrency_conflict
+            effects = @event_store.read_command_events(Coordinator::Write::CommandEventReadCriteria.new(
+              command_id: item.command_id, through_global_position: Coordinator::Write::EventQueries::RESOURCE_BOUNDARY_MAXIMUM_GLOBAL_POSITION,
+              maximum_count: Coordinator::Write::Types::OPERATION_BATCH_MAXIMUM_HISTORY_EVENTS))
+            record_item_failure(source:, index: item.index, failed_step: "start-or-finalize-item", error: target_result.failure, effects_committed: !effects.empty?)
+            return
+          end
         end
         execution = target_result.value!
         parent = outcome_parent(source, execution)
@@ -113,8 +127,7 @@ module Coordinator::Processes
           source,
           process_command_id: process_step.target_command_id
         )
-        execute!(
-          @batch_executor.call_command(
+        recorded = @batch_executor.call_command(
             @command_builder.record_outcome(
               source:,
               item:,
@@ -122,9 +135,14 @@ module Coordinator::Processes
               command_id: process_step.target_command_id
             ),
             caused_by: process_step.event
-          ),
-          process_step:
-        )
+          )
+        if recorded.failure? && recorded.failure.code == :concurrency_conflict
+          @process_step_planner.record_dispatch_failure(process_step:, failure: recorded.failure)
+          record_item_failure(source:, index: item.index, failed_step: "record-item-outcome", error: recorded.failure,
+            effects_committed: execution.command_state.succeeded? || execution.command_state.execution_failure&.effects_committed || false)
+        else
+          execute!(recorded, process_step:)
+        end
       end
 
       def progress_after_page(source)
@@ -175,6 +193,18 @@ module Coordinator::Processes
           ),
           process_step:
         )
+      end
+
+      def record_item_failure(source:, index:, failed_step:, error:, effects_committed:)
+        step = plan(source_event: source.event, step_name: "record-item-failure",
+          subject_kind: "operation-batch-item", subject_id: "#{source.payload.batch_id}:#{index}", rule_version: "operation-batch-item-failure/v1")
+        command = Coordinator::Write::Commands::RecordOperationBatchItemFailure.new(command_id: step.target_command_id,
+          actor: OperationBatches::CommandBuilder::SYSTEM_ACTOR, batch_id: source.payload.batch_id, index:,
+          failure: Coordinator::Write::Tasks::ExecutionFailureV1.new(failed_step:, reason_code: error.code.to_s,
+            reason: error.message, retryable: true, effects_committed:, attempts: 3))
+        # If the failure fact itself cannot commit after its bounded attempts,
+        # leave delivery unacknowledged. Never fabricate a successful outcome.
+        @item_failure.call_command(command, caused_by: step.event).value!
       end
 
       def outcome_parent(source, execution)
@@ -236,6 +266,9 @@ module Coordinator::Processes
         return if HANDLED_CODES.include?(result.failure.code)
 
         @process_step_planner.record_dispatch_failure(process_step:, failure: result.failure)
+        # A failed continuation/completion was not committed. Preserve the
+        # failure fact, but do not acknowledge delivery and strand the Saga.
+        raise OperationBatchProcessRejected, result.failure.message
       end
 
       def plan(source_event:, step_name:, subject_kind:, subject_id:, rule_version:)

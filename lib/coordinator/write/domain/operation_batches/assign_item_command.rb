@@ -29,12 +29,6 @@ module Coordinator::Write
             batch_id: command.batch_id, index: command.index, command_id:
           )
           writes = [ EventWrite.new(stream: @stream_factory.operation_batch(command.batch_id), event: assignment) ]
-          unless registration
-            writes << EventWrite.new(
-              stream: @stream_factory.command(command_id),
-              event: Events::CommandRegisteredV1.new(command_id:, request_id: item.request_id, tool_name: item.tool_name)
-            )
-          end
           Success(EventPlan.new(writes:))
         end
 

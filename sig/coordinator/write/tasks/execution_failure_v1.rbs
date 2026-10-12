@@ -1,0 +1,8 @@
+class Coordinator::Write::Tasks::ExecutionFailureV1 < Coordinator::Shared::Value
+  def failed_step: () -> String
+  def reason_code: () -> String
+  def reason: () -> String
+  def retryable: () -> bool
+  def effects_committed: () -> bool
+  def attempts: () -> Integer
+end

@@ -1,0 +1,14 @@
+module Coordinator
+  module Write
+    module Commands
+      class RecordWorkIntentionRenewalOutcome < Shared::Value
+        def command_id: () -> String
+        def actor: () -> Actor
+        def renewal_id: () -> String
+        def intention_id: () -> String
+        def renewal_event: () -> EventReference?
+        def failure: () -> WorkIntentionRenewals::MemberFailureV1?
+      end
+    end
+  end
+end

@@ -2,7 +2,7 @@ module Coordinator
   module Write
     module Operations
       class ExecuteAssignOperationBatchItemCommand
-        def initialize: (event_store: _EventStore, ?loader: OperationBatches::Loader, ?decider: Domain::OperationBatches::AssignItemCommand, ?request_marker: CommandLifecycle::RequestMarker, ?schema_registry: EventSchemaRegistry, ?stream_factory: StreamFactory, ?event_factory: EventFactory, ?id_generator: Shared::_IdGenerator) -> void
+        def initialize: (event_store: _EventStore, ?loader: OperationBatches::Loader, ?decider: Domain::OperationBatches::AssignItemCommand, ?registration_loader: OperationBatches::RegistrationLoader, ?stream_factory: StreamFactory, ?event_factory: EventFactory, ?id_generator: Shared::_IdGenerator, ?revision_retry: OptimisticRevisionRetry) -> void
         def call_command: (Commands::AssignOperationBatchItemCommand command, ?caused_by: PgEventstore::Event?) -> Dry::Monads::Result
       end
     end

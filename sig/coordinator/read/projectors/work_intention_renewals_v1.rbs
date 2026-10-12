@@ -1,0 +1,12 @@
+module Coordinator
+  module Read
+    module Projectors
+      class WorkIntentionRenewalsV1
+        PROJECTION: ProjectionDefinition
+
+        def initialize: (?schema_registry: Write::EventSchemaRegistry, ?renewals: Repositories::WorkIntentionRenewals, ?processed_events: Repositories::ProcessedProjectionEvents, ?contract: Contracts::WorkIntentionRenewalSourceEvent) -> void
+        def call: (PgEventstore::Event event) -> void
+      end
+    end
+  end
+end

@@ -11,6 +11,7 @@ module Coordinator
         def status: () -> String
         def terminal?: () -> bool
         def rejected?: () -> bool
+        def failed?: () -> bool
       end
     end
   end

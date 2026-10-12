@@ -127,7 +127,8 @@ RSpec.describe Coordinator::Processes::ProcessManagers::WorkIntentionExpirySched
         "release-set-lifecycle-v1",
         "resource-boundary-maintenance-v2",
         "verification-evidence-outcome-v1",
-        "verification-obligation-validity-v1"
+        "verification-obligation-validity-v1",
+        "work-intention-set-renewal-v1"
       ]
     )
   end
@@ -172,16 +173,7 @@ RSpec.describe Coordinator::Processes::ProcessManagers::WorkIntentionExpirySched
   end
 
   def renew(reservation, duration:)
-    Coordinator::Write::Operations::ExecuteRenewWorkIntentionSet.new(event_store:).call(
-      command_id: "cmd-renew-a",
-      actor: { kind: "agent", id: "agent-a" },
-      change_set_id: "CS-LSE",
-      work_item_id: "W-LSE-A",
-      attempt_id: "A-LSE-A",
-      intention_set_id: reservation.receipt.intention_set_id,
-      intentions: WorkIntentionOperationScenario.work_intention_inputs(reservation.receipt),
-      ttl_seconds: duration
-    ).value!
+    WorkIntentionOperationScenario.renewal_event(event_store:, reference: reservation.receipt.intentions.sole, duration:)
   end
 
   def intention_events(reservation)

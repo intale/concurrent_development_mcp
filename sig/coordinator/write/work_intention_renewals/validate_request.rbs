@@ -1,0 +1,15 @@
+module Coordinator
+  module Write
+    module WorkIntentionRenewals
+      class ValidateRequest
+        def call: (
+          attempt_state: Coordinator::Write::Domain::Attempts::State,
+          set_state: Coordinator::Write::Domain::WorkIntentions::SetState,
+          member_states: Array[Coordinator::Write::Domain::WorkIntentions::State],
+          command: Coordinator::Write::Commands::RenewWorkIntentionSet,
+          renewed_at: String
+        ) -> Dry::Monads::Result
+      end
+    end
+  end
+end

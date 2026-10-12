@@ -5,46 +5,38 @@ RSpec.describe Coordinator::Write::Operations::ExecuteRenewWorkIntentionSet, :ev
   let(:streams) { Coordinator::Write::StreamFactory.new }
   subject(:operation) { described_class.new(event_store:) }
 
-  it "renews every active intention without recording a set snapshot" do
+  it "plans stable child identities and a deadline without renewing any member yet" do
     reservation = setup_reservation
 
-    result = operation.call(renew_input(reservation, command_id: "cmd-renew-intentions"))
+    command = stored_command(renew_input(reservation, command_id: "cmd-renew-intentions"))
+    result = operation.call_command(command)
 
     expect(result).to be_success
-    receipt = result.value!.data
-    expect(receipt.intentions.map(&:intention_id)).to eq(reservation.receipt.intentions.map(&:intention_id))
-    expect(receipt.intentions.map(&:fencing_token)).to eq([ 1, 1 ])
-    expect(receipt.expires_at).to be > receipt.previous_expires_at
-    receipt.intentions.each do |reference|
+    planned = Coordinator::Write::WorkIntentionRenewals::Loader.new(event_store:).call(command.command_id)
+    expect(planned.state.assignments.map(&:intention_id)).to eq(command.intentions.map(&:intention_id))
+    expect(planned.state.assignments.map(&:fencing_token)).to eq([ 1, 1 ])
+    expect(planned.state.assignments.flat_map { [ _1.renew_command_id, _1.outcome_command_id ] }.uniq.length).to eq(4)
+    planned.state.assignments.each do |reference|
       events = read_intention(reference.intention_id)
-      expect(events.map(&:type)).to eq(
-        [ "ResourceWorkIntentionDeclared", "ResourceWorkIntentionRenewed" ]
-      )
-      renewal = events.last
-      expect(renewal.data.keys).to contain_exactly(
-        "intention_id", "resource_id", "fencing_token", "expires_at"
-      )
-      expect(renewal.data).to include(
-        "intention_id" => reference.intention_id,
-        "resource_id" => reference.resource_id,
-        "fencing_token" => reference.fencing_token
-      )
+      expect(events.map(&:type)).to eq([ "ResourceWorkIntentionDeclared" ])
     end
-    expect(result.value!.emitted_events.map(&:type)).not_to include("WriteSetRenewed")
+    replay = operation.call_command(command).value!
+    expect(replay.id).to eq(result.value!.id)
+    expect(Coordinator::Write::WorkIntentionRenewals::Loader.new(event_store:).call(command.command_id).events.map(&:id)).to eq(planned.events.map(&:id))
   end
 
   it "rejects incomplete and stale member observations without partial renewal" do
     reservation = setup_reservation
     intentions = WorkIntentionOperationScenario.work_intention_inputs(reservation.receipt)
 
-    incomplete = operation.call(
+    incomplete = operation.call_command(stored_command(
       renew_input(reservation, command_id: "cmd-renew-incomplete").merge(intentions: intentions.first(1))
-    )
-    stale = operation.call(
+    ))
+    stale = operation.call_command(stored_command(
       renew_input(reservation, command_id: "cmd-renew-stale").merge(
         intentions: intentions.map.with_index { |entry, index| index.zero? ? entry.merge(fencing_token: 2) : entry }
       )
-    )
+    ))
 
     expect(incomplete.failure).to have_attributes(code: :work_intention_set_snapshot_mismatch)
     expect(stale.failure).to have_attributes(code: :work_intention_reference_mismatch)
@@ -53,22 +45,11 @@ RSpec.describe Coordinator::Write::Operations::ExecuteRenewWorkIntentionSet, :ev
     end
   end
 
-  it "returns a no-change result when the requested deadline would not extend the intentions" do
-    reservation = nil
-    Timecop.freeze(Time.utc(2026, 9, 1, 10, 0, 0)) do
-      reservation = setup_reservation
-    end
-
-    result = Timecop.freeze(Time.utc(2026, 9, 1, 10, 0, 10)) do
-      operation.call(
-        renew_input(reservation, command_id: "cmd-renew-shorter").merge(
-          ttl_seconds: 30
-        )
-      )
-    end
-
+  it "still plans the Saga when every member can satisfy the shorter request without a new effect" do
+    reservation = setup_reservation
+    result = operation.call_command(stored_command(renew_input(reservation, command_id: "cmd-renew-shorter").merge(ttl_seconds: 30)))
     expect(result).to be_success
-    expect(result.value!.emitted_events).to be_empty
+    expect(result.value!.type).to eq("WorkIntentionSetRenewalRequested")
     reservation.receipt.intentions.each do |reference|
       expect(read_intention(reference.intention_id).map(&:type)).to eq([ "ResourceWorkIntentionDeclared" ])
     end
@@ -100,10 +81,11 @@ RSpec.describe Coordinator::Write::Operations::ExecuteRenewWorkIntentionSet, :ev
       end
     )
 
-    result = operation.call(input)
+    result = operation.call_command(stored_command(input))
 
     expect(result).to be_success
-    expect(result.value!.data.intentions.map(&:resource_id)).to contain_exactly(
+    planned = Coordinator::Write::WorkIntentionRenewals::Loader.new(event_store:).call(result.value!.stream.stream_id)
+    expect(planned.state.assignments.map(&:resource_id)).to contain_exactly(
       *references.map(&:resource_id)
     )
   end
@@ -114,6 +96,11 @@ RSpec.describe Coordinator::Write::Operations::ExecuteRenewWorkIntentionSet, :ev
       attempts: [ [ "W-LSE-A", "A-LSE-A", "agent-a" ] ]
     )
     WorkIntentionOperationScenario.declare(event_store:, paths: [ "app/a.rb", "app/b.rb" ])
+  end
+
+  def stored_command(input)
+    prepared = Coordinator::Write::Operations::PrepareRenewWorkIntentionSet.new.call(input).value!
+    prepared.class.new(prepared.attributes.merge(command_id: SecureRandom.uuid_v7))
   end
 
   def renew_input(reservation, command_id:)

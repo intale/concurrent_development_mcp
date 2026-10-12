@@ -5,6 +5,7 @@ module Coordinator::Read
     class ResultV1 < Value
       Status = Types::String.enum(
         "ok",
+        "failed",
         "command_id_reused",
         "denied",
         "conflict",

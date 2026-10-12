@@ -23,7 +23,7 @@ module Coordinator::Write
         matches = state.command_id == item.command_id &&
                   state.tool_name == item.tool_name &&
                   state.canonical_input_digest == item.canonical_input_digest &&
-                  state.status == command.outcome
+                  (state.status == command.outcome || (state.failed? && command.outcome == "rejected"))
         base.failure("target Command terminal state must match the Batch item outcome") unless matches
       end
 
@@ -31,7 +31,11 @@ module Coordinator::Write
         command = values[:command]
         state = values[:command_state]
         rejection = command.rejection
-        matches = if command.outcome == "rejected"
+        matches = if state.failed? && command.outcome == "rejected"
+                    rejection && rejection.code == "saga_execution_failed" &&
+                      rejection.reason == state.execution_failure.reason &&
+                      rejection.retryable == state.execution_failure.retryable
+        elsif command.outcome == "rejected"
                     rejection &&
                       rejection.code == state.rejection_code &&
                       rejection.reason == state.rejection_reason &&

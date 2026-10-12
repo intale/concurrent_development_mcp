@@ -1,0 +1,6 @@
+class Coordinator::Write::Events::OptimisticSagas::WorkIntentionSetRenewalRequestedV1 < Coordinator::Write::Events::Base
+  def renewal_id: () -> String
+  def intention_set_id: () -> String
+  def attempt_id: () -> String
+  def expires_at: () -> String
+end

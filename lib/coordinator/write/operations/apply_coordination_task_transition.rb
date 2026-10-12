@@ -11,7 +11,8 @@ module Coordinator::Write
         stream_factory: StreamFactory.new,
         event_factory: EventFactory.new,
         id_generator: IdGenerator.new,
-        revision_guard: ExpectedRevisionGuard.new
+        revision_guard: ExpectedRevisionGuard.new,
+        revision_retry: OptimisticRevisionRetry.new
       )
         @event_store = event_store
         @loader = loader
@@ -19,12 +20,14 @@ module Coordinator::Write
         @event_factory = event_factory
         @id_generator = id_generator
         @revision_guard = revision_guard
+        @revision_retry = revision_retry
       end
 
       def call(command:, decider:, transition_name:, caused_by: nil)
         event_id = @id_generator.uuid_v7
 
         @revision_guard.call(task_id: command.task_id) do
+          @revision_retry.call do
           snapshot = @loader.call(command.task_id)
           decision = decider.call(state: snapshot.state, command:)
           next decision if decision.failure?
@@ -45,6 +48,7 @@ module Coordinator::Write
               occurred_at: persisted.created_at.utc.iso8601(6)
             )
           )
+          end
         end
       end
 

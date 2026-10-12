@@ -1,0 +1,10 @@
+class Coordinator::Write::Events::OptimisticSagas::OperationBatchItemFailedV1 < Coordinator::Write::Events::Base
+  def batch_id: () -> String
+  def index: () -> Integer
+  def failed_step: () -> String
+  def reason_code: () -> String
+  def reason: () -> String
+  def retryable: () -> bool
+  def effects_committed: () -> bool
+  def attempts: () -> Integer
+end

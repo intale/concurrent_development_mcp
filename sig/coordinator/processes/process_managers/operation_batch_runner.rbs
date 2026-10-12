@@ -4,7 +4,7 @@ module Coordinator
       class OperationBatchRunner
         HANDLED_CODES: Array[Symbol]
 
-        def initialize: (event_store: Write::_EventStore, ?source_builder: OperationBatches::SourceBuilder, ?loader: Write::OperationBatches::Loader, ?target_builder: Write::Tasks::TargetCommandBuilder, ?target_executor: Write::Tasks::TargetExecutor, ?item_executor: Write::OperationBatches::ItemExecutor, ?item_registrar: Write::Operations::ExecuteAssignOperationBatchItemCommand, ?command_builder: OperationBatches::CommandBuilder, ?process_step_planner: Coordinator::Processes::ProcessStepPlanner, ?batch_executor: Write::Operations::ExecuteOperationBatchCommand) -> void
+        def initialize: (event_store: Write::_EventStore, ?source_builder: OperationBatches::SourceBuilder, ?loader: Write::OperationBatches::Loader, ?target_builder: Write::Tasks::TargetCommandBuilder, ?target_executor: Coordinator::Processes::TargetCommandExecutor, ?item_executor: Coordinator::Processes::OperationBatches::ItemExecutor, ?item_registrar: Coordinator::Processes::OperationBatches::ItemRegistrar, ?command_builder: OperationBatches::CommandBuilder, ?process_step_planner: Coordinator::Processes::ProcessStepPlanner, ?batch_executor: Write::Operations::ExecuteOperationBatchCommand, ?item_failure: Write::Operations::ExecuteRecordOperationBatchItemFailure) -> void
         def call: (PgEventstore::Event event) -> nil
       end
     end

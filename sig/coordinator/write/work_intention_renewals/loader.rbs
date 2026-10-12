@@ -1,0 +1,10 @@
+module Coordinator
+  module Write
+    module WorkIntentionRenewals
+      class Loader
+        def initialize: (event_store: _EventStore, ?stream_factory: StreamFactory, ?schema_registry: EventSchemaRegistry) -> void
+        def call: (String renewal_id) -> Snapshot
+      end
+    end
+  end
+end

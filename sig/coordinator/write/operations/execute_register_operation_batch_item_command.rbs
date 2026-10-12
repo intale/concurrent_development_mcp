@@ -1,0 +1,10 @@
+module Coordinator
+  module Write
+    module Operations
+      class ExecuteRegisterOperationBatchItemCommand
+        def initialize: (event_store: _EventStore, ?loader: OperationBatches::Loader, ?registration_loader: OperationBatches::RegistrationLoader, ?validation_decider: Domain::OperationBatches::AssignItemCommand, ?registration_decider: OperationBatches::RegisterItemCommand, ?request_marker: CommandLifecycle::RequestMarker, ?event_factory: EventFactory, ?stream_factory: StreamFactory, ?id_generator: Shared::_IdGenerator) -> void
+        def call_command: (Commands::RegisterOperationBatchItemCommand command, caused_by: PgEventstore::Event) -> Dry::Monads::Result
+      end
+    end
+  end
+end

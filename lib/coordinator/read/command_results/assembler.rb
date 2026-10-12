@@ -32,7 +32,9 @@ module Coordinator::Read
       end
 
       def call(source)
-        semantic_result = if source.command_state.rejected?
+        semantic_result = if source.command_state.failed?
+                            failed(source)
+        elsif source.command_state.rejected?
                             rejected(source)
         else
                             completion = successful_completion(source)
@@ -53,6 +55,16 @@ module Coordinator::Read
       end
 
       private
+
+      def failed(source)
+        failure = load_payload(source.terminal_event)
+        details = Coordinator::Write::Tasks::DomainErrorV1::SagaExecutionFailureDetails.new(failure.to_h.except(:command_id))
+        @semantic_result_mapper.call(
+          Failure(Coordinator::Write::OutcomeError.new(
+            code: :saga_execution_failed, message: failure.reason, details: details.to_h
+          )), command_id: source.command_state.request_id, tool_name: source.command_state.tool_name
+        )
+      end
 
       def successful_completion(source)
         args = common_args(source)
@@ -346,7 +358,7 @@ module Coordinator::Read
           policy_version: Coordinator::Write::WorkIntentionPolicyV1::VERSION,
           intentions: evidence.resources,
           intention_count: evidence.resources.length,
-          renewed_at: source.completed_at,
+          renewed_at: effect_timestamp(source, "ResourceWorkIntentionRenewed", fallback_type: "WorkIntentionSetRenewalRequested"),
           previous_expires_at: evidence.before_command_expires_at,
           expires_at: evidence.current_expires_at
         )
@@ -362,7 +374,7 @@ module Coordinator::Read
           intentions: evidence.resources,
           intention_count: evidence.resources.length,
           previous_expires_at: evidence.current_expires_at,
-          withdrawn_at: source.completed_at
+          withdrawn_at: effect_timestamp(source, "ResourceWorkIntentionWithdrawn")
         )
         @completion_builder.work_intention_set_withdraw(**args, release:)
       end
@@ -373,6 +385,12 @@ module Coordinator::Read
           through_position: source.terminal_event.global_position,
           before_position: (source.persisted_events.map(&:global_position).min || source.terminal_event.global_position + 1) - 1
         )
+      end
+
+      def effect_timestamp(source, type, fallback_type: nil)
+        event = source.persisted_events.select { _1.type == type }.last ||
+          source.persisted_events.find { _1.type == fallback_type } || source.terminal_event
+        event.created_at.utc.iso8601(6)
       end
 
       def work_intention_reference_for(declaration)
