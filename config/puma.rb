@@ -28,6 +28,10 @@
 threads_count = ENV.fetch("RAILS_MAX_THREADS", 3)
 threads threads_count, threads_count
 
+workers_count = ENV.fetch("WEB_WORKERS", 1)
+workers workers_count
+preload_app!
+
 # Specifies the `port` that Puma will listen on to receive requests; default is 3000.
 port ENV.fetch("PORT", 3000)
 
