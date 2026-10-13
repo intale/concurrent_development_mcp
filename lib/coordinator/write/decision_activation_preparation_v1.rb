@@ -7,6 +7,8 @@ module Coordinator::Write
       attribute :recorded_event_id, Types::UuidV7
       attribute :derived_event_id, Types::UuidV7
       attribute :activated_event_id, Types::UuidV7
+    attribute :number_event_id, Types::UuidV7
+    attribute :correlation_id, Types::UuidV7
     attribute :slot_opened_event_id, Types::UuidV7
     attribute :slot_head_event_id, Types::UuidV7
     attribute :partition_event_ids, Types::Array.of(Types::UuidV7).constrained(size: 32)

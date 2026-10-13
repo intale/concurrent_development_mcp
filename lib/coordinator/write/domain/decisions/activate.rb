@@ -51,6 +51,12 @@ module Coordinator::Write
             EventWrite.new(
               stream: decision_stream,
               event: activated_event(command)
+            ),
+            EventWrite.new(
+              stream: decision_stream,
+              event: Events::ProjectionNumbers::DecisionCorrectionsNumberChangedV1.new(
+                decision_id: command.decision_id, corrections_number: 0
+              )
             )
           ]
           writes.concat(slot_writes(candidate.slot, decision_head))

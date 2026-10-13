@@ -1,0 +1,6 @@
+module Coordinator::Write::Metadata
+  class OperationBatchManifestV1 < Coordinator::Write::EventMetadata
+    def item_count: () -> Integer
+    def encoded_byte_size: () -> Integer
+  end
+end

@@ -1,0 +1,7 @@
+module Coordinator::Write::Events
+  module ProjectionNumbers
+    class OperationBatchManifestAcceptedV1 < Base
+      def batch_id: () -> String
+    end
+  end
+end

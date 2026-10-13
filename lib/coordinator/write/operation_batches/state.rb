@@ -21,6 +21,8 @@ module Coordinator::Write
       attribute :assignments, Types::Array.of(Events::OperationBatchItemCommandAssignedV1)
       attribute :starts, Types::Array.of(Events::OperationBatchItemExecutionStartedV1)
       attribute :page_size, Types::OperationBatchPageSize.optional
+      attribute :succeeded_items_number, Types::Integer.constrained(gteq: 0, lteq: Types::OPERATION_BATCH_MAXIMUM_ITEMS).optional
+      attribute :unsuccessful_items_number, Types::Integer.constrained(gteq: 0, lteq: Types::OPERATION_BATCH_MAXIMUM_ITEMS).optional
       attribute :outcomes, Types::Array.of(Outcome)
       attribute :completion_links, Types::Array.of(CompletionLink)
       attribute :cancellation, Cancellation.optional
@@ -35,6 +37,8 @@ module Coordinator::Write
           assignments: [],
           starts: [],
           page_size: nil,
+          succeeded_items_number: 0,
+          unsuccessful_items_number: 0,
           outcomes: [],
           completion_links: [],
           cancellation: nil,
@@ -45,6 +49,8 @@ module Coordinator::Write
       def self.reduce(events, items: [], page_size: nil, item_count: items.length)
         creation = nil
         target_selection = nil
+        succeeded_items_number = nil
+        unsuccessful_items_number = nil
         outcomes = []
         assignments = []
         starts = []
@@ -56,6 +62,8 @@ module Coordinator::Write
           case event
           when Events::OperationBatchCreatedV2 then creation = event
           when Events::OperationBatchTargetSelectedV1 then target_selection = event
+          when Events::ProjectionNumbers::OperationBatchSucceededItemsNumberChangedV1 then succeeded_items_number = event.items_number
+          when Events::ProjectionNumbers::OperationBatchUnsuccessfulItemsNumberChangedV1 then unsuccessful_items_number = event.items_number
           when Events::OperationBatchItemCommandAssignedV1 then assignments << event
           when Events::OperationBatchItemExecutionStartedV1 then starts << event
           when Events::OperationBatchItemSucceededV2, Events::OperationBatchItemRejectedV2,
@@ -77,6 +85,8 @@ module Coordinator::Write
           assignments:,
           starts:,
           page_size:,
+          succeeded_items_number:,
+          unsuccessful_items_number:,
           outcomes:,
           completion_links:,
           cancellation:,
@@ -86,6 +96,10 @@ module Coordinator::Write
 
       def item(index)
         items.find { _1.index == index }
+      end
+
+      def numbers_initialized?
+        !succeeded_items_number.nil? && !unsuccessful_items_number.nil?
       end
 
       def outcome(index)

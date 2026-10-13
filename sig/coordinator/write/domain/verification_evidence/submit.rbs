@@ -3,7 +3,7 @@ module Coordinator
     module Domain
       module VerificationEvidence
         class Submit
-          def initialize: (?stream_factory: StreamFactory, ?outcome_digest_builder: CompatibilityAssessments::OutcomeDigestBuilder) -> void
+          def initialize: (?stream_factory: StreamFactory) -> void
           def call: (
             state: State,
             command: Commands::SubmitCompatibilityAssessment,

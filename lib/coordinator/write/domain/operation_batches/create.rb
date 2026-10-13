@@ -27,7 +27,10 @@ module Coordinator::Write
                 command_id: item.command_id,
                 input: item.submitted_input
               )
-            end
+            end,
+            Events::ProjectionNumbers::OperationBatchManifestAcceptedV1.new(batch_id: command.batch_id),
+            Events::ProjectionNumbers::OperationBatchSucceededItemsNumberChangedV1.new(batch_id: command.batch_id, items_number: 0),
+            Events::ProjectionNumbers::OperationBatchUnsuccessfulItemsNumberChangedV1.new(batch_id: command.batch_id, items_number: 0)
           ]
           Success(
             EventPlan.new(

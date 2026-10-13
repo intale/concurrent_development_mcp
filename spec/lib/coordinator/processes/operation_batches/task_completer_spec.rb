@@ -18,9 +18,11 @@ RSpec.describe Coordinator::Processes::OperationBatches::TaskCompleter, :event_s
     Coordinator::Processes::ProcessManagers::CoordinationTaskExecutor.new(event_store:).call(submitted)
     expect(Coordinator::Write::Tasks::Loader.new(event_store:).call(task.task_id).state.status).to eq("working")
     expect(Coordinator::Write::CommandLifecycle::Loader.new(event_store:).call(task.command_id).state.status).to eq("registered")
-    created = event_store.read_grouped(streams.operation_batch(command.batch_id), Coordinator::Write::EventQueries::OPERATION_BATCH_CONTROL).first
+    created = event_store.read_grouped(streams.operation_batch(command.batch_id), Coordinator::Write::EventQueries::OPERATION_BATCH_CONTROL)
+      .find { _1.type == "OperationBatchCreated" }
     Coordinator::Processes::ProcessManagers::OperationBatchRunner.new(event_store:).call(created)
-    terminal = event_store.read_grouped(streams.operation_batch(command.batch_id), Coordinator::Write::EventQueries::OPERATION_BATCH_CONTROL).last
+    terminal = event_store.read_grouped(streams.operation_batch(command.batch_id), Coordinator::Write::EventQueries::OPERATION_BATCH_CONTROL)
+      .find { _1.type == "OperationBatchCompleted" }
     child = Coordinator::Write::OperationBatches::Loader.new(event_store:).item(command.batch_id, 0).state.item(0)
     child_terminal = event_store.read(streams.command(child.command_id), Coordinator::Write::EventQueries::COMMAND_HISTORY).last
     expect(Coordinator::Write::CommandResults::SourceLoader.new(event_store:).call(child_terminal)).not_to be_nil

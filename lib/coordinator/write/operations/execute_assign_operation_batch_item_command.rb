@@ -63,23 +63,25 @@ module Coordinator::Write
       private
 
       def persist(plan, command:, item:, actor:, event_ids:, correlation_id:, caused_by:, expected_revision:)
-        write = plan.writes.sole
-        unless write.stream == @stream_factory.operation_batch(command.batch_id)
+        stream = @stream_factory.operation_batch(command.batch_id)
+        unless plan.writes.all? { _1.stream == stream }
           raise InvalidOperationBatchEventPlan, "Assignment writes only the Batch stream"
         end
         common = {
           command_id: command.command_id, actor_kind: command.actor.kind, actor_id: command.actor.id,
           recorded_by: "coordinator", policy_version: "operation-batch/v2"
         }
-        metadata = write.event.is_a?(Events::OperationBatchItemCommandAssignedV1) ?
-          Metadata::OperationBatchItemAssignmentV1.new(**common, canonical_input_digest: item.canonical_input_digest) :
-          EventMetadata.new(common)
-        event = @event_factory.build!(
-          event: write.event, event_id: event_ids.first, metadata:,
-          markers: [ "operation-batch:#{command.batch_id}", "batch-item:#{command.batch_id}:#{command.index}",
-                     "command:#{command.command_id}" ], correlation_id:, caused_by:
-        )
-        @event_store.append(write.stream, [ event ], expected_revision:).sole
+        events = plan.events.zip(event_ids).map do |payload, event_id|
+          metadata = payload.is_a?(Events::OperationBatchItemCommandAssignedV1) ?
+            Metadata::OperationBatchItemAssignmentV1.new(**common, canonical_input_digest: item.canonical_input_digest) :
+            EventMetadata.new(common)
+          @event_factory.build!(
+            event: payload, event_id:, metadata:,
+            markers: [ "operation-batch:#{command.batch_id}", "batch-item:#{command.batch_id}:#{command.index}",
+                       "command:#{command.command_id}" ], correlation_id:, caused_by:
+          )
+        end
+        @event_store.append(stream, events, expected_revision:).first
       end
     end
   end

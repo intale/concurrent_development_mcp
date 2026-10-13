@@ -79,6 +79,11 @@ module Coordinator::Write
             writes.concat(asset_writes(asset:, asset_id:, asset_stream:, revision_stream:, revision_id:, skill_id: command.skill_id, revision:))
           end
 
+          writes << EventWrite.new(
+            stream: revision_stream,
+            event: Events::ProjectionNumbers::SkillRevisionRepresentationRecordedV1.new(skill_revision_id: revision_id)
+          )
+
           publication = Events::SkillRevisionPublishedV3.new(
             skill_id: command.skill_id,
             skill_revision_id: revision_id,

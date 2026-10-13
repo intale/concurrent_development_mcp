@@ -22,6 +22,26 @@ Then("the Batch Task durably accepts all {int} items") do |count|
   assert_acceptance(@operation_batch_task.dig("result", "statusMessage").include?("requested effects are not yet confirmed"), "Acceptance explains its limited guarantee")
   assert_acceptance_equal(count, operation_batch_events.count { _1.type == "OperationBatchItemEnqueued" }, "Durable manifest count")
   assert_acceptance_equal(1, operation_batch_events.count { _1.type == "OperationBatchCreated" }, "Creation facts")
+  manifest = operation_batch_events.select { _1.type == "OperationBatchManifestAccepted" }.sole
+  assert_acceptance_equal({ "batch_id" => @operation_batch_id }, manifest.data, "Manifest fact has no content dump")
+  assert_acceptance_equal(count, manifest.metadata.fetch("item_count"), "Immutable manifest cardinality")
+  assert_acceptance_equal(
+    operation_batch_events.select { _1.type == "OperationBatchItemEnqueued" }.sum { _1.metadata.fetch("encoded_byte_size") },
+    manifest.metadata.fetch("encoded_byte_size"), "Immutable manifest byte size"
+  )
+end
+
+Then("Batch number facts record {int} successes and {int} unsuccessful items") do |succeeded, unsuccessful|
+  events = operation_batch_events
+  {
+    "OperationBatchSucceededItemsNumberChanged" => succeeded,
+    "OperationBatchUnsuccessfulItemsNumberChanged" => unsuccessful
+  }.each do |type, number|
+    facts = events.select { _1.type == type }
+    assert_acceptance_equal((0..number).to_a, facts.map { _1.data.fetch("items_number") }, "Absolute #{type} progression")
+    assert_acceptance(facts.all? { _1.data.keys.sort == %w[batch_id items_number] }, "Number fact payload stays cohesive")
+    assert_acceptance(facts.all? { _1.correlation_id == events.first.correlation_id }, "Number facts retain the Batch correlation")
+  end
 end
 
 When("the agent submits two independent batches and one ordinary publication sharing an identical request") do

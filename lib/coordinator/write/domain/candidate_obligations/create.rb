@@ -63,6 +63,19 @@ module Coordinator::Write
                 obligation_id: command.obligation_id,
                 candidate_id: state.target.subject.candidate_id
               )
+            ),
+            EventWrite.new(
+              stream:,
+              event: Events::ProjectionNumbers::VerificationObligationEvidenceNumberChangedV1.new(
+                obligation_id: command.obligation_id, evidence_number: 0
+              )
+            ),
+            EventWrite.new(
+              stream:,
+              event: Events::ProjectionNumbers::VerificationObligationEvidenceCoverageChangedV1.new(
+                obligation_id: command.obligation_id,
+                passed_evidence_kinds: [], missing_evidence_kinds: policy.required_evidence
+              )
             )
           ])
           Success(Coordinator::Write::CandidateObligations::DecisionV1.created(plan, obligation))

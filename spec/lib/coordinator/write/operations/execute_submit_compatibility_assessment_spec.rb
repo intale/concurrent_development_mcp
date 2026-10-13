@@ -29,6 +29,17 @@ RSpec.describe Coordinator::Write::Operations::ExecuteSubmitCompatibilityAssessm
       "claimant:agent-blue"
     )
     expect(command_events(input.fetch(:command_id))).to be_empty
+    progress = progress_events(created)
+    expect(progress.select { _1.type == "VerificationObligationEvidenceNumberChanged" }.map(&:data)).to eq([
+      { "obligation_id" => created.fetch(:result).obligation_id, "evidence_number" => 0 },
+      { "obligation_id" => created.fetch(:result).obligation_id, "evidence_number" => 1 }
+    ])
+    expect(progress.last.data).to include("passed_evidence_kinds" => [ "combined_tests" ],
+      "missing_evidence_kinds" => [ "contract_compatibility_review" ])
+    accepted_progress = progress.select { _1.metadata.fetch("command_id") == input.fetch(:command_id) }
+    expect([ events.sole, *accepted_progress ].map(&:id).uniq.length).to eq(3)
+    expect(accepted_progress.map(&:correlation_id).uniq).to eq([ events.sole.correlation_id ])
+    expect(accepted_progress.map(&:metadata)).to all(satisfy { !_1.key?("assessment_input_digest") && !_1.key?("policy") })
   end
 
   it "records evidence before the process manager derives satisfied and failed outcomes" do
@@ -106,6 +117,11 @@ RSpec.describe Coordinator::Write::Operations::ExecuteSubmitCompatibilityAssessm
       [ "VerificationEvidenceSubmitted", "VerificationEvidenceSubmitted" ]
     )
     expect(command_events(input.fetch(:command_id))).to be_empty
+    expect(progress_events(created).select { _1.type == "VerificationObligationEvidenceNumberChanged" }
+      .map { _1.data.fetch("evidence_number") }).to eq([ 0, 1, 2 ])
+    coverage = progress_events(created).select { _1.type == "VerificationObligationEvidenceCoverageChanged" }
+    expect(coverage.length).to eq(1)
+    expect(coverage.sole.data.fetch("passed_evidence_kinds")).to eq([])
   end
 
   it "denies stale policy, claim fences, owners, candidate bindings, terminal histories, and expired claims without receipts" do
@@ -178,6 +194,12 @@ RSpec.describe Coordinator::Write::Operations::ExecuteSubmitCompatibilityAssessm
     end.map(&:value)
 
     expect(results).to all(be_success)
+    progress = progress_events(created)
+    expect(progress.select { _1.type == "VerificationObligationEvidenceNumberChanged" }
+      .map { _1.data.fetch("evidence_number") }).to eq([ 0, 1, 2 ])
+    expect(progress.select { _1.type == "VerificationObligationEvidenceCoverageChanged" }.length).to eq(2)
+    expect(Coordinator::Write::VerificationObligations::OutcomeStateLoader.new(event_store:)
+      .call(created.fetch(:result).obligation_id).latest_revision).to eq(progress.last.stream_revision)
     evidence_events(created).select { _1.type == "VerificationEvidenceSubmitted" }.each do |event|
       process_outcome(event)
       process_outcome(event)
@@ -274,6 +296,8 @@ RSpec.describe Coordinator::Write::Operations::ExecuteSubmitCompatibilityAssessm
       details: include(maximum_count: 32)
     )
     expect(evidence_events(created).length).to eq(32)
+    expect(progress_events(created).select { _1.type == "VerificationObligationEvidenceNumberChanged" }
+      .map { _1.data.fetch("evidence_number") }).to eq((0..32).to_a)
     expect(command_events(overflow.fetch(:command_id))).to be_empty
   end
 
@@ -314,6 +338,14 @@ RSpec.describe Coordinator::Write::Operations::ExecuteSubmitCompatibilityAssessm
 
   def command_events(command_id)
     event_store.read(streams.command(command_id), Coordinator::Write::EventQueries::COMMAND_HISTORY)
+  end
+
+  def progress_events(created)
+    event_store.read(streams.verification_obligation(created.fetch(:result).obligation_id),
+      Coordinator::Write::EventReadCriteria.new(
+        event_types: %w[VerificationObligationEvidenceNumberChanged VerificationObligationEvidenceCoverageChanged],
+        maximum_count: 2 * (Coordinator::Write::Types::VERIFICATION_EVIDENCE_MAXIMUM_COUNT + 1), direction: :asc
+      ))
   end
 
   def process_outcome(event)

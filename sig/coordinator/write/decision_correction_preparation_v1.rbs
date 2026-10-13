@@ -4,6 +4,9 @@ module Coordinator
       def corrected_at: () -> String
       def input_digest: () -> String
       def correction_event_id: () -> String
+      def derived_event_id: () -> String
+      def number_event_id: () -> String
+      def correlation_id: () -> String
       def slot_event_ids: () -> Array[String]
       def partition_event_ids: () -> Array[String]
     end

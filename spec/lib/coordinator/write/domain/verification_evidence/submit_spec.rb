@@ -7,17 +7,21 @@ RSpec.describe Coordinator::Write::Domain::VerificationEvidence::Submit do
   let(:submitted_at) { VerificationEvidenceExamples::SUBMITTED_AT }
   let(:assessment_input_digest) { VerificationEvidenceExamples.digest("new-assessment") }
 
-  it "VER-EVIDENCE-PARTIAL-01 emits one attributed fact and remains open" do
+  it "VER-EVIDENCE-PARTIAL-01 emits attributed evidence and absolute progress, and remains open" do
     result = decide
 
     expect(result).to be_success
-    expect(result.value!.events).to contain_exactly(
+    expect(result.value!.events.first).to match(
       have_attributes(
         evidence_id:,
         evidence_kind: "combined_tests",
         assessment: have_attributes(conclusion: "passed"),
         claim: have_attributes(claimant_id: "agent-blue", fencing_token: 1)
       )
+    )
+    expect(result.value!.events.drop(1)).to contain_exactly(
+      have_attributes(obligation_id: VerificationEvidenceExamples.command.obligation_id, evidence_number: 1),
+      have_attributes(passed_evidence_kinds: [ "combined_tests" ], missing_evidence_kinds: [ "contract_compatibility_review" ])
     )
   end
 
@@ -27,8 +31,11 @@ RSpec.describe Coordinator::Write::Domain::VerificationEvidence::Submit do
 
     plan = decide(state: VerificationEvidenceExamples.state(evidence: [ existing ]), command:).value!
 
-    expect(plan.events.sole).to be_a(Coordinator::Write::Events::VerificationEvidenceSubmittedV2)
-    expect(plan.events.sole.evidence_kind).to eq("contract_compatibility_review")
+    expect(plan.events.first).to be_a(Coordinator::Write::Events::VerificationEvidenceSubmittedV2)
+    expect(plan.events.first.evidence_kind).to eq("contract_compatibility_review")
+    expect(plan.events.last).to have_attributes(
+      passed_evidence_kinds: %w[combined_tests contract_compatibility_review], missing_evidence_kinds: []
+    )
   end
 
   it "VER-EVIDENCE-FAILED-03 records failed evidence without embedding an outcome" do
@@ -36,10 +43,12 @@ RSpec.describe Coordinator::Write::Domain::VerificationEvidence::Submit do
 
     plan = decide(command:).value!
 
-    expect(plan.events.sole).to have_attributes(
+    expect(plan.events.first).to have_attributes(
       evidence_id:,
       assessment: have_attributes(conclusion: "failed")
     )
+    expect(plan.events.last).to have_attributes(evidence_number: 1)
+    expect(plan.events.length).to eq(2)
   end
 
   it "VER-EVIDENCE-NONTERMINAL-04 records inconclusive and not-applicable conclusions without a terminal fact" do
@@ -47,9 +56,21 @@ RSpec.describe Coordinator::Write::Domain::VerificationEvidence::Submit do
       command = VerificationEvidenceExamples.command(conclusion:)
 
       expect(decide(command:).value!.events.map(&:class)).to eq([
-        Coordinator::Write::Events::VerificationEvidenceSubmittedV2
+        Coordinator::Write::Events::VerificationEvidenceSubmittedV2,
+        Coordinator::Write::Events::ProjectionNumbers::VerificationObligationEvidenceNumberChangedV1
       ])
     end
+  end
+
+  it "records a new number without a false coverage change when an already passed kind is submitted again" do
+    existing = VerificationEvidenceExamples.observation(evidence_kind: "combined_tests")
+    plan = decide(state: VerificationEvidenceExamples.state(evidence: [ existing ])).value!
+
+    expect(plan.events.map(&:class)).to eq([
+      Coordinator::Write::Events::VerificationEvidenceSubmittedV2,
+      Coordinator::Write::Events::ProjectionNumbers::VerificationObligationEvidenceNumberChangedV1
+    ])
+    expect(plan.events.last).to have_attributes(evidence_number: 2)
   end
 
   it "VER-EVIDENCE-EXPIRED-05 denies a claim at its exact expiry" do

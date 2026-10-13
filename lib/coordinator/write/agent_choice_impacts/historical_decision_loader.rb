@@ -67,6 +67,8 @@ module Coordinator::Write
         )
         Decisions::DecisionCurrentStateV1.new(
           decision_id: head.decision_id,
+          latest_revision: head.decision_revision,
+          corrections_number: nil,
           definition:,
           head:,
           slot: nil,

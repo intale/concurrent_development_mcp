@@ -1,0 +1,7 @@
+module Coordinator::Write::Events::ProjectionNumbers
+  class VerificationObligationEvidenceCoverageChangedV1 < Coordinator::Write::Events::Base
+    def obligation_id: () -> String
+    def passed_evidence_kinds: () -> Array[String]
+    def missing_evidence_kinds: () -> Array[String]
+  end
+end

@@ -3,6 +3,6 @@
 module Coordinator::Write
   class CandidateCompatibilityObligationPreparationV1 < Value
     attribute :created_at, Types::Timestamp
-    attribute :event_ids, Types::Array.of(Types::UuidV7).constrained(size: 4)
+    attribute :event_ids, Types::Array.of(Types::UuidV7).constrained(size: 6)
   end
 end

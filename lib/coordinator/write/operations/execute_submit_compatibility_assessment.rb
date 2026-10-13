@@ -60,7 +60,7 @@ module Coordinator::Write
           submitted_at: @clock.now,
           input_digest: @input_digest.compatibility_assessment_submit(command),
           assessment_input_digest: @assessment_input_digest.call(command),
-          evidence_event_id: @id_generator.uuid_v7,
+          event_ids: Array.new(3) { @id_generator.uuid_v7 },
           correlation_id: @id_generator.uuid_v7
         )
       end
@@ -176,11 +176,12 @@ module Coordinator::Write
       end
 
       def persist_domain_plan(plan, state:, command:, preparation:, caused_by:)
-        physical = plan.events.map do |event|
+        physical = plan.events.zip(preparation.event_ids).map do |event, event_id|
           @event_factory.build!(
             event:,
-            event_id: preparation.evidence_event_id,
-            metadata: command_metadata(command, state.obligation, preparation),
+            event_id:,
+            metadata: event.is_a?(Events::VerificationEvidenceSubmittedV2) ?
+              command_metadata(command, state.obligation, preparation) : progress_metadata(command),
             markers: event_markers(state, command, event),
             caused_by:,
             correlation_id: root_correlation_id(preparation, caused_by)
@@ -204,6 +205,8 @@ module Coordinator::Write
             "claim:#{event.claim.claim_id}",
             "claimant:#{event.claim.claimant_id}"
           ]
+        else
+          common
         end
       end
 
@@ -237,6 +240,13 @@ module Coordinator::Write
           assessment_input_digest: preparation.assessment_input_digest,
           obligation_validity_input_digest: obligation.validity_input_digest,
           policy: obligation.policy
+        )
+      end
+
+      def progress_metadata(command)
+        EventMetadata.new(
+          command_id: command.command_id, actor_kind: command.actor.kind, actor_id: command.actor.id,
+          recorded_by: "coordinator", policy_version: "compatibility-assessment/v2"
         )
       end
 

@@ -23,28 +23,31 @@ module Coordinator::Write
       private
 
       def validate_correction(key, plan, state, command, streams)
-        writes = plan.writes.first(2)
+        writes = plan.writes.first(3)
         unless writes.map { _1.event.class } == [
           Events::DecisionDerivedFromInterpretationV1,
-          Events::DecisionDefinitionCorrectedV2
+          Events::DecisionDefinitionCorrectedV2,
+          Events::ProjectionNumbers::DecisionCorrectionsNumberChangedV1
         ] && writes.all? { _1.stream == streams.decision(command.decision_id) }
           key.failure("must begin with correction and interpretation-derivation facts")
           return
         end
 
-        derived, correction = writes.map(&:event)
+        derived, correction, number = writes.map(&:event)
         unless correction.decision_id == command.decision_id &&
                correction.interpretation_id == command.interpretation_id &&
                correction.definition == state.candidate.definition.document &&
                derived.decision_id == command.decision_id &&
-               derived.interpretation_id == command.interpretation_id
+               derived.interpretation_id == command.interpretation_id &&
+               number.decision_id == command.decision_id && state.current.corrections_number &&
+               number.corrections_number == state.current.corrections_number + 1
           key.failure("correction facts must retain only the decided definition and identities")
         end
       end
 
       def validate_slots(key, plan, state, command, streams)
         expected = expected_slot_events(state)
-        writes = plan.writes.drop(2).first(expected.length)
+        writes = plan.writes.drop(3).first(expected.length)
         unless writes.map { _1.event.class } == expected
           key.failure("must contain the exact slot topology transition")
           return expected.length
@@ -98,7 +101,7 @@ module Coordinator::Write
       end
 
       def validate_partitions(key, plan, state, command, streams, slot_count)
-        writes = plan.writes.drop(2 + slot_count)
+        writes = plan.writes.drop(3 + slot_count)
         expected = partition_changes(state, command.decision_id)
         unless writes.length == expected.length &&
                writes.all? do |write|

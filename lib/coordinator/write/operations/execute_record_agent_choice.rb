@@ -238,8 +238,11 @@ module Coordinator::Write
         recorded = load_event(recorded_event)
         correction = correction_event && load_event(correction_event)
         head_event = correction_event || activated_event
+        number_event = events.find { _1.type == "DecisionCorrectionsNumberChanged" }
         current = Decisions::DecisionCurrentStateV1.new(
           decision_id: expected_head.decision_id,
+          latest_revision: events.first.stream_revision,
+          corrections_number: number_event && load_event(number_event).corrections_number,
           definition: normalize_definition(correction ? correction.definition : recorded.definition),
           head: Decisions::DecisionHeadV1.new(
             decision_id: expected_head.decision_id,

@@ -41,6 +41,9 @@ RSpec.describe "BAT-01 MCP Operation Batches" do
       OperationBatchTargetSelected
       OperationBatchItemEnqueued
       OperationBatchItemEnqueued
+      OperationBatchManifestAccepted
+      OperationBatchSucceededItemsNumberChanged
+      OperationBatchUnsuccessfulItemsNumberChanged
     ])
     loader = Coordinator::Write::OperationBatches::Loader.new(event_store:)
     items = (0...2).map { loader.item(batch_id, _1).state.items.sole }
@@ -63,14 +66,19 @@ RSpec.describe "BAT-01 MCP Operation Batches" do
       OperationBatchTargetSelected
       OperationBatchItemEnqueued
       OperationBatchItemEnqueued
+      OperationBatchManifestAccepted
+      OperationBatchSucceededItemsNumberChanged
+      OperationBatchUnsuccessfulItemsNumberChanged
       OperationBatchItemCommandAssigned
       OperationBatchItemExecutionStarted
       OperationBatchItemSucceeded
       OperationBatchItemCompletionLinked
+      OperationBatchSucceededItemsNumberChanged
       OperationBatchItemCommandAssigned
       OperationBatchItemExecutionStarted
       OperationBatchItemRejected
       OperationBatchItemCompletionLinked
+      OperationBatchUnsuccessfulItemsNumberChanged
       OperationBatchCompleted
     ])
     expect(persisted_batch_events.map(&:correlation_id).uniq).to contain_exactly(created_event.correlation_id)

@@ -61,6 +61,8 @@ module Coordinator::Write
           input_digest: @input_digest.decision_correct(command),
           correction_event_id: @id_generator.uuid_v7,
           derived_event_id: @id_generator.uuid_v7,
+          number_event_id: @id_generator.uuid_v7,
+          correlation_id: @id_generator.uuid_v7,
           slot_event_ids: Array.new(3) { @id_generator.uuid_v7 },
           partition_event_ids: Array.new(64) { @id_generator.uuid_v7 },
         )
@@ -82,7 +84,7 @@ module Coordinator::Write
           correction_event: future_correction_reference(
             event_id: preparation.correction_event_id,
             decision_id: command.decision_id,
-            stream_revision: current.head.decision_revision + 2
+            stream_revision: current.latest_revision + 2
           )
         )
         return candidate if candidate.failure?
@@ -187,6 +189,7 @@ module Coordinator::Write
         recorded = load_event(recorded_event)
         correction = correction_event && load_event(correction_event)
         head_event = correction_event || activated_event
+        number_event = events.find { _1.type == "DecisionCorrectionsNumberChanged" }
         definition_payload = correction ? correction.definition : recorded.definition
         definition = normalize_definition(definition_payload)
         slot_result = resolve_current_slot(@decision_slot_builder.call(definition))
@@ -199,6 +202,8 @@ module Coordinator::Write
           Decisions::DecisionCurrentStateV1.new(
             decision_id:,
             definition:,
+            latest_revision: events.first.stream_revision,
+            corrections_number: number_event && load_event(number_event).corrections_number,
             head: Decisions::DecisionHeadV1.new(
               decision_id:,
               decision_revision: head_event.stream_revision,
@@ -379,7 +384,8 @@ module Coordinator::Write
               slots:,
               state:
             ),
-            caused_by:
+            caused_by:,
+            correlation_id: caused_by ? nil : preparation.correlation_id
           )
           [ write.stream, event ]
         end
@@ -395,6 +401,8 @@ module Coordinator::Write
           [ preparation.correction_event_id, slot_index, partition_index ]
         when Events::DecisionDerivedFromInterpretationV1
           [ preparation.derived_event_id, slot_index, partition_index ]
+        when Events::ProjectionNumbers::DecisionCorrectionsNumberChangedV1
+          [ preparation.number_event_id, slot_index, partition_index ]
         when Events::DecisionSlotOpenedV2, Events::DecisionSlotHeadChangedV2
           [ preparation.slot_event_ids.fetch(slot_index), slot_index + 1, partition_index ]
         when Events::DecisionAddedToPartitionV1, Events::DecisionRemovedFromPartitionV1
@@ -404,7 +412,8 @@ module Coordinator::Write
 
       def markers_for(event, command, slots:, state:)
         case event
-        when Events::DecisionDefinitionCorrectedV2, Events::DecisionDerivedFromInterpretationV1
+        when Events::DecisionDefinitionCorrectedV2, Events::DecisionDerivedFromInterpretationV1,
+             Events::ProjectionNumbers::DecisionCorrectionsNumberChangedV1
           correction_markers(command, state)
         when Events::DecisionSlotOpenedV2
           slot_markers(slots.fetch(event.slot_id), command)

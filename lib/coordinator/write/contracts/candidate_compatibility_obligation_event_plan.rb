@@ -34,13 +34,20 @@ module Coordinator::Write
           Events::VerificationObligationTargetCandidateAssignedV1.new(
             obligation_id: command.obligation_id,
             candidate_id: state.target.subject.candidate_id
+          ),
+          Events::ProjectionNumbers::VerificationObligationEvidenceNumberChangedV1.new(
+            obligation_id: command.obligation_id, evidence_number: 0
+          ),
+          Events::ProjectionNumbers::VerificationObligationEvidenceCoverageChangedV1.new(
+            obligation_id: command.obligation_id,
+            passed_evidence_kinds: [], missing_evidence_kinds: policy.required_evidence
           )
         ]
         plan = values[:plan]
         unless !state.existing && policy && !reasons.empty? &&
                plan.events == expected &&
-               plan.writes.map(&:stream) == Array.new(4, stream)
-          key(:plan).failure("must contain the four exact cohesive obligation facts")
+               plan.writes.map(&:stream) == Array.new(6, stream)
+          key(:plan).failure("must contain the six exact cohesive obligation and initial progress facts")
         end
       end
     end

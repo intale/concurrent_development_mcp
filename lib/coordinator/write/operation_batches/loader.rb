@@ -25,13 +25,7 @@ module Coordinator::Write
         stream = @stream_factory.operation_batch(batch_id)
         controls = control_events(stream)
         progress = @event_store.read(stream, EventQueries::OPERATION_BATCH_PROGRESS)
-        last_item = @event_store.read_latest(stream, EventQueries::OPERATION_BATCH_LAST_ENQUEUED)
-        count = last_item ? Types::OperationBatchItemIndex[last_item.data.fetch("index")] + 1 : 0
-        if controls.any? { _1.type == "OperationBatchCreated" } && count.zero?
-          raise InvalidOperationBatchHistory, "Accepted Batch has no manifest items"
-        end
-
-        snapshot(controls + progress, item_count: count)
+        snapshot(controls + progress)
       end
 
       def control(batch_id)
@@ -93,6 +87,8 @@ module Coordinator::Write
 
       def snapshot(events, items: [], item_count: nil)
         creation = events.find { _1.type == "OperationBatchCreated" }
+        manifest = events.find { _1.type == "OperationBatchManifestAccepted" }
+        item_count = manifest.metadata.fetch("item_count") if manifest
         SnapshotV1.new(
           state: State.reduce(
             events.map { load(_1) }, items:, item_count:,

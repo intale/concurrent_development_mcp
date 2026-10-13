@@ -91,10 +91,11 @@ RSpec.describe Coordinator::Write::Domain::Skills::GranularPublish do
       Coordinator::Write::Events::SkillAssetContentDefinedV1,
       Coordinator::Write::Events::SkillAssetExecutabilityDefinedV1,
       Coordinator::Write::Events::SkillAssetAddedToRevisionV1,
+      Coordinator::Write::Events::ProjectionNumbers::SkillRevisionRepresentationRecordedV1,
       Coordinator::Write::Events::SkillRevisionPublishedV3
     ])
     expect(writes.map(&:stream).count { _1 == skill_stream }).to eq(2)
-    expect(writes.map(&:stream).count { _1 == revision_stream }).to eq(4)
+    expect(writes.map(&:stream).count { _1 == revision_stream }).to eq(5)
     expect(writes.map(&:stream).count { _1 == asset_stream }).to eq(4)
     expect(writes.find { _1.event.is_a?(Coordinator::Write::Events::SkillAssetContentDefinedV1) }.event.to_h)
       .to eq(asset_id:, content: "#!/bin/sh\n")

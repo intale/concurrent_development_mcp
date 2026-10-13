@@ -8,6 +8,7 @@ module Coordinator
       def revision_created_event_id: () -> String
       def description_event_id: () -> String
       def instructions_event_id: () -> String
+      def representation_event_id: () -> String
       def asset_ids: () -> Array[Skills::AssetPublicationIdsV1]
       def publication_event_id: () -> String
     end

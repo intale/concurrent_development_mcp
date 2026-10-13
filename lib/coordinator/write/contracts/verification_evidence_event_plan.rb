@@ -20,10 +20,8 @@ module Coordinator::Write
           assessment_input_digest: values[:assessment_input_digest],
           submitted_at: values[:submitted_at]
         )
-        valid = decision.success? && decision.value! == values[:plan] &&
-          values[:plan].events.length == 1 &&
-          values[:plan].events.sole.is_a?(Events::VerificationEvidenceSubmittedV2)
-        key(:plan).failure("must preserve the exact cohesive verification-evidence decision") unless valid
+        valid = decision.success? && decision.value! == values[:plan]
+        key(:plan).failure("must preserve the exact evidence and absolute progress decision") unless valid
       end
     end
   end

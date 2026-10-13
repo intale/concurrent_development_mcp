@@ -16,6 +16,9 @@ module Coordinator
         def assignments: () -> Array[Events::OperationBatchItemCommandAssignedV1]
         def starts: () -> Array[Events::OperationBatchItemExecutionStartedV1]
         def page_size: () -> Integer?
+        def succeeded_items_number: () -> Integer?
+        def unsuccessful_items_number: () -> Integer?
+        def numbers_initialized?: () -> bool
         def outcomes: () -> Array[outcome]
         def completion_links: () -> Array[completion_link]
         def cancellation: () -> Events::OperationBatchCancellationRequestedV2?

@@ -16,6 +16,9 @@ module Coordinator::Write
           return Failure(item_not_found(command)) unless state.item(command.index)
           return Failure(already_recorded(command)) if state.outcome(command.index)
           return Failure(rejection_mismatch(command)) unless rejection_matches_outcome?(command)
+          unless state.numbers_initialized?
+            return Failure(error(:operation_batch_numbers_uninitialized, "Batch numbers must be initialized from authoritative history", command))
+          end
 
           event = if command.outcome == "rejected"
                     rejected_event(command)
@@ -29,7 +32,16 @@ module Coordinator::Write
             completion: command.target_event
           )
           stream = @stream_factory.operation_batch(command.batch_id)
-          Success(EventPlan.new(writes: [ event, completion ].map { EventWrite.new(stream:, event: _1) }))
+          number = if command.outcome == "rejected"
+                     Events::ProjectionNumbers::OperationBatchUnsuccessfulItemsNumberChangedV1.new(
+                       batch_id: command.batch_id, items_number: state.unsuccessful_items_number + 1
+                     )
+          else
+                     Events::ProjectionNumbers::OperationBatchSucceededItemsNumberChangedV1.new(
+                       batch_id: command.batch_id, items_number: state.succeeded_items_number + 1
+                     )
+          end
+          Success(EventPlan.new(writes: [ event, completion, number ].map { EventWrite.new(stream:, event: _1) }))
         end
 
         private

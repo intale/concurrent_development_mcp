@@ -21,7 +21,7 @@ RSpec.describe Coordinator::Write::Operations::ExecuteClaimVerificationObligatio
 
     expect(result).to be_success
     claim = claim_events.sole
-    expect(claim).to have_attributes(type: "VerificationObligationClaimed", stream_revision: 4)
+    expect(claim).to have_attributes(type: "VerificationObligationClaimed", stream_revision: 6)
     expect(claim.data).to include(
       "obligation_id" => obligation_id,
       "claimant_id" => "agent-blue",
@@ -45,7 +45,7 @@ RSpec.describe Coordinator::Write::Operations::ExecuteClaimVerificationObligatio
       claim_id: claim.data.fetch("claim_id"),
       claimant_id: "agent-blue",
       fencing_token: 1,
-      claim_event: have_attributes(event_id: claim.id, stream_revision: 4)
+      claim_event: have_attributes(event_id: claim.id, stream_revision: 6)
     )
     expect(command_events("cmd-claim-1")).to be_empty
   end

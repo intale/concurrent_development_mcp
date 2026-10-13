@@ -56,6 +56,8 @@ module Coordinator::Write
           recorded_event_id: @id_generator.uuid_v7,
           derived_event_id: @id_generator.uuid_v7,
           activated_event_id: @id_generator.uuid_v7,
+          number_event_id: @id_generator.uuid_v7,
+          correlation_id: @id_generator.uuid_v7,
           slot_opened_event_id: @id_generator.uuid_v7,
           slot_head_event_id: @id_generator.uuid_v7,
           partition_event_ids: Array.new(32) { @id_generator.uuid_v7 },
@@ -307,7 +309,8 @@ module Coordinator::Write
             event_id:,
             metadata: command_metadata(command),
             markers: markers_for(write.event, command, definition:, slot:),
-            caused_by:
+            caused_by:,
+            correlation_id: caused_by ? nil : preparation.correlation_id
           )
           [ write.stream, event ]
         end
@@ -325,6 +328,8 @@ module Coordinator::Write
           [ preparation.derived_event_id, partition_index ]
         when Events::DecisionActivatedV2
           [ preparation.activated_event_id, partition_index ]
+        when Events::ProjectionNumbers::DecisionCorrectionsNumberChangedV1
+          [ preparation.number_event_id, partition_index ]
         when Events::DecisionSlotOpenedV2
           [ preparation.slot_opened_event_id, partition_index ]
         when Events::DecisionSlotHeadChangedV2
@@ -337,7 +342,7 @@ module Coordinator::Write
       def markers_for(event, command, definition:, slot:)
         case event
         when Events::DecisionRecordedV2, Events::DecisionDerivedFromInterpretationV1,
-             Events::DecisionActivatedV2
+             Events::DecisionActivatedV2, Events::ProjectionNumbers::DecisionCorrectionsNumberChangedV1
           decision_markers(command, definition, slot)
         when Events::DecisionSlotOpenedV2, Events::DecisionSlotHeadChangedV2
           slot_markers(slot, command)

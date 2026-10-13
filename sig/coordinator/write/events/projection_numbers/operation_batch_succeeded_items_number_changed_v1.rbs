@@ -1,0 +1,6 @@
+module Coordinator::Write::Events::ProjectionNumbers
+  class OperationBatchSucceededItemsNumberChangedV1 < Coordinator::Write::Events::Base
+    def batch_id: () -> String
+    def items_number: () -> Integer
+  end
+end

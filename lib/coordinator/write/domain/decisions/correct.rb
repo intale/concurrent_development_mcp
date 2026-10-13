@@ -18,6 +18,11 @@ module Coordinator::Write
 
         def call(state:, command:, corrected_at:)
           return revision_changed(state.current, command) unless state.current.head.event == command.expected_head
+          if state.current.corrections_number.nil?
+            return Failure(OutcomeError.new(code: :decision_corrections_number_uninitialized,
+              message: "Decision has no authoritative corrections number; initialize its history before correcting it",
+              details: { decision_id: command.decision_id }))
+          end
 
           slot_error = validate_slots(state)
           return slot_error if slot_error
@@ -48,6 +53,12 @@ module Coordinator::Write
             EventWrite.new(
               stream: @stream_factory.decision(command.decision_id),
               event: correction_event(candidate, command)
+            ),
+            EventWrite.new(
+              stream: @stream_factory.decision(command.decision_id),
+              event: Events::ProjectionNumbers::DecisionCorrectionsNumberChangedV1.new(
+                decision_id: command.decision_id, corrections_number: current.corrections_number + 1
+              )
             )
           ]
           writes.concat(slot_writes(state, correction_head))

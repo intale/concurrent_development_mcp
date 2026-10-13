@@ -17,7 +17,10 @@ RSpec.describe Coordinator::Write::Operations::ExecuteOperationBatchCommand, :ev
       "OperationBatchCreated",
       "OperationBatchTargetSelected",
       "OperationBatchItemEnqueued",
-      "OperationBatchItemEnqueued"
+      "OperationBatchItemEnqueued",
+      "OperationBatchManifestAccepted",
+      "OperationBatchSucceededItemsNumberChanged",
+      "OperationBatchUnsuccessfulItemsNumberChanged"
     ])
     expect(first.value!.data).to have_attributes(
       batch_id: command.batch_id,
@@ -34,6 +37,14 @@ RSpec.describe Coordinator::Write::Operations::ExecuteOperationBatchCommand, :ev
     expect(load(target)).to have_attributes(batch_id: command.batch_id, target_tool: "skill_publish")
     enqueued = events.select { _1.type == "OperationBatchItemEnqueued" }
     expect(enqueued.map { _1.metadata.keys }).to all(include("canonical_input_digest", "encoded_byte_size"))
+    manifest = events.find { _1.type == "OperationBatchManifestAccepted" }
+    expect(manifest.data).to eq("batch_id" => command.batch_id)
+    expect(manifest.metadata).to include(
+      "item_count" => 2,
+      "encoded_byte_size" => enqueued.sum { _1.metadata.fetch("encoded_byte_size") }
+    )
+    numbers = events.select { _1.type.end_with?("ItemsNumberChanged") }
+    expect(numbers.map(&:data)).to all(eq("batch_id" => command.batch_id, "items_number" => 0))
     loader = Coordinator::Write::OperationBatches::Loader.new(event_store:)
     items = (0...2).map { loader.item(command.batch_id, _1).state.items.sole }
     expect(items.map(&:request_id)).to eq(%w[item-1 item-2])
@@ -55,7 +66,7 @@ RSpec.describe Coordinator::Write::Operations::ExecuteOperationBatchCommand, :ev
     expect(operation.call_command(original).failure.code).to eq(:operation_batch_id_conflict)
     expect(operation.call_command(changed_command).failure.code).to eq(:operation_batch_id_conflict)
     expect(operation.call_command(conflicting_batch).failure.code).to eq(:operation_batch_id_conflict)
-    expect(batch_events(original.batch_id).length).to eq(4)
+    expect(batch_events(original.batch_id).length).to eq(7)
   end
 
   it "projects a batch-item result from its persisted Batch instruction without a Task submission" do

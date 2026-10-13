@@ -57,6 +57,7 @@ module Coordinator::Write
           revision_created_event_id: @id_generator.uuid_v7,
           description_event_id: @id_generator.uuid_v7,
           instructions_event_id: @id_generator.uuid_v7,
+          representation_event_id: @id_generator.uuid_v7,
           asset_ids: command.assets.map { build_asset_ids },
           publication_event_id: @id_generator.uuid_v7
         )
@@ -269,6 +270,7 @@ module Coordinator::Write
         when Events::SkillRevisionCreatedV1 then preparation.revision_created_event_id
         when Events::SkillRevisionDescriptionDefinedV1 then preparation.description_event_id
         when Events::SkillRevisionInstructionsDefinedV1 then preparation.instructions_event_id
+        when Events::ProjectionNumbers::SkillRevisionRepresentationRecordedV1 then preparation.representation_event_id
         when Events::SkillRevisionPublishedV3 then preparation.publication_event_id
         else
           asset_ids = preparation.asset_ids.find { _1.asset_id == event.asset_id }
@@ -307,6 +309,8 @@ module Coordinator::Write
           )
         when Events::SkillRevisionPublishedV3
           Metadata::SkillPublicationV3.new(**attributes, content_digest: command.content_digest)
+        when Events::ProjectionNumbers::SkillRevisionRepresentationRecordedV1
+          Metadata::SkillRevisionRepresentationV1.new(**attributes, asset_count: command.assets.length)
         else
           EventMetadata.new(**attributes)
         end
@@ -341,6 +345,7 @@ module Coordinator::Write
         when Events::SkillRevisionCreatedV1,
              Events::SkillRevisionDescriptionDefinedV1,
              Events::SkillRevisionInstructionsDefinedV1,
+             Events::ProjectionNumbers::SkillRevisionRepresentationRecordedV1,
              Events::SkillAssetAddedToRevisionV1
           markers << "skill-revision:#{event.skill_revision_id}"
         when Events::SkillAssetCreatedV1,

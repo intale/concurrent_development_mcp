@@ -5,6 +5,9 @@ module Coordinator
       def input_digest: () -> String
       def recorded_event_id: () -> String
       def activated_event_id: () -> String
+      def derived_event_id: () -> String
+      def number_event_id: () -> String
+      def correlation_id: () -> String
       def slot_opened_event_id: () -> String
       def slot_head_event_id: () -> String
       def partition_event_ids: () -> Array[String]

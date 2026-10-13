@@ -41,8 +41,8 @@ module Coordinator::Write
                   []
         end
         count = case command
-        when Commands::CreateOperationBatch then items.length + 2
-        when Commands::RecordOperationBatchItemOutcome then 2
+        when Commands::CreateOperationBatch then items.length + 5
+        when Commands::RecordOperationBatchItemOutcome then 3
         else 1
         end
         OperationBatches::PreparationV1.new(
@@ -161,6 +161,9 @@ module Coordinator::Write
             **common, canonical_input_digest: item.canonical_input_digest,
             encoded_byte_size: preparation.item_encoded_byte_sizes.fetch(event.index)
           )
+        when Events::ProjectionNumbers::OperationBatchManifestAcceptedV1
+          Metadata::OperationBatchManifestV1.new(**common, item_count: preparation.items.length,
+            encoded_byte_size: preparation.item_encoded_byte_sizes.sum)
         else
           EventMetadata.new(common)
         end

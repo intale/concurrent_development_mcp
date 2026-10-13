@@ -59,7 +59,7 @@ RSpec.describe "DEC-02A MCP Decision correction" do
         "policy_status" => "active",
           "correction_event" => include(
             "type" => "DecisionDefinitionCorrected",
-            "stream_revision" => 4
+            "stream_revision" => 5
         )
       ),
       "next_actions" => [

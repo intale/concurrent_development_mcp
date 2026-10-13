@@ -25,7 +25,18 @@ module Coordinator::Write
             command:,
             evidence_id:
           )
-          Success(EventPlan.new(writes: [ write(command.obligation_id, evidence) ]))
+          events = [ evidence, Events::ProjectionNumbers::VerificationObligationEvidenceNumberChangedV1.new(
+            obligation_id: command.obligation_id, evidence_number: state.evidence.length + 1
+          ) ]
+          previous_passed = state.passed_evidence_by_kind.keys
+          if evidence.assessment.conclusion == "passed" && !previous_passed.include?(evidence.evidence_kind)
+            required = state.obligation.required_evidence
+            passed = required.select { previous_passed.include?(_1) || _1 == evidence.evidence_kind }
+            events << Events::ProjectionNumbers::VerificationObligationEvidenceCoverageChangedV1.new(
+              obligation_id: command.obligation_id, passed_evidence_kinds: passed, missing_evidence_kinds: required - passed
+            )
+          end
+          Success(EventPlan.new(writes: events.map { write(command.obligation_id, _1) }))
         end
 
         private

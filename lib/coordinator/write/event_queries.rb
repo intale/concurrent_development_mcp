@@ -176,6 +176,9 @@ module Coordinator::Write
     OPERATION_BATCH_HISTORY = EventReadCriteria.new(
       event_types: [
         "OperationBatchCreated",
+        "OperationBatchManifestAccepted",
+        "OperationBatchSucceededItemsNumberChanged",
+        "OperationBatchUnsuccessfulItemsNumberChanged",
         "OperationBatchTargetSelected",
         "OperationBatchItemEnqueued",
         "OperationBatchItemCommandAssigned",
@@ -190,7 +193,7 @@ module Coordinator::Write
         "OperationBatchCancelled",
         "OperationBatchCompleted"
       ],
-      maximum_count: Types::OPERATION_BATCH_MAXIMUM_HISTORY_EVENTS,
+      maximum_count: Types::OPERATION_BATCH_MAXIMUM_HISTORY_EVENTS + Types::OPERATION_BATCH_MAXIMUM_ITEMS + 3,
       direction: :asc
     )
 
@@ -208,8 +211,9 @@ module Coordinator::Write
       event_types: %w[
         OperationBatchCreated OperationBatchTargetSelected OperationBatchContinuationRequested
         OperationBatchCancellationRequested OperationBatchCancelled OperationBatchCompleted
+        OperationBatchManifestAccepted OperationBatchSucceededItemsNumberChanged OperationBatchUnsuccessfulItemsNumberChanged
       ],
-      direction: :asc
+      direction: :desc
     )
 
     OPERATION_BATCH_PROGRESS = EventReadCriteria.new(
@@ -221,10 +225,6 @@ module Coordinator::Write
       direction: :asc
     )
 
-    OPERATION_BATCH_LAST_ENQUEUED = LatestEventReadCriteria.new(
-      event_types: [ "OperationBatchItemEnqueued" ]
-    )
-
     DECISION_EXISTENCE = EventReadCriteria.new(
       event_types: [ "DecisionRecorded", "DecisionActivated" ],
       maximum_count: 3,
@@ -232,7 +232,10 @@ module Coordinator::Write
     )
 
     DECISION_CORRECTION_STATE = GroupedEventReadCriteria.new(
-      event_types: [ "DecisionRecorded", "DecisionActivated", "DecisionDefinitionCorrected" ],
+      event_types: %w[
+        DecisionRecorded DecisionDerivedFromInterpretation DecisionActivated DecisionDefinitionCorrected
+        DecisionCorrectionsNumberChanged
+      ],
       direction: :desc
     )
 
@@ -407,6 +410,8 @@ module Coordinator::Write
         "VerificationObligationTargetCandidateAssigned",
         "VerificationObligationClaimed",
         "VerificationEvidenceSubmitted",
+        "VerificationObligationEvidenceNumberChanged",
+        "VerificationObligationEvidenceCoverageChanged",
         "VerificationObligationEvidenceSelected",
         "VerificationObligationSatisfied",
         "VerificationObligationFailed",
@@ -436,6 +441,8 @@ module Coordinator::Write
         "VerificationObligationTargetCandidateAssigned",
         "VerificationObligationClaimed",
         "VerificationEvidenceSubmitted",
+        "VerificationObligationEvidenceNumberChanged",
+        "VerificationObligationEvidenceCoverageChanged",
         "VerificationObligationEvidenceSelected",
         "VerificationObligationSatisfied",
         "VerificationObligationFailed",
@@ -474,13 +481,15 @@ module Coordinator::Write
         "VerificationObligationTargetCandidateAssigned",
         "VerificationObligationClaimed",
         "VerificationEvidenceSubmitted",
+        "VerificationObligationEvidenceNumberChanged",
+        "VerificationObligationEvidenceCoverageChanged",
         "VerificationObligationEvidenceSelected",
         "VerificationObligationSatisfied",
         "VerificationObligationFailed",
         "VerificationObligationWaived",
         "VerificationObligationInvalidated"
       ],
-      maximum_count: 52,
+      maximum_count: 52 + 2 * (Types::VERIFICATION_EVIDENCE_MAXIMUM_COUNT + 1),
       direction: :asc
     )
 

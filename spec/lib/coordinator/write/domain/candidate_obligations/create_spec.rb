@@ -22,7 +22,7 @@ RSpec.describe Coordinator::Write::Domain::CandidateObligations::Create do
   end
   let(:command) { CandidateObligationExamples.command(source:, target:) }
 
-  it "IMP-02-GATE-01 creates four cohesive compatibility-obligation facts" do
+  it "IMP-02-GATE-01 creates cohesive compatibility-obligation facts with initial absolute progress" do
     decision = decide
 
     expect(decision).to have_attributes(outcome: "created")
@@ -46,7 +46,10 @@ RSpec.describe Coordinator::Write::Domain::CandidateObligations::Create do
     expect(decision.plan.events.drop(1)).to contain_exactly(
       have_attributes(obligation_id: command.obligation_id, change_set_id: "CS-obligation"),
       have_attributes(obligation_id: command.obligation_id, candidate_id: source.subject.candidate_id),
-      have_attributes(obligation_id: command.obligation_id, candidate_id: target.subject.candidate_id)
+      have_attributes(obligation_id: command.obligation_id, candidate_id: target.subject.candidate_id),
+      have_attributes(obligation_id: command.obligation_id, evidence_number: 0),
+      have_attributes(obligation_id: command.obligation_id,
+        passed_evidence_kinds: [], missing_evidence_kinds: %w[combined_tests contract_compatibility_review])
     )
   end
 

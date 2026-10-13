@@ -29,6 +29,7 @@ RSpec.describe Coordinator::Write::Operations::ExecutePublishSkillRevision, :eve
       SkillAssetContentDefined
       SkillAssetExecutabilityDefined
       SkillAssetAddedToRevision
+      SkillRevisionRepresentationRecorded
       SkillRevisionPublished
     ])
     expect(events).to all(satisfy { _1.markers.include?("command:cmd-skill-1") })
@@ -44,6 +45,10 @@ RSpec.describe Coordinator::Write::Operations::ExecutePublishSkillRevision, :eve
     publication = events.last
     expect(publication.data.keys).to contain_exactly("skill_id", "skill_revision_id", "revision")
     expect(publication.metadata).to include("content_digest" => receipt.content_digest)
+    representation = events.find { _1.type == "SkillRevisionRepresentationRecorded" }
+    expect(representation.data).to eq("skill_revision_id" => publication.data.fetch("skill_revision_id"))
+    expect(representation.metadata.fetch("asset_count")).to eq(1)
+    expect(representation.stream.stream_name).to eq("SkillRevision")
     expect(command_events("cmd-skill-1")).to be_empty
   end
 
@@ -57,6 +62,22 @@ RSpec.describe Coordinator::Write::Operations::ExecutePublishSkillRevision, :eve
     expect(replay.failure.code).to eq(:skill_revision_conflict)
     expect(changed.failure.code).to eq(:skill_revision_conflict)
     expect(skill_revision_events("review", "project:alpha").map(&:id)).to eq(event_ids)
+  end
+
+  it "records the exact empty and maximum-size immutable asset manifest descriptors" do
+    [ 0, Coordinator::Write::Types::SKILL_ASSET_MAXIMUM_COUNT ].each do |count|
+      assets = Array.new(count) do |index|
+        input.fetch(:assets).first.merge(path: "assets/#{index}.txt")
+      end
+      scope = "project:asset-number-#{count}"
+      expect(operation.call(input(command_id: "cmd-skill-assets-#{count}", scope:, assets:))).to be_success
+      events = skill_revision_events("review", scope)
+      descriptor = events.select { _1.type == "SkillRevisionRepresentationRecorded" }.sole
+
+      expect(descriptor.metadata.fetch("asset_count")).to eq(count)
+      expect(events.map(&:id).uniq.length).to eq(events.length)
+      expect(skill_events("review", scope).map(&:stream_revision)).to eq([ 0, 1 ])
+    end
   end
 
   it "advances only from the exact authoritative revision" do
@@ -172,6 +193,7 @@ RSpec.describe Coordinator::Write::Operations::ExecutePublishSkillRevision, :eve
           SkillRevisionDescriptionDefined
           SkillRevisionInstructionsDefined
           SkillAssetAddedToRevision
+          SkillRevisionRepresentationRecorded
         ],
         maximum_count: 100,
         direction: :asc

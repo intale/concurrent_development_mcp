@@ -21,7 +21,10 @@ module Coordinator::Write
 
           if registration && (registration.payload.tool_name != item.tool_name ||
                               registration.canonical_input_digest != item.canonical_input_digest)
-            return Success(rejection(command, item:, registration:))
+            unless state.numbers_initialized?
+              return Failure(error(:operation_batch_numbers_uninitialized, "Batch numbers must be initialized from authoritative history", command))
+            end
+            return Success(rejection(command, item:, registration:, state:))
           end
 
           command_id = registration ? registration.payload.command_id : item.command_id
@@ -34,7 +37,7 @@ module Coordinator::Write
 
         private
 
-        def rejection(command, item:, registration:)
+        def rejection(command, item:, registration:, state:)
           rejection = Tasks::DomainErrorV1::CommandIdReusedError.new(
             code: "command_id_reused",
             message: "Batch item request ID is already bound to another tool or input",
@@ -46,12 +49,15 @@ module Coordinator::Write
               requested_input_digest: item.canonical_input_digest
             )
           )
+          stream = @stream_factory.operation_batch(command.batch_id)
           EventPlan.new(writes: [ EventWrite.new(
-            stream: @stream_factory.operation_batch(command.batch_id),
+            stream:,
             event: Events::OperationBatchItemRegistrationRejectedV1.new(
               batch_id: command.batch_id, index: command.index, error: rejection
             )
-          ) ])
+          ), EventWrite.new(stream:, event: Events::ProjectionNumbers::OperationBatchUnsuccessfulItemsNumberChangedV1.new(
+            batch_id: command.batch_id, items_number: state.unsuccessful_items_number + 1
+          )) ])
         end
 
         def error(code, message, command)

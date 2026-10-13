@@ -1,0 +1,5 @@
+module Coordinator::Write::Metadata
+  class SkillRevisionRepresentationV1 < Coordinator::Write::EventMetadata
+    def asset_count: () -> Integer
+  end
+end

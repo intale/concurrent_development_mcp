@@ -30,7 +30,7 @@ RSpec.describe Coordinator::Write::Operations::ExecuteCorrectDecision, :event_st
       ]
     )
     correction = decision_events("D-1").last
-    expect(correction).to have_attributes(stream_revision: 4)
+    expect(correction).to have_attributes(stream_revision: 5)
     expect(correction.data.keys).to contain_exactly(
       "decision_id", "definition", "interpretation_id", "rationale", "source_message_id"
     )
@@ -47,7 +47,7 @@ RSpec.describe Coordinator::Write::Operations::ExecuteCorrectDecision, :event_st
     expect(heads.length).to eq(2)
     expect(heads.last.data.fetch("head")).to include(
       "decision_id" => "D-1",
-      "decision_revision" => 4
+      "decision_revision" => 5
     )
     partition_history = partition_events("repo:#{RepositoryScenario::DEFAULT_REPOSITORY_ID}:testing")
     expect(partition_history.map(&:stream_revision)).to eq([ 0, 1, 2 ])
@@ -55,9 +55,25 @@ RSpec.describe Coordinator::Write::Operations::ExecuteCorrectDecision, :event_st
     expect(original.value!.data).to have_attributes(
       outcome: "corrected",
       policy_status: "active",
-      correction_event: have_attributes(type: "DecisionDefinitionCorrected", stream_revision: 4)
+      correction_event: have_attributes(type: "DecisionDefinitionCorrected", stream_revision: 5)
     )
     expect(command_events("cmd-decision-correction-1")).to be_empty
+    expect(correction_numbers("D-1").map { _1.data.fetch("corrections_number") }).to eq([ 0, 1 ])
+  end
+
+  it "advances two corrections from the physical revisions while preserving the exact policy heads" do
+    activation = seed_active_decision
+    seed_correction(value: InterpretationInput.named_choice("minitest"))
+    first = operation.call(InterpretationInput.correction(expected_head: reference(activation))).value!
+    seed_correction(interpretation_id: "I-3", message_id: "M-correction-3", command_suffix: "correction-3",
+      value: InterpretationInput.named_choice("rspec"))
+    second = operation.call(InterpretationInput.correction(command_id: "cmd-correction-3",
+      interpretation_id: "I-3", expected_head: first.data.correction_event.to_h)).value!
+
+    expect([ first.data.correction_event, second.data.correction_event ].map(&:stream_revision)).to eq([ 5, 8 ])
+    expect(correction_numbers("D-1").map { _1.data.fetch("corrections_number") }).to eq([ 0, 1, 2 ])
+    expect(slot_events(second.data.slot.slot_id).last.data.fetch("head").fetch("event").fetch("event_id"))
+      .to eq(second.data.correction_event.event_id)
   end
 
   it "implements DEC-02A-CORRECT-NARROW-SCOPE-01 by moving the slot and advancing both partitions" do
@@ -162,6 +178,7 @@ RSpec.describe Coordinator::Write::Operations::ExecuteCorrectDecision, :event_st
     expect(results.count(&:success?)).to eq(1)
     expect(results.count(&:failure?)).to eq(1)
     expect(results.find(&:failure?).failure.code).to eq(:decision_revision_changed)
+    expect(correction_numbers("D-1").map { _1.data.fetch("corrections_number") }).to eq([ 0, 1 ])
     expect(decision_events("D-1").map(&:type)).to eq(
       %w[
         DecisionRecorded
@@ -378,6 +395,12 @@ RSpec.describe Coordinator::Write::Operations::ExecuteCorrectDecision, :event_st
         direction: :asc
       )
     )
+  end
+
+  def correction_numbers(decision_id)
+    event_store.read(streams.decision(decision_id), Coordinator::Write::EventReadCriteria.new(
+      event_types: [ "DecisionCorrectionsNumberChanged" ], maximum_count: 3, direction: :asc
+    ))
   end
 
   def slot_events(slot_id)

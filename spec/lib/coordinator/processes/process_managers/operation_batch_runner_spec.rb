@@ -29,14 +29,19 @@ RSpec.describe Coordinator::Processes::ProcessManagers::OperationBatchRunner, :e
       "OperationBatchTargetSelected",
       "OperationBatchItemEnqueued",
       "OperationBatchItemEnqueued",
+      "OperationBatchManifestAccepted",
+      "OperationBatchSucceededItemsNumberChanged",
+      "OperationBatchUnsuccessfulItemsNumberChanged",
       "OperationBatchItemCommandAssigned",
       "OperationBatchItemExecutionStarted",
       "OperationBatchItemSucceeded",
       "OperationBatchItemCompletionLinked",
+      "OperationBatchSucceededItemsNumberChanged",
       "OperationBatchItemCommandAssigned",
       "OperationBatchItemExecutionStarted",
       "OperationBatchItemRejected",
       "OperationBatchItemCompletionLinked",
+      "OperationBatchUnsuccessfulItemsNumberChanged",
       "OperationBatchCompleted"
     ])
     expect(batch_events(command.batch_id).map(&:id)).to eq(first_history.map(&:id))
@@ -66,6 +71,9 @@ RSpec.describe Coordinator::Processes::ProcessManagers::OperationBatchRunner, :e
       "OperationBatchCreated",
       "OperationBatchTargetSelected",
       "OperationBatchItemEnqueued",
+      "OperationBatchManifestAccepted",
+      "OperationBatchSucceededItemsNumberChanged",
+      "OperationBatchUnsuccessfulItemsNumberChanged",
       "OperationBatchCancellationRequested",
       "OperationBatchCancelled"
     ])
@@ -107,10 +115,14 @@ RSpec.describe Coordinator::Processes::ProcessManagers::OperationBatchRunner, :e
       "OperationBatchCreated",
       "OperationBatchTargetSelected",
       "OperationBatchItemEnqueued",
+      "OperationBatchManifestAccepted",
+      "OperationBatchSucceededItemsNumberChanged",
+      "OperationBatchUnsuccessfulItemsNumberChanged",
       "OperationBatchItemCommandAssigned",
       "OperationBatchItemExecutionStarted",
       "OperationBatchItemSucceeded",
       "OperationBatchItemCompletionLinked",
+      "OperationBatchSucceededItemsNumberChanged",
       "OperationBatchCompleted"
     ])
     outcome = history.find { _1.type == "OperationBatchItemSucceeded" }

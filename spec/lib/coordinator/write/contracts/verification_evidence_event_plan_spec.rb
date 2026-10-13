@@ -23,8 +23,8 @@ RSpec.describe Coordinator::Write::Contracts::VerificationEvidenceEventPlan do
   end
 
   it "rejects a shaped plan whose evidence fact was altered" do
-    altered_event = plan.events.sole.new(evidence_kind: "contract_compatibility_review")
-    altered = plan.new(writes: [ plan.writes.sole.new(event: altered_event) ])
+    altered_event = plan.events.first.new(evidence_kind: "contract_compatibility_review")
+    altered = plan.new(writes: [ plan.writes.first.new(event: altered_event), *plan.writes.drop(1) ])
 
     expect(
       contract.call(
@@ -36,5 +36,13 @@ RSpec.describe Coordinator::Write::Contracts::VerificationEvidenceEventPlan do
         submitted_at:
       )
     ).to be_failure
+  end
+
+  it "rejects an otherwise valid plan that invents an absolute evidence count" do
+    writes = plan.writes.dup
+    writes[1] = writes[1].new(event: writes[1].event.new(evidence_number: 2))
+
+    expect(contract.call(plan: plan.new(writes:), state:, command:, evidence_id:,
+      assessment_input_digest:, submitted_at:)).to be_failure
   end
 end

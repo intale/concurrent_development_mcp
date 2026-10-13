@@ -221,9 +221,24 @@ module VerificationEvidenceOutcomeAcceptanceWorld
     end
     assert_acceptance(evidence, "Traced evidence fact is missing")
     assert_acceptance(outcome, "Traced outcome fact is missing")
+    command_facts = event_store.read_marked_types(
+      streams.verification_obligation(@obligation_id), Coordinator::Write::MarkedTypesEventReadCriteria.new(
+        event_types: %w[
+          VerificationEvidenceSubmitted VerificationObligationEvidenceNumberChanged
+          VerificationObligationEvidenceCoverageChanged
+        ], marker: "command:#{command_id}", maximum_count: 3, direction: :asc
+      )
+    )
+    assert_acceptance_equal(
+      %w[VerificationEvidenceSubmitted VerificationObligationEvidenceNumberChanged VerificationObligationEvidenceCoverageChanged],
+      command_facts.map(&:type), "Complete evidence command facts"
+    )
+    assert_acceptance_equal(2, command_facts.fetch(1).data.fetch("evidence_number"), "Absolute evidence number")
+    assert_acceptance_equal([], command_facts.last.data.fetch("missing_evidence_kinds"), "Complete required coverage")
     assert_acceptance_equal("CommandSucceeded", command_terminal&.type, "Evidence command terminal")
     assert_acceptance_equal(started.id, evidence.causation_id, "Evidence immediate parent")
-    assert_acceptance_equal(evidence.id, command_terminal.causation_id, "Command terminal immediate parent")
+    assert_acceptance_equal(command_facts.last.id, command_terminal.causation_id, "Command terminal immediate parent")
+    assert_acceptance_equal([ started.id ], command_facts.map(&:causation_id).uniq, "Evidence and progress immediate parent")
     assert_acceptance_equal(command_terminal.id, task_completed.causation_id, "Task completion parent")
     process_step = process_step_event(
       source_event: evidence,
@@ -252,6 +267,7 @@ module VerificationEvidenceOutcomeAcceptanceWorld
         submitted,
         started,
         evidence,
+        *command_facts.drop(1),
         process_step,
         *outcome_facts,
         command_terminal,

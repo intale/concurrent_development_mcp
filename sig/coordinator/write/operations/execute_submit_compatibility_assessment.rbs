@@ -16,6 +16,7 @@ module Coordinator
           ?schema_registry: EventSchemaRegistry,
           ?stream_factory: StreamFactory,
           ?completion_builder: CommandResultBuilder,
+          ?definition_loader: VerificationObligations::DefinitionLoader,
           ?policy_loader: CandidateObligations::ImpactPolicyLoader,
           ?history_contract: Contracts::VerificationEvidenceHistory,
           ?event_plan_contract: Contracts::VerificationEvidenceEventPlan

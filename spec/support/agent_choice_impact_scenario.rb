@@ -218,6 +218,8 @@ module AgentChoiceImpactScenario
     Coordinator::Write::Decisions::DecisionCurrentStateV1.new(
       decision_id:,
       definition:,
+      latest_revision: events.first.stream_revision,
+      corrections_number: load(events.find { _1.type == "DecisionCorrectionsNumberChanged" }).corrections_number,
       head: Coordinator::Write::Decisions::DecisionHeadV1.new(
         decision_id:,
         decision_revision: head_event.stream_revision,

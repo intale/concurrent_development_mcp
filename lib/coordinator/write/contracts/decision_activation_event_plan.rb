@@ -16,7 +16,7 @@ module Coordinator::Write
         command = values[:command]
         streams = values[:stream_factory]
         candidate = state.candidate
-        expected_count = 3 + candidate.partitions.length + (candidate.slot ? 2 : 0)
+        expected_count = 4 + candidate.partitions.length + (candidate.slot ? 2 : 0)
 
         key(:plan).failure("must contain the complete activation fact set") unless plan.events.length == expected_count
         validate_decision_facts(key, plan, candidate, command, streams)
@@ -27,11 +27,12 @@ module Coordinator::Write
       private
 
       def validate_decision_facts(key, plan, candidate, command, streams)
-        writes = plan.writes.first(3)
+        writes = plan.writes.first(4)
         expected_types = [
           Events::DecisionRecordedV2,
           Events::DecisionDerivedFromInterpretationV1,
-          Events::DecisionActivatedV2
+          Events::DecisionActivatedV2,
+          Events::ProjectionNumbers::DecisionCorrectionsNumberChangedV1
         ]
         unless writes.map { _1.event.class } == expected_types
           key.failure("must begin with recorded, derivation, and activation facts")
@@ -40,16 +41,17 @@ module Coordinator::Write
         expected_stream = streams.decision(command.decision_id)
         key.failure("Decision facts must share the command Decision stream") unless writes.all? { _1.stream == expected_stream }
 
-        recorded, derived, activated = writes.map(&:event)
+        recorded, derived, activated, number = writes.map(&:event)
         unless [ recorded, derived, activated ].all? { _1.decision_id == command.decision_id } &&
                [ recorded, derived, activated ].all? { _1.interpretation_id == command.interpretation_id } &&
-               recorded.definition == candidate.definition.document
+               recorded.definition == candidate.definition.document &&
+               number.decision_id == command.decision_id && number.corrections_number.zero?
           key.failure("Decision facts must retain the decided identities and definition")
         end
       end
 
       def validate_slot_facts(key, plan, candidate, command, streams)
-        writes = plan.writes.drop(3).first(candidate.slot ? 2 : 0)
+        writes = plan.writes.drop(4).first(candidate.slot ? 2 : 0)
         return key.failure("set-union activation must not write a DecisionSlot") unless candidate.slot || writes.empty?
         return unless candidate.slot
 
@@ -72,7 +74,7 @@ module Coordinator::Write
       end
 
       def validate_partition_facts(key, plan, state, command, streams)
-        writes = plan.writes.drop(state.candidate.slot ? 5 : 3)
+        writes = plan.writes.drop(state.candidate.slot ? 6 : 4)
         unless writes.length == state.partition_states.length &&
                writes.all? { _1.event.is_a?(Events::DecisionAddedToPartitionV1) }
           key.failure("must add the Decision to every and only derived partition")

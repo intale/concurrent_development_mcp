@@ -50,6 +50,12 @@ RSpec.describe Coordinator::Write::Operations::ExecuteActivateDecision, :event_s
     )
     expect(load(partition_fact)).to have_attributes(decision_id: "D-1", partition_revision: 0)
     expect(command_events("cmd-decision-activation-1")).to be_empty
+    number = event_store.read(streams.decision("D-1"), Coordinator::Write::EventReadCriteria.new(
+      event_types: [ "DecisionCorrectionsNumberChanged" ], maximum_count: 1, direction: :asc
+    )).sole
+    expect(number.data).to eq("decision_id" => "D-1", "corrections_number" => 0)
+    expect(number.correlation_id).to eq(activation.correlation_id)
+    expect(number.stream_revision).to eq(3)
   end
 
   it "implements DEC-01-NOT-ACCEPTED-01 without facts" do

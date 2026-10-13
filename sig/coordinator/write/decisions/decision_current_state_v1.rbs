@@ -7,6 +7,8 @@ module Coordinator
         def decision_id: () -> String
         def definition: () -> DecisionDefinitionV1
         def head: () -> DecisionHeadV1
+        def latest_revision: () -> Integer
+        def corrections_number: () -> Integer?
         def slot: () -> DecisionSlotV1?
         def partitions: () -> Array[DecisionPartitionV1]
       end

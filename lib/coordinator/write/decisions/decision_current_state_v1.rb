@@ -8,6 +8,8 @@ module Coordinator::Write
       attribute :decision_id, Types::Identifier
       attribute :definition, DecisionDefinitionV1
       attribute :head, DecisionHeadV1
+      attribute :latest_revision, Types::Integer.constrained(gteq: 0)
+      attribute :corrections_number, Types::Integer.constrained(gteq: 0).optional
       attribute :slot, DecisionSlotV1.optional
       attribute :partitions, Types::Array.of(Partition).constrained(min_size: 1, max_size: 32)
     end

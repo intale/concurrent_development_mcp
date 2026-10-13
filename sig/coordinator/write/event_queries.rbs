@@ -28,7 +28,6 @@ module Coordinator
       OPERATION_BATCH_EXISTENCE: EventReadCriteria
       OPERATION_BATCH_CONTROL: GroupedEventReadCriteria
       OPERATION_BATCH_PROGRESS: EventReadCriteria
-      OPERATION_BATCH_LAST_ENQUEUED: LatestEventReadCriteria
       DECISION_EXISTENCE: EventReadCriteria
       DECISION_CORRECTION_STATE: GroupedEventReadCriteria
       DECISION_LATEST_IMPACT_CHANGE: GroupedEventReadCriteria

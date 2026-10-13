@@ -41,7 +41,7 @@ module Coordinator::Write
         verify_invocation!(invocation)
         preparation = CandidateCompatibilityObligationPreparationV1.new(
           created_at: @clock.now,
-          event_ids: Array.new(4) { @id_generator.uuid_v7 }
+          event_ids: Array.new(6) { @id_generator.uuid_v7 }
         )
 
         @event_store.multiple do
