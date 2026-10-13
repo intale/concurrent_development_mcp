@@ -1,0 +1,21 @@
+module Coordinator::Read::Projections
+  module Batches
+    type column_value = nil | bool | Integer | Float | String | Time | Array[column_value] | Hash[String | Symbol, column_value]
+    type column_attributes = Hash[Symbol, column_value]
+
+    class ColumnPatches
+      attr_reader identity_columns: Array[Symbol]
+
+      def initialize: (identity_columns: Array[Symbol]) -> void
+      def insert: (column_attributes attributes) -> nil
+      def assign: (column_attributes attributes) -> nil
+      def inserts: () -> Array[column_attributes]
+      def update_groups: () -> Array[UpdateGroup]
+      def empty?: () -> bool
+
+      private
+
+      def identity: (column_attributes attributes) -> Array[column_value]
+    end
+  end
+end

@@ -1,0 +1,8 @@
+module Coordinator::Read::Projections::Batches
+  class UpdateGroup
+    attr_reader columns: Array[Symbol]
+    attr_reader rows: Array[column_attributes]
+
+    def initialize: (columns: Array[Symbol], rows: Array[column_attributes]) -> void
+  end
+end
