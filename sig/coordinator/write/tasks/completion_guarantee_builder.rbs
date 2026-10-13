@@ -1,0 +1,13 @@
+module Coordinator
+  module Write
+    module Tasks
+      class CompletionGuaranteeBuilder
+        def initialize: () -> void
+        def success: (tool_name: String, data: CommandReceiptData::value, emitted_events: Array[EventReference]) -> CompletionGuaranteeV1
+        def rejection: (tool_name: String, error: DomainErrorV1::domain_error) -> CompletionGuaranteeV1
+        private
+        def guarantee: (tool_name: String, outcome: String, effects: String) -> CompletionGuaranteeV1
+      end
+    end
+  end
+end

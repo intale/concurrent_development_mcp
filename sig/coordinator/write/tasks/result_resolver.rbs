@@ -1,0 +1,10 @@
+module Coordinator
+  module Write
+    module Tasks
+      class ResultResolver
+        def initialize: (event_store: Write::_EventStore, ?command_loader: Write::CommandLifecycle::Loader, ?source_loader: Write::CommandResults::SourceLoader, ?assembler: Write::CommandResults::Assembler) -> void
+        def call: (Write::Domain::CoordinationTasks::State state) -> SemanticResultV1::value
+      end
+    end
+  end
+end

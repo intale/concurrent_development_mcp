@@ -1,0 +1,10 @@
+module Coordinator
+  module Processes
+    module OperationBatches
+      class TaskCompleter
+        def initialize: (event_store: Write::_EventStore, ?batch_loader: Write::OperationBatches::Loader, ?command_loader: Write::CommandLifecycle::Loader, ?task_source_builder: CoordinationTaskSourceBuilder, ?command_transition: Write::Operations::ApplyCommandTransition, ?task_outcome: Write::Operations::RecordCoordinationTaskOutcome) -> void
+        def call: (PgEventstore::Event event) -> void
+      end
+    end
+  end
+end

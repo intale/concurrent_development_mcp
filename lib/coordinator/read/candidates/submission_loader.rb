@@ -20,7 +20,7 @@ module Coordinator::Read
         event_store:,
         stream_factory: Coordinator::Write::StreamFactory.new,
         schema_registry: Coordinator::Write::EventSchemaRegistry.new,
-        instruction_loader: CommandResults::InstructionLoader.new(event_store:),
+        instruction_loader: Coordinator::Write::CommandResults::InstructionLoader.new(event_store:),
         target_command_builder: Coordinator::Write::Tasks::TargetCommandBuilder.new
       )
         @event_store = event_store

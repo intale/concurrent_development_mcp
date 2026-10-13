@@ -19,7 +19,8 @@ module Coordinator::Mcp
 
       class Created < Base
         attribute :resultType, Types::String.constrained(eql: "task")
-        attribute :status, Types::String.constrained(eql: "working")
+        attribute :status, Types::String.enum("working", "completed", "failed", "cancelled")
+        attribute :statusMessage, Types::String
       end
 
       class Working < Base
@@ -34,6 +35,7 @@ module Coordinator::Mcp
       class Completed < Base
         attribute :resultType, Types::String.constrained(eql: "complete")
         attribute :status, Types::String.constrained(eql: "completed")
+        attribute :statusMessage, Types::String
         attribute :result, CallToolResult
       end
 

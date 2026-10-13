@@ -1,0 +1,1085 @@
+# frozen_string_literal: true
+
+RSpec.describe Coordinator::Write::CommandResults::Assembler, :event_store do
+  subject(:assemble) do
+    lambda do |terminal|
+      source = Coordinator::Write::CommandResults::SourceLoader.new(event_store:).call(terminal)
+      described_class.new(event_store:).call(source)
+    end
+  end
+
+  let(:event_store) { Coordinator::Write::EventStore.new(client: PgEventstore.client) }
+  let(:streams) { Coordinator::Write::StreamFactory.new }
+  let(:event_factory) { Coordinator::Write::EventFactory.new }
+  let(:command_id) { SecureRandom.uuid_v7 }
+  let(:task_id) { SecureRandom.uuid_v7 }
+  let(:occurred_at) { "2026-09-03T12:00:00.000000Z" }
+  let(:canonical_input_digest) { "sha256:#{'a' * 64}" }
+  let(:command) do
+    Coordinator::Write::Commands::CreateChangeSet.new(
+      command_id:,
+      actor: Coordinator::Write::Commands::Actor.new(kind: "agent", id: "assembly-spec"),
+      change_set_id: "CS-command-result",
+      goal: "Assemble a semantic command result",
+      acceptance_criteria: [ "No presentation document is persisted as an event" ]
+    )
+  end
+
+  it "assembles success from authoritative command and domain facts" do
+    register_command
+    append_task_submission
+    domain_events = append_change_set_facts
+    terminal = append_terminal(Coordinator::Write::Events::CommandSucceededV1.new(command_id:))
+
+    result = assemble.call(terminal)
+
+    expect(result).to have_attributes(
+      command_id: "assembly-spec-request",
+      tool_name: "change_set_create",
+      status: "ok",
+      receipt: "assembly-spec-request",
+      completed_at: terminal.created_at.utc.iso8601(6)
+    )
+    expect(result.data).to have_attributes(change_set_id: "CS-command-result")
+    expect(result.emitted_events.map(&:event_id)).to eq(domain_events.map(&:id))
+    expect(result.semantic_result).to be_a(Coordinator::Write::Tasks::SemanticResultV1::Success)
+  end
+
+  it "assembles a typed rejection without a receipt" do
+    register_command
+    append_task_submission
+    rejection = Coordinator::Write::Tasks::DomainErrorV1::ChangeSetError.new(
+      code: "change_set_already_exists",
+      message: "ChangeSet already exists",
+      details: Coordinator::Write::Tasks::DomainErrorV1::ChangeSetDetails.new(
+        change_set_id: "CS-command-result"
+      )
+    )
+    terminal = append_terminal(
+      Coordinator::Write::Events::CommandRejectedV2.new(
+        command_id:,
+        error: rejection,
+        retryable: false
+      )
+    )
+
+    result = assemble.call(terminal)
+
+    expect(result).to have_attributes(
+      command_id: "assembly-spec-request",
+      status: "denied",
+      receipt: nil,
+      summary: "ChangeSet already exists",
+      completed_at: terminal.created_at.utc.iso8601(6)
+    )
+    expect(result.data).to eq(rejection)
+    expect(result.semantic_result).to be_a(
+      Coordinator::Write::Tasks::SemanticResultV1::DomainRejection
+    )
+  end
+
+  it "does not build a public receipt for an internal policy command" do
+    append(
+      streams.command(command_id),
+      Coordinator::Write::Events::CommandRegisteredV1.new(
+        command_id:, request_id: "policy-request", tool_name: "coordination-policy"
+      ),
+      metadata: canonical_metadata, markers: [ "command:#{command_id}" ]
+    )
+    terminal = append_terminal(Coordinator::Write::Events::CommandSucceededV1.new(command_id:))
+
+    expect(Coordinator::Write::CommandResults::SourceLoader.new(event_store:).call(terminal)).to be_nil
+  end
+
+  it "rejects a public Command whose client instruction is missing" do
+    register_command
+    terminal = append_terminal(Coordinator::Write::Events::CommandSucceededV1.new(command_id:))
+
+    expect { Coordinator::Write::CommandResults::SourceLoader.new(event_store:).call(terminal) }
+      .to raise_error(Coordinator::Write::InvalidCommandHistory, "Command has no Task or Operation Batch instruction")
+  end
+
+  context "when another Repository command won the same natural key" do
+    let(:canonical_repository_id) { SecureRandom.uuid_v7 }
+    let(:command) do
+      Coordinator::Write::Commands::RegisterRepository.new(
+        command_id:,
+        actor: Coordinator::Write::Commands::Actor.new(kind: "agent", id: "assembly-spec"),
+        repository_id: SecureRandom.uuid_v7,
+        scope: "project:command-result",
+        repository_key: "shared-repository",
+        display_name: "Shared Repository",
+        paths: [],
+        remotes: []
+      )
+    end
+
+    it "assembles the canonical existing registration without an emitted event" do
+      append_canonical_repository
+      register_command
+      append_task_submission
+      terminal = append_terminal(
+        Coordinator::Write::Events::CommandSucceededV1.new(command_id:)
+      )
+
+      result = assemble.call(terminal)
+
+      expect(result.data).to have_attributes(
+        repository_id: canonical_repository_id,
+        scope: command.scope
+      )
+      expect(result.summary).to eq("Canonical Repository registration already exists for the exact scope and key.")
+      expect(result.emitted_events).to be_empty
+    end
+  end
+
+  context "when a Skill publication resolves an existing canonical identity" do
+    let(:canonical_skill_id) { SecureRandom.uuid_v7 }
+    let(:command) do
+      Coordinator::Write::Operations::PreparePublishSkillRevision.new.call(
+        command_id:,
+        actor: { kind: "agent", id: "assembly-spec" },
+        name: "canonical-review",
+        scope: "project:command-result",
+        expected_revision: 1,
+        description: "Canonical review instructions",
+        instructions: "Review the current facts.",
+        assets: []
+      ).value!
+    end
+
+    it "returns the canonical Skill UUID for a second publication" do
+      append_skill_registration
+      append_skill_publication(revision: 1, owner: "prior-skill-command")
+      register_command
+      append_task_submission
+      publication = append_skill_publication(revision: 2, owner: command_id)
+      terminal = append_terminal(Coordinator::Write::Events::CommandSucceededV1.new(command_id:))
+
+      result = assemble.call(terminal)
+
+      expect(command.skill_id).not_to eq(canonical_skill_id)
+      expect(result.data).to have_attributes(skill_id: canonical_skill_id, revision: 2)
+      expect(result.data.publication_event.event_id).to eq(publication.id)
+      expect(result.emitted_events.map(&:event_id)).to eq([ publication.id ])
+    end
+
+    it "reconstructs a semantic no-op from the exact canonical publication" do
+      append_skill_registration
+      publication = append_skill_publication(revision: 1, owner: "prior-skill-command")
+      register_command
+      append_task_submission
+      terminal = append_terminal(Coordinator::Write::Events::CommandSucceededV1.new(command_id:))
+
+      result = assemble.call(terminal)
+
+      expect(result.data).to have_attributes(
+        skill_id: canonical_skill_id, revision: 1,
+        published_at: publication.created_at.utc.iso8601(6)
+      )
+      expect(result.data.publication_event.event_id).to eq(publication.id)
+      expect(result.emitted_events).to be_empty
+    end
+
+    it "does not substitute a later publication when a no-op result is assembled late" do
+      append_skill_registration
+      publication = append_skill_publication(revision: 1, owner: "prior-skill-command")
+      register_command
+      append_task_submission
+      terminal = append_terminal(Coordinator::Write::Events::CommandSucceededV1.new(command_id:))
+      append_skill_publication(revision: 2, owner: "later-skill-command")
+
+      result = assemble.call(terminal)
+
+      expect(result.data).to have_attributes(skill_id: canonical_skill_id, revision: 1)
+      expect(result.data.publication_event.event_id).to eq(publication.id)
+    end
+
+    it "rejects a no-op source with no publication at the expected revision" do
+      append_skill_registration
+      register_command
+      append_task_submission
+      terminal = append_terminal(Coordinator::Write::Events::CommandSucceededV1.new(command_id:))
+
+      expect { assemble.call(terminal) }
+        .to raise_error(Coordinator::Write::InvalidCommandHistory, /Skill publication/)
+    end
+
+    it "rejects a publication whose content digest differs from the command" do
+      append_skill_registration
+      append_skill_publication(revision: 1, owner: "prior-skill-command", digest: "sha256:#{'b' * 64}")
+      register_command
+      append_task_submission
+      terminal = append_terminal(Coordinator::Write::Events::CommandSucceededV1.new(command_id:))
+
+      expect { assemble.call(terminal) }
+        .to raise_error(Coordinator::Write::InvalidCommandHistory, /Skill publication/)
+    end
+
+    def append_skill_registration
+      append(
+        streams.skill(canonical_skill_id),
+        Coordinator::Write::Events::SkillRegisteredV1.new(
+          skill_id: canonical_skill_id, name: command.name, scope: command.scope
+        ),
+        metadata: command_metadata(command_id: "prior-skill-command", policy_version: "skill-repository/v2"),
+        markers: [
+          "skill:#{canonical_skill_id}",
+          Coordinator::Write::Skills::MarkerBuilder.new.natural_key(name: command.name, scope: command.scope)
+        ]
+      )
+    end
+
+    def append_skill_publication(revision:, owner:, digest: command.content_digest)
+      append(
+        streams.skill(canonical_skill_id),
+        Coordinator::Write::Events::SkillRevisionPublishedV3.new(
+          skill_id: canonical_skill_id, skill_revision_id: SecureRandom.uuid_v7, revision:
+        ),
+        metadata: Coordinator::Write::Metadata::SkillPublicationV3.new(
+          **command_metadata(command_id: owner, policy_version: "skill-repository/v2").to_h,
+          content_digest: digest
+        ),
+        markers: [ "skill:#{canonical_skill_id}", "command:#{owner}" ]
+      )
+    end
+  end
+
+  context "when another proposed Artifact UUID captured the canonical bytes" do
+    let(:canonical_artifact_id) { SecureRandom.uuid_v7 }
+    let(:proposed_artifact_id) { SecureRandom.uuid_v7 }
+    let(:observation_id) { SecureRandom.uuid_v7 }
+    let(:source) do
+      Coordinator::Write::DevelopmentArtifacts::SourceV1.new(
+        kind: "local_file",
+        locator: "docs/canonical.md",
+        revision: "abc123",
+        observed_at: occurred_at,
+        collector: "assembly-spec/v1"
+      )
+    end
+    let(:content) do
+      Coordinator::Write::DevelopmentArtifacts::ContentBuilder.new.call(
+        encoding: "utf-8",
+        media_type: "text/markdown",
+        text: "canonical bytes\n"
+      ).value!
+    end
+    let(:proposed_artifact) do
+      Coordinator::Write::DevelopmentArtifacts::ArtifactV2.new(
+        artifact_id: proposed_artifact_id,
+        scope: "project:command-result",
+        title: "Canonical bytes",
+        kind: "documentation",
+        labels: %w[canonical docs],
+        content:,
+        source:
+      )
+    end
+    let(:proposed_observation) do
+      Coordinator::Write::DevelopmentArtifacts::ArtifactObservationV1.new(
+        observation_id:,
+        artifact_id: proposed_artifact_id,
+        scope: proposed_artifact.scope,
+        title: proposed_artifact.title,
+        kind: proposed_artifact.kind,
+        labels: proposed_artifact.labels,
+        source:
+      )
+    end
+    let(:command) do
+      Coordinator::Write::Commands::CaptureDevelopmentArtifact.new(
+        command_id:,
+        actor: Coordinator::Write::Commands::Actor.new(kind: "agent", id: "assembly-spec"),
+        artifact: proposed_artifact,
+        observation: proposed_observation
+      )
+    end
+
+    it "assembles the canonical Artifact from the new observation" do
+      append_canonical_artifact
+      register_command
+      append_task_submission
+      observation = append_canonical_artifact_observation
+      terminal = append_terminal(Coordinator::Write::Events::CommandSucceededV1.new(command_id:))
+
+      result = assemble.call(terminal)
+
+      expect(canonical_artifact_id).not_to eq(proposed_artifact_id)
+      expect(result.data).to have_attributes(
+        artifact_id: canonical_artifact_id,
+        observation_id:,
+        outcome: "observed",
+        content_sha256: content.content_sha256
+      )
+      expect(result.emitted_events.map(&:event_id)).to eq(observation.map(&:id))
+    end
+
+    it "uses the committed Observation UUID when a resumed instruction carries another proposal" do
+      append_canonical_artifact
+      register_command
+      append_task_submission
+      persisted_observation_id = SecureRandom.uuid_v7
+      observations = append_canonical_artifact_observation(observation_id: persisted_observation_id)
+      terminal = append_terminal(Coordinator::Write::Events::CommandSucceededV1.new(command_id:))
+
+      result = assemble.call(terminal)
+
+      expect(persisted_observation_id).not_to eq(command.observation.observation_id)
+      expect(result.data).to have_attributes(artifact_id: canonical_artifact_id, observation_id: persisted_observation_id)
+      expect(result.emitted_events.map(&:event_id)).to eq(observations.map(&:id))
+    end
+  end
+
+  context "when another proposed Relation UUID declared the same natural relation" do
+    let(:canonical_relation_id) { SecureRandom.uuid_v7 }
+    let(:proposed_relation_id) { SecureRandom.uuid_v7 }
+    let(:source_artifact_id) { SecureRandom.uuid_v7 }
+    let(:target_artifact_id) { SecureRandom.uuid_v7 }
+    let(:proposed_relation) do
+      Coordinator::Write::DevelopmentArtifacts::RelationV1.new(
+        relation_id: proposed_relation_id,
+        source_artifact_id:,
+        relation: "references",
+        target: Coordinator::Write::DevelopmentArtifacts::RelationTargetV1.new(
+          kind: "artifact",
+          id: target_artifact_id
+        ),
+        attributes: Coordinator::Write::DevelopmentArtifacts::RelationAttributesV1.new(
+          path: "child.md",
+          normalized_locator: "docs/child.md"
+        )
+      )
+    end
+    let(:command) do
+      Coordinator::Write::Commands::DeclareDevelopmentArtifactRelation.new(
+        command_id:,
+        actor: Coordinator::Write::Commands::Actor.new(kind: "agent", id: "assembly-spec"),
+        artifact_relation: proposed_relation
+      )
+    end
+
+    it "assembles the canonical Relation selected by its natural-key marker" do
+      append_canonical_artifact_relation
+      register_command
+      append_task_submission
+      terminal = append_terminal(
+        Coordinator::Write::Events::CommandSucceededV1.new(command_id:)
+      )
+
+      result = assemble.call(terminal)
+
+      expect(canonical_relation_id).not_to eq(proposed_relation_id)
+      expect(result.data).to have_attributes(
+        relation_id: canonical_relation_id,
+        source_artifact_id:,
+        relation: "references",
+        outcome: "existing"
+      )
+      expect(result.emitted_events).to be_empty
+    end
+  end
+
+  context "when granular Artifact facts are emitted" do
+    let(:artifact_id) { SecureRandom.uuid_v7 }
+    let(:command) do
+      Coordinator::Write::Commands::UpdateDevelopmentArtifact.new(
+        command_id:,
+        actor: Coordinator::Write::Commands::Actor.new(kind: "agent", id: "assembly-spec"),
+        artifact_id:,
+        expected_revision: 4,
+        changes: Coordinator::Write::DevelopmentArtifacts::UpdateChangesV1.new(title: "Updated")
+      )
+    end
+
+    it "reconstructs changed properties and native event time" do
+      register_command
+      append_task_submission
+      fact = append(
+        streams.development_artifact(artifact_id),
+        Coordinator::Write::Events::DevelopmentArtifactTitleChangedV1.new(
+          artifact_id:, title: "Updated"
+        ),
+        metadata: command_metadata(policy_version: "development-artifact-repository/v2"),
+        markers: [ "development-artifact:#{artifact_id}", "command:#{command_id}" ]
+      )
+      terminal = append_terminal(Coordinator::Write::Events::CommandSucceededV1.new(command_id:))
+
+      result = assemble.call(terminal)
+
+      expect(result.data).to have_attributes(
+        artifact_id:,
+        resulting_stream_revision: fact.stream_revision,
+        changed_properties: [ "title" ],
+        outcome: "updated",
+        updated_at: fact.created_at.utc.iso8601(6)
+      )
+    end
+  end
+
+  context "when a flat v2 Relation fact is emitted" do
+    let(:source_artifact_id) { SecureRandom.uuid_v7 }
+    let(:relation_id) { SecureRandom.uuid_v7 }
+    let(:command) do
+      Coordinator::Write::Commands::DeclareDevelopmentArtifactRelation.new(
+        command_id:,
+        actor: Coordinator::Write::Commands::Actor.new(kind: "agent", id: "assembly-spec"),
+        artifact_relation: Coordinator::Write::DevelopmentArtifacts::RelationV1.new(
+          relation_id:,
+          source_artifact_id:,
+          relation: "references",
+          target: Coordinator::Write::DevelopmentArtifacts::RelationTargetV1.new(
+            kind: "external",
+            id: "https://example.test/target"
+          ),
+          attributes: Coordinator::Write::DevelopmentArtifacts::RelationAttributesV1.new(
+            path: nil,
+            fragment: nil,
+            normalized_locator: nil
+          )
+        )
+      )
+    end
+
+    it "reconstructs the target status from the flat declaration" do
+      register_command
+      append_task_submission
+      declaration = append(
+        streams.development_artifact_relation(relation_id),
+        Coordinator::Write::Events::DevelopmentArtifactRelationDeclaredV2.new(
+          relation_id:,
+          source_artifact_id:,
+          relation: "references",
+          target_kind: "external",
+          target_id: "https://example.test/target",
+          path: nil,
+          fragment: nil,
+          normalized_locator: nil
+        ),
+        metadata: command_metadata(policy_version: "development-artifact-repository/v2"),
+        markers: [ "development-artifact-relation:#{relation_id}", "command:#{command_id}" ]
+      )
+      terminal = append_terminal(Coordinator::Write::Events::CommandSucceededV1.new(command_id:))
+
+      result = assemble.call(terminal)
+
+      expect(result.data.target).to have_attributes(
+        kind: "external",
+        id: "https://example.test/target",
+        status: "unverified"
+      )
+      expect(result.data.declared_at).to eq(declaration.created_at.utc.iso8601(6))
+    end
+  end
+
+  context "when a granular classification correction is recorded" do
+    let(:artifact_id) { SecureRandom.uuid_v7 }
+    let(:observation_id) { SecureRandom.uuid_v7 }
+    let(:command) do
+      Coordinator::Write::Commands::CorrectDevelopmentArtifactClassification.new(
+        command_id:,
+        actor: Coordinator::Write::Commands::Actor.new(kind: "agent", id: "assembly-spec"),
+        observation_id:,
+        expected_revision: 1,
+        title: "Corrected title",
+        kind: "documentation",
+        labels: [ "corrected" ],
+        reason: "The initial classification was incomplete"
+      )
+    end
+
+    it "uses correction-recorded revision, command values, and native event time" do
+      register_command
+      append_task_submission
+      append(
+        streams.development_artifact_observation(observation_id),
+        Coordinator::Write::Events::DevelopmentArtifactObservationRecordedV1.new(
+          observation_id:
+        ),
+        metadata: command_metadata(policy_version: "development-artifact-repository/v2"),
+        markers: [ "development-artifact-observation:#{observation_id}" ]
+      )
+      correction = append(
+        streams.development_artifact_observation(observation_id),
+        Coordinator::Write::Events::DevelopmentArtifactClassificationCorrectionRecordedV1.new(
+          artifact_id:,
+          observation_id:,
+          classification_revision: 2,
+          reason: command.reason
+        ),
+        metadata: command_metadata(policy_version: "development-artifact-repository/v2"),
+        markers: [ "development-artifact:#{artifact_id}", "command:#{command_id}" ]
+      )
+      terminal = append_terminal(Coordinator::Write::Events::CommandSucceededV1.new(command_id:))
+
+      result = assemble.call(terminal)
+
+      expect(result.data).to have_attributes(
+        artifact_id:,
+        observation_id:,
+        classification_revision: 2,
+        title: "Corrected title",
+        kind: "documentation",
+        labels: [ "corrected" ],
+        outcome: "corrected",
+        corrected_at: correction.created_at.utc.iso8601(6)
+      )
+    end
+  end
+
+  context "when intention receipts are assembled from exact command-time facts" do
+    let(:set_id) { SecureRandom.uuid_v7 }
+    let(:intention_id) { SecureRandom.uuid_v7 }
+    let(:resource_id) { SecureRandom.uuid_v7 }
+    let(:initial_expiry) { "2026-10-09T10:00:00.000000Z" }
+    let(:first_expiry) { "2026-10-09T11:00:00.000000Z" }
+    let(:second_expiry) { "2026-10-09T12:00:00.000000Z" }
+    let(:command) do
+      Coordinator::Write::Commands::RenewWorkIntentionSet.new(
+        command_id:,
+        actor: Coordinator::Write::Commands::Actor.new(kind: "agent", id: "assembly-spec"),
+        change_set_id: "CS-command-result", work_item_id: "W-command-result",
+        attempt_id: "A-command-result", intention_set_id: set_id,
+        intentions: [ Coordinator::Write::WorkIntentionFencedReferenceV1.new(resource_id:, intention_id:, fencing_token: 1) ],
+        ttl_seconds: 600
+      )
+    end
+
+    it "reports the immediately preceding renewal rather than the original declaration deadline" do
+      append_initial_intention
+      append_renewal(first_expiry, owner: "previous-renewal")
+      register_command
+      append_task_submission
+      append_renewal(second_expiry, owner: command_id)
+      terminal = append_terminal(Coordinator::Write::Events::CommandSucceededV1.new(command_id:))
+
+      expect(assemble.call(terminal).data).to have_attributes(
+        previous_expires_at: first_expiry, expires_at: second_expiry, intention_count: 1
+      )
+    end
+
+    it "does not borrow later renewal deadlines or expanded membership during delayed assembly" do
+      append_initial_intention
+      register_command
+      append_task_submission
+      append_renewal(first_expiry, owner: command_id)
+      terminal = append_terminal(Coordinator::Write::Events::CommandSucceededV1.new(command_id:))
+      append_renewal(second_expiry, owner: "later-renewal")
+      append_later_member
+      append_withdrawal(owner: "later-withdrawal")
+
+      result = assemble.call(terminal)
+
+      expect(result.data).to have_attributes(
+        previous_expires_at: initial_expiry, expires_at: first_expiry, intention_count: 1
+      )
+      expect(result.data.intentions.map(&:intention_id)).to eq([ intention_id ])
+    end
+
+    it "excludes future-command membership even when its fact was delivered before this terminal" do
+      append_initial_intention
+      register_command
+      append_task_submission
+      append_renewal(first_expiry, owner: command_id)
+      append_later_member(complete: false)
+      terminal = append_terminal(Coordinator::Write::Events::CommandSucceededV1.new(command_id:))
+      append_successful_source_command("later-expansion")
+
+      result = assemble.call(terminal)
+
+      expect(result.data).to have_attributes(
+        previous_expires_at: initial_expiry, expires_at: first_expiry, intention_count: 1
+      )
+      expect(result.data.intentions.map(&:intention_id)).to eq([ intention_id ])
+    end
+
+    context "for a declaration followed by later renewal and expansion" do
+      let(:command) do
+        Coordinator::Write::Commands::DeclareWorkIntentionSet.new(
+          command_id:,
+          actor: Coordinator::Write::Commands::Actor.new(kind: "agent", id: "assembly-spec"),
+          change_set_id: "CS-command-result", work_item_id: "W-command-result",
+          attempt_id: "A-command-result", repository_id: RepositoryScenario::DEFAULT_REPOSITORY_ID,
+          base_commit_oid: "a" * 40, ttl_seconds: 600,
+          resources: [ Coordinator::Write::WorkIntentionTargetV1.new(resource_id:, base_blob_oid: nil, purpose: "Current edit") ]
+        )
+      end
+
+      it "keeps the original declaration membership and deadline" do
+        register_command
+        append_task_submission
+        append_initial_intention(owner: command_id)
+        terminal = append_terminal(Coordinator::Write::Events::CommandSucceededV1.new(command_id:))
+        append_renewal(first_expiry, owner: "later-renewal")
+        append_later_member
+
+        result = assemble.call(terminal)
+
+        expect(result.data).to have_attributes(expires_at: initial_expiry)
+        expect(result.data.intentions.map(&:intention_id)).to eq([ intention_id ])
+      end
+    end
+
+    context "for an expansion followed by another expansion" do
+      let(:expansion_resource_id) { resource_id }
+      let(:command) do
+        Coordinator::Write::Commands::ExpandWorkIntentionSet.new(
+          command_id:,
+          actor: Coordinator::Write::Commands::Actor.new(kind: "agent", id: "assembly-spec"),
+          change_set_id: "CS-command-result", work_item_id: "W-command-result",
+          attempt_id: "A-command-result", intention_set_id: set_id,
+          repository_id: RepositoryScenario::DEFAULT_REPOSITORY_ID, base_commit_oid: "a" * 40,
+          resources: [ Coordinator::Write::WorkIntentionTargetV1.new(resource_id: expansion_resource_id, base_blob_oid: nil, purpose: "Current edit") ]
+        )
+      end
+
+      it "keeps its command-time count and expires_at even when the no-op is assembled late" do
+        append_initial_intention
+        register_command
+        append_task_submission
+        terminal = append_terminal(Coordinator::Write::Events::CommandSucceededV1.new(command_id:))
+        append_renewal(first_expiry, owner: "later-renewal")
+        append_later_member
+
+        result = assemble.call(terminal)
+
+        expect(result.data).to have_attributes(expires_at: initial_expiry, intention_count: 1, added_intentions: [])
+      end
+
+      context "when this command adds a resource" do
+        let(:expansion_resource_id) { SecureRandom.uuid_v7 }
+
+        it "reports only the members added by this command and its exact resulting count" do
+          append_initial_intention
+          register_command
+          append_task_submission
+          added_intention_id = SecureRandom.uuid_v7
+          append_intention_member(
+            intention_id: added_intention_id, resource_id: expansion_resource_id,
+            path: "docs/expanded.md", owner: command_id
+          )
+          terminal = append_terminal(Coordinator::Write::Events::CommandSucceededV1.new(command_id:))
+          append_later_member
+          append_renewal(first_expiry, owner: "later-renewal")
+
+          result = assemble.call(terminal)
+
+          expect(result.data).to have_attributes(expires_at: initial_expiry, intention_count: 2)
+          expect(result.data.added_intentions.map(&:intention_id)).to eq([ added_intention_id ])
+        end
+      end
+    end
+
+    def append_initial_intention(owner: "initial-declaration")
+      owner = source_owner_id(owner)
+      append(
+        streams.work_intention_set(set_id),
+        Coordinator::Write::Events::WorkIntentionSetCreatedV1.new(
+          set_id:, attempt_id: "A-command-result", work_item_id: "W-command-result",
+          change_set_id: "CS-command-result", repository_id: RepositoryScenario::DEFAULT_REPOSITORY_ID
+        ),
+        metadata: command_metadata(command_id: owner),
+        markers: [ "work-intention-set:#{set_id}", "attempt:A-command-result", "command:#{owner}" ]
+      )
+      append_intention_member(intention_id:, resource_id:, path: "README.md", owner:)
+    end
+
+    def append_later_member(complete: true)
+      append_intention_member(
+        intention_id: SecureRandom.uuid_v7, resource_id: SecureRandom.uuid_v7,
+        path: "docs/later.md", owner: "later-expansion", complete:
+      )
+    end
+
+    def append_intention_member(intention_id:, resource_id:, path:, owner:, complete: true)
+      owner = source_owner_id(owner)
+      append(
+        streams.resource(resource_id),
+        Coordinator::Write::Events::ResourceIdentityV2::Registered.new(
+          resource_id:, repository_id: RepositoryScenario::DEFAULT_REPOSITORY_ID,
+          kind: "file", normalized_path: path
+        ),
+        metadata: command_metadata(command_id: "resource-registration"), markers: [ "resource:#{resource_id}" ]
+      )
+      append(
+        streams.resource_work_intention(intention_id),
+        Coordinator::Write::Events::ResourceWorkIntentionDeclaredV1.new(
+          intention_id:, set_id:, resource_id:, repository_id: RepositoryScenario::DEFAULT_REPOSITORY_ID,
+          change_set_id: "CS-command-result", work_item_id: "W-command-result", attempt_id: "A-command-result",
+          agent_id: "assembly-spec", mode: "shared", purpose: "Current edit", context: nil,
+          object_format: "sha1", base_commit_oid: "a" * 40, base_blob_oid: nil,
+          fencing_token: 1, expires_at: initial_expiry
+        ),
+        metadata: command_metadata(command_id: owner),
+        markers: [ "work-intention:#{intention_id}", "command:#{owner}" ]
+      )
+      append(
+        streams.work_intention_set(set_id),
+        Coordinator::Write::Events::WorkIntentionAddedToSetV1.new(set_id:, intention_id:, resource_id:),
+        metadata: command_metadata(command_id: owner),
+        markers: [ "work-intention-set:#{set_id}", "command:#{owner}" ]
+      )
+      append_successful_source_command(owner) if complete && owner != command_id
+    end
+
+    def append_renewal(expires_at, owner:)
+      owner = source_owner_id(owner)
+      append(
+        streams.resource_work_intention(intention_id),
+        Coordinator::Write::Events::ResourceWorkIntentionRenewedV1.new(
+          intention_id:, resource_id:, fencing_token: 1, expires_at:
+        ),
+        metadata: command_metadata(command_id: owner),
+        markers: [ "work-intention:#{intention_id}", "command:#{owner}" ]
+      )
+    end
+
+    def append_withdrawal(owner:)
+      owner = source_owner_id(owner)
+      append(
+        streams.resource_work_intention(intention_id),
+        Coordinator::Write::Events::ResourceWorkIntentionWithdrawnV1.new(
+          intention_id:, resource_id:, fencing_token: 1, reason: "Finished the edit"
+        ),
+        metadata: command_metadata(command_id: owner),
+        markers: [ "work-intention:#{intention_id}", "command:#{owner}" ]
+      )
+    end
+
+    def append_successful_source_command(owner)
+      owner = source_owner_id(owner)
+      [
+        Coordinator::Write::Events::CommandRegisteredV1.new(
+          command_id: owner, request_id: "source-#{owner}", tool_name: "work_intention_set_declare"
+        ),
+        Coordinator::Write::Events::CommandSucceededV1.new(command_id: owner)
+      ].each do |fact|
+        append(
+          streams.command(owner), fact, metadata: command_metadata(command_id: owner),
+          markers: [ "command:#{owner}" ]
+        )
+      end
+    end
+
+    def source_owner_id(label)
+      @intention_source_command_ids ||= { command_id => command_id }
+      @intention_source_command_ids.fetch(label) do
+        generated = SecureRandom.uuid_v7
+        @intention_source_command_ids[generated] = generated
+        @intention_source_command_ids[label] = generated
+      end
+    end
+  end
+
+  context "when an Attempt is abandoned through granular lifecycle facts" do
+    let(:prior_intention_command_id) { SecureRandom.uuid_v7 }
+    let(:intention_id) { SecureRandom.uuid_v7 }
+    let(:resource_id) { SecureRandom.uuid_v7 }
+    let(:set_id) { SecureRandom.uuid_v7 }
+    let(:command) do
+      Coordinator::Write::Commands::AbandonAttempt.new(
+        command_id:,
+        actor: Coordinator::Write::Commands::Actor.new(kind: "agent", id: "assembly-spec"),
+        change_set_id: "CS-command-result",
+        work_item_id: "W-command-result",
+        attempt_id: "A-command-result",
+        reason: "Execution was interrupted after an intermediate checkpoint."
+      )
+    end
+
+    it "reconstructs the receipt without an abandonment snapshot" do
+      append_work_intention_set
+      register_command
+      append_task_submission
+      append_abandonment_facts
+      terminal = append_terminal(Coordinator::Write::Events::CommandSucceededV1.new(command_id:))
+
+      result = assemble.call(terminal)
+
+      expect(result).to have_attributes(
+        status: "ok",
+        summary: "Attempt abandoned; WorkItem requeued; 1 active work intention(s) withdrawn.",
+        warnings: [ "Reacquire the WorkItem with a fresh Attempt ID and base snapshot before resuming." ]
+      )
+      expect(result.data).to have_attributes(
+        change_set_id: command.change_set_id,
+        work_item_id: command.work_item_id,
+        attempt_id: command.attempt_id
+      )
+      expect(result.emitted_events.map(&:type)).to eq([
+        "ResourceWorkIntentionWithdrawn",
+        "AttemptAbandoned",
+        "WorkItemRequeued"
+      ])
+    end
+
+    def append_work_intention_set
+      facts = [
+        Coordinator::Write::Events::WorkIntentionSetCreatedV1.new(
+          set_id:,
+          attempt_id: command.attempt_id,
+          work_item_id: command.work_item_id,
+          change_set_id: command.change_set_id,
+          repository_id: RepositoryScenario::DEFAULT_REPOSITORY_ID
+        ),
+        Coordinator::Write::Events::WorkIntentionAddedToSetV1.new(
+          set_id:,
+          intention_id:,
+          resource_id:
+        )
+      ]
+      facts.each do |fact|
+        append(
+          streams.work_intention_set(set_id),
+          fact,
+          metadata: command_metadata(command_id: prior_intention_command_id),
+          markers: [ "attempt:#{command.attempt_id}", "work-intention-set:#{set_id}" ]
+        )
+      end
+      append(
+        streams.command(prior_intention_command_id),
+        Coordinator::Write::Events::CommandSucceededV1.new(command_id: prior_intention_command_id),
+        metadata: command_metadata(command_id: prior_intention_command_id),
+        markers: [ "command:#{prior_intention_command_id}" ]
+      )
+    end
+
+    def append_abandonment_facts
+      [
+        [
+          streams.resource_work_intention(intention_id),
+          Coordinator::Write::Events::ResourceWorkIntentionWithdrawnV1.new(
+            intention_id:,
+            resource_id:,
+            fencing_token: 1,
+            reason: command.reason
+          )
+        ],
+        [
+          streams.attempt(command.attempt_id),
+          Coordinator::Write::Events::AttemptAbandonedV3.new(
+            attempt_id: command.attempt_id,
+            reason: command.reason
+          )
+        ],
+        [
+          streams.work_item(command.work_item_id),
+          Coordinator::Write::Events::WorkItemRequeuedV2.new(
+            work_item_id: command.work_item_id,
+            change_set_id: command.change_set_id,
+            attempt_id: command.attempt_id,
+            agent_id: command.actor.id,
+            reason: command.reason
+          )
+        ]
+      ].map do |stream, fact|
+        append(
+          stream,
+          fact,
+          metadata: command_metadata,
+          markers: [ "command:#{command_id}", "attempt:#{command.attempt_id}" ]
+        )
+      end
+    end
+  end
+
+  def register_command
+    append(
+      streams.command(command_id),
+      Coordinator::Write::Events::CommandRegisteredV1.new(
+        command_id:,
+        request_id: "assembly-spec-request",
+        tool_name:
+      ),
+      metadata: canonical_metadata,
+      markers: [ "command:#{command_id}" ]
+    )
+  end
+
+  def append_task_submission
+    append(
+      streams.coordination_task(task_id),
+      Coordinator::Write::Events::CoordinationTaskSubmittedV3.new(
+        task_id:,
+        command_id:,
+        tool_name:,
+        command_input: Coordinator::Write::CommandInputDigest.new.document(command),
+        poll_interval_ms: 500,
+        ttl_ms: nil
+      ),
+      metadata: canonical_metadata,
+      markers: [ "task:#{task_id}", "command:#{command_id}" ]
+    )
+  end
+
+  def append_change_set_facts
+    [
+      Coordinator::Write::Events::ChangeSetCreatedV2.new(change_set_id: "CS-command-result"),
+      Coordinator::Write::Events::ChangeSetGoalDefinedV1.new(
+        change_set_id: "CS-command-result", goal: command.goal
+      ),
+      Coordinator::Write::Events::ChangeSetAcceptanceCriteriaDefinedV2.new(
+        change_set_id: "CS-command-result",
+        acceptance_criteria: command.acceptance_criteria
+      )
+    ].map do |payload|
+      append(
+        streams.change_set("CS-command-result"),
+        payload,
+        metadata: command_metadata,
+        markers: [ "command:#{command_id}" ]
+      )
+    end
+  end
+
+  def append_canonical_repository
+    marker = Coordinator::Write::Repositories::NaturalKeyMarker.new.call(
+      scope: command.scope,
+      repository_key: command.repository_key
+    )
+    payloads = [
+      Coordinator::Write::Events::RepositoryRegisteredV2.new(
+        repository_id: canonical_repository_id,
+        scope: command.scope,
+        repository_key: command.repository_key
+      )
+    ]
+    if command.display_name
+      payloads << Coordinator::Write::Events::RepositoryDisplayNameChangedV1.new(
+        repository_id: canonical_repository_id, display_name: command.display_name
+      )
+    end
+    command.paths.each do |path|
+      payloads << Coordinator::Write::Events::RepositoryPathAddedV1.new(
+        repository_id: canonical_repository_id, path:
+      )
+    end
+    command.remotes.each do |remote|
+      payloads << Coordinator::Write::Events::RepositoryRemoteAddedV1.new(
+        repository_id: canonical_repository_id, remote:
+      )
+    end
+    payloads.map do |payload|
+      append(
+        streams.repository(canonical_repository_id), payload,
+        metadata: command_metadata, markers: [ marker.marker ]
+      )
+    end
+  end
+
+  def append_canonical_artifact
+    append(
+      streams.development_artifact(canonical_artifact_id),
+      Coordinator::Write::Events::DevelopmentArtifactCreatedV1.new(artifact_id: canonical_artifact_id),
+      metadata: command_metadata(policy_version: "development-artifact-repository/v1"),
+      markers: []
+    )
+  end
+
+  def append_canonical_artifact_observation(observation_id: self.observation_id)
+    recorded = append(
+      streams.development_artifact_observation(observation_id),
+      Coordinator::Write::Events::DevelopmentArtifactObservationRecordedV1.new(observation_id:),
+      metadata: command_metadata(policy_version: "development-artifact-repository/v1"),
+      markers: [ "command:#{command_id}" ]
+    )
+    fact = event_store.read(streams.development_artifact(canonical_artifact_id), Coordinator::Write::EventQueries::DEVELOPMENT_ARTIFACT_CAPTURE).sole
+    linked = append(
+      streams.development_artifact_observation(observation_id),
+      Coordinator::Write::Events::DevelopmentArtifactObservationFactLinkedV1.new(
+        observation_id:,
+        artifact_id: canonical_artifact_id,
+        role: "created",
+        observed_fact: Coordinator::Write::EventReference.new(
+          event_id: fact.id, type: fact.type, stream_context: fact.stream.context,
+          stream_name: fact.stream.stream_name, stream_id: fact.stream.stream_id,
+          stream_revision: fact.stream_revision
+        )
+      ),
+      metadata: command_metadata(policy_version: "development-artifact-repository/v1"),
+      markers: [ "command:#{command_id}" ]
+    )
+    [ recorded, linked ]
+  end
+
+  def append_canonical_artifact_relation
+    source_command_id = SecureRandom.uuid_v7
+    relation = Coordinator::Write::DevelopmentArtifacts::RelationV1.new(
+      proposed_relation.to_h.merge(relation_id: canonical_relation_id)
+    )
+    payload = Coordinator::Write::Events::DevelopmentArtifactRelationDeclaredV2.new(
+      relation_id: canonical_relation_id,
+      source_artifact_id: relation.source_artifact_id,
+      relation: relation.relation,
+      target_kind: relation.target.kind,
+      target_id: relation.target.id,
+      path: relation.relation_attributes.path,
+      fragment: relation.relation_attributes.fragment,
+      normalized_locator: relation.relation_attributes.normalized_locator
+    )
+    append(
+      streams.development_artifact_relation(canonical_relation_id),
+      payload,
+      metadata: command_metadata(
+        command_id: source_command_id,
+        policy_version: "development-artifact-repository/v1"
+      ),
+      markers: Coordinator::Write::DevelopmentArtifacts::MarkerBuilder.new.relation(
+        artifact_relation: relation,
+        command_id: source_command_id
+      )
+    )
+  end
+
+  def append_terminal(payload)
+    append(
+      streams.command(command_id),
+      payload,
+      metadata: Coordinator::Write::EventMetadata.new(
+        command_id:,
+        actor_kind: "agent",
+        actor_id: "assembly-spec",
+        recorded_by: "coordinator",
+        policy_version: "command-lifecycle/v1"
+      ),
+      markers: [ "command:#{command_id}", "tool:#{tool_name}" ],
+      expected_revision: 0
+    )
+  end
+
+  def append(stream, payload, metadata:, markers:, expected_revision: nil)
+    event = event_factory.build!(
+      event: payload,
+      event_id: SecureRandom.uuid_v7,
+      metadata:,
+      markers:
+    )
+    options = expected_revision.nil? ? {} : { expected_revision: }
+    event_store.append(stream, [ event ], **options).sole
+  end
+
+  def canonical_metadata
+    Coordinator::Write::Metadata::CanonicalCommandV1.new(
+      command_id:,
+      actor_kind: "agent",
+      actor_id: "assembly-spec",
+      recorded_by: "coordinator",
+      policy_version: "coordination-task/v3",
+      canonical_input_digest:
+    )
+  end
+
+  def tool_name
+    Coordinator::Write::Tasks::TargetContractRegistry.fetch_for(command).tool_name
+  end
+
+  def command_metadata(command_id: self.command_id, policy_version: "change-set/v1")
+    Coordinator::Write::EventMetadata.new(
+      command_id:,
+      actor_kind: "agent",
+      actor_id: "assembly-spec",
+      recorded_by: "coordinator",
+      policy_version:
+    )
+  end
+end

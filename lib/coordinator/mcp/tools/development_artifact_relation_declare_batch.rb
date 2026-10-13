@@ -9,14 +9,16 @@ module Coordinator::Mcp::Tools
       split fragments, normalize relative POSIX locators against the source locator, resolve
       exact targets, and declare 1..1,000 idempotent edges within the 3-MiB limit. Preserve
       literal link evidence; never guess unresolved or ambiguous targets—record those outcomes
-      in a caller-captured import_manifest Artifact instead. Poll the returned Task, then
-      operation_batch_get for every per-item Saga outcome. Acceptance stores the manifest; child request identities are bound
+      in a caller-captured import_manifest Artifact instead. Poll tasks/get until the whole
+      bounded Saga settles; its final result reports every per-item Saga outcome: successful,
+      rejected, failed and unexecuted items.
+      Earlier successes are not rolled back. operation_batch_get is optional projected per-item
+      context, not persistence confirmation. Initial acceptance stores only the manifest; child request identities are bound
       independently, reusing identical requests or rejecting changed inputs per item.
       For an unknown result replay the exact command_id and payload; a known terminal result followed by new intent needs a new
       command_id.
     TEXT
     input_schema Coordinator::Mcp::Schemas.development_artifact_relation_declare_batch
-    output_schema Coordinator::Mcp::ArtifactSchemas.operation_batch_acceptance_result
     operation "operations.submit_create_development_artifact_relation_declare_batch_task"
   end
 end

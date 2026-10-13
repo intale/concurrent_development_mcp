@@ -12,6 +12,7 @@ module Coordinator
           def data: () -> CommandReceiptData::value
           def warnings: () -> Array[String]
           def next_actions: () -> Array[NextAction]
+          def completion: () -> CompletionGuaranteeV1
         end
 
         class DomainRejection < Shared::Value
@@ -21,6 +22,7 @@ module Coordinator
           def command_id: () -> String
           def error: () -> (DomainErrorV1::domain_error)
           def next_actions: () -> Array[NextAction]
+          def completion: () -> CompletionGuaranteeV1
         end
       end
     end

@@ -7,8 +7,10 @@ module Coordinator::Mcp::Tools
     description <<~TEXT.squish
       Import pass 1: inventory content using capabilities available to the client, then capture
       all selected exact bytes as 1..1,000 ordinary commands within the 3-MiB canonical-input
-      limit. Poll the returned Task, then operation_batch_get for per-item Saga outcomes and
-      request-binding denials. Acceptance stores the manifest; each child request is bound
+      limit. Poll tasks/get until the whole bounded Saga settles; its final result reports
+      successful, rejected, failed and unexecuted items without rolling back earlier successes.
+      operation_batch_get is optional projected per-item context, not persistence confirmation.
+      Initial acceptance stores only the manifest; each child request is bound
       independently as the Saga reaches it. Identical requests reuse their canonical result.
       Then
       build an exact scope/source-kind/locator/revision to Artifact-ID map. The server assumes
@@ -17,7 +19,6 @@ module Coordinator::Mcp::Tools
       a known terminal result uses a new command_id.
     TEXT
     input_schema Coordinator::Mcp::Schemas.development_artifact_capture_batch
-    output_schema Coordinator::Mcp::ArtifactSchemas.operation_batch_acceptance_result
     operation "operations.submit_create_development_artifact_capture_batch_task"
   end
 end

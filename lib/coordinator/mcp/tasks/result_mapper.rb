@@ -11,21 +11,24 @@ module Coordinator::Mcp
         ResultV1::Created.new(
           common_attributes(state).merge(
             resultType: "task",
-            status: "working"
+            status: state.status,
+            statusMessage: acceptance_message(state)
           )
         )
       end
 
-      def detailed(state, projected_result: nil)
+      def detailed(state, semantic_result: nil)
         case state.status
         when "working"
           working(state)
         when "completed"
+          result = completed_result(semantic_result)
           ResultV1::Completed.new(
             common_attributes(state).merge(
               resultType: "complete",
               status: "completed",
-              result: completed_result(projected_result)
+              statusMessage: result.structuredContent.summary,
+              result:
             )
           )
         when "failed"
@@ -33,7 +36,7 @@ module Coordinator::Mcp
             common_attributes(state).merge(
               resultType: "complete",
               status: "failed",
-              statusMessage: state.status_message,
+              statusMessage: "#{state.status_message} This protocol failure does not establish whether target effects committed. Do not infer rollback or submit another write to confirm persistence.",
               error: failed_error(state)
             )
           )
@@ -42,7 +45,7 @@ module Coordinator::Mcp
             common_attributes(state).merge(
               resultType: "complete",
               status: "cancelled",
-              statusMessage: state.status_message
+              statusMessage: "#{state.status_message} Cancellation does not roll back previously committed effects or cancel other related operations."
             )
           )
         else
@@ -54,16 +57,6 @@ module Coordinator::Mcp
         ResultV1::Acknowledgement.new(resultType: "complete")
       end
 
-      def projection_pending(state)
-        ResultV1::WorkingWithMessage.new(
-          common_attributes(state).merge(
-            resultType: "complete",
-            status: "working",
-            statusMessage: "Command completed; its result projection is catching up."
-          )
-        )
-      end
-
       private
 
       def working(state)
@@ -71,11 +64,16 @@ module Coordinator::Mcp
           resultType: "complete",
           status: "working"
         )
-        return ResultV1::Working.new(attributes) unless state.status_message
-
         ResultV1::WorkingWithMessage.new(
-          attributes.merge(statusMessage: state.status_message)
+          attributes.merge(statusMessage: acceptance_message(state))
         )
+      end
+
+      def acceptance_message(state)
+        return "The original Task is #{state.status}; retrieve its authoritative outcome through tasks/get. Do not resubmit a new mutation to confirm persistence." if state.terminal?
+
+        note = "The request is durably recorded, but its requested effects are not yet confirmed. Poll this Task at pollIntervalMs; entity reads may lag and cannot establish completion."
+        [ state.status_message, note ].compact.join(" ")
       end
 
       def common_attributes(state)
@@ -88,10 +86,10 @@ module Coordinator::Mcp
         }
       end
 
-      def completed_result(projected_result)
-        raise KeyError, "Completed Task result has not been projected yet" unless projected_result
+      def completed_result(semantic_result)
+        raise KeyError, "Completed Task has no authoritative result" unless semantic_result
 
-        @semantic_presenter.call(projected_result)
+        @semantic_presenter.call(semantic_result)
       end
 
       def failed_error(state)

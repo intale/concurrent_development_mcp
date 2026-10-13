@@ -19,6 +19,7 @@ module Coordinator
         class Created < Base
           def resultType: () -> String
           def status: () -> String
+          def statusMessage: () -> String
         end
 
         class Working < Base
@@ -33,6 +34,7 @@ module Coordinator
         class Completed < Base
           def resultType: () -> String
           def status: () -> String
+          def statusMessage: () -> String
           def result: () -> CallToolResult
         end
 

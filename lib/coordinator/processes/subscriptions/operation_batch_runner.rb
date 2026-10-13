@@ -16,6 +16,8 @@ module Coordinator::Processes
           OperationBatchCreated
           OperationBatchContinuationRequested
           OperationBatchCancellationRequested
+          OperationBatchCompleted
+          OperationBatchCancelled
         ]
       )
 

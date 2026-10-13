@@ -5,8 +5,8 @@ module Coordinator
         PROJECTION: ProjectionDefinition
 
         def initialize: (
-          source_loader: CommandResults::SourceLoader,
-          assembler: CommandResults::Assembler,
+          source_loader: Coordinator::Write::CommandResults::SourceLoader,
+          assembler: Coordinator::Write::CommandResults::Assembler,
           ?receipts: Repositories::CommandReceipts,
           ?processed_events: Repositories::ProcessedProjectionEvents
         ) -> void

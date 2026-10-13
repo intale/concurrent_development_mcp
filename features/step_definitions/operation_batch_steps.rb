@@ -18,10 +18,9 @@ When("the agent submits two competing initial revisions in one Skill batch") do
 end
 
 Then("the Batch Task durably accepts all {int} items") do |count|
-  outcome = @operation_batch_task.dig("result", "result", "structuredContent")
-  assert_acceptance_equal("completed", @operation_batch_task.dig("result", "status"), "Batch Task status")
-  assert_acceptance_equal("accepted", outcome.dig("data", "status"), "Batch acceptance")
-  assert_acceptance_equal(count, outcome.dig("data", "total"), "Accepted item count")
+  assert_acceptance_equal("working", @operation_batch_task.dig("result", "status"), "Batch Task stays working until Saga settlement")
+  assert_acceptance(@operation_batch_task.dig("result", "statusMessage").include?("requested effects are not yet confirmed"), "Acceptance explains its limited guarantee")
+  assert_acceptance_equal(count, operation_batch_events.count { _1.type == "OperationBatchItemEnqueued" }, "Durable manifest count")
   assert_acceptance_equal(1, operation_batch_events.count { _1.type == "OperationBatchCreated" }, "Creation facts")
 end
 
@@ -234,6 +233,7 @@ Then("the available Batch completes with one success and one rejection") do
 end
 
 Then("both child command results are independently available through MCP") do
+  start_task_result_subscriptions
   items = operation_batch_manifest.fetch(:items)
   items.each do |item|
     request_id = item.fetch("arguments").fetch("command_id")
@@ -278,6 +278,8 @@ Then("the cancellation Task succeeds without undoing completed items") do
   result = @operation_batch_cancel_task.dig("result", "result")
   assert_acceptance_equal("completed", @operation_batch_cancel_task.dig("result", "status"), "Cancel Task")
   assert_acceptance_equal(false, result.fetch("isError"), "Cancel tool error")
+  assert_acceptance_equal("request", result.dig("structuredContent", "completion", "scope"), "Cancellation request, not settled Saga")
+  assert_acceptance(result.dig("structuredContent", "summary").include?("not downstream completion or rollback"), "Request scope explanation")
   assert_acceptance_equal(
     50,
     operation_batch_events.count { _1.type == "OperationBatchItemSucceeded" },
@@ -315,6 +317,12 @@ Then("the Batch history derives {int} successes and one item not run after cance
   assert_acceptance_equal(count, counts.fetch(:succeeded), "Cancelled successes")
   assert_acceptance_equal(0, counts.fetch(:rejected), "Cancelled rejections")
   assert_acceptance_equal(1, counts.fetch(:remaining), "Cancelled remainder")
+  original = await_task_terminal(@operation_batch_task_id, client_id: "import-agent").dig("result", "result")
+  assert_acceptance_equal(true, original.fetch("isError"), "Cancelled import outcome")
+  assert_acceptance_equal("cancelled", original.dig("structuredContent", "completion", "outcome"), "Settled original Batch Task")
+  assert_acceptance_equal("partial", original.dig("structuredContent", "completion", "effects"), "Retained prefix")
+  assert_acceptance_equal(count, original.dig("structuredContent", "data", "details", "succeeded"), "Authoritative retained successes")
+  assert_acceptance_equal(1, original.dig("structuredContent", "data", "details", "not_run"), "Authoritative not-run remainder")
   project_operation_batch(
     events,
     timeout_seconds: LiveSubscriptions::HIGH_VOLUME_TIMEOUT_SECONDS

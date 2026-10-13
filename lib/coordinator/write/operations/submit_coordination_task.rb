@@ -17,6 +17,7 @@ module Coordinator::Write
         stream_factory: StreamFactory.new,
         request_marker: CommandLifecycle::RequestMarker.new,
         execution_lane: Tasks::ExecutionLane.new,
+        task_loader: Tasks::Loader.new(event_store:),
         correlation_resolver: Tasks::CorrelationResolver.new(
           release_set_correlation_loader: ReleaseSets::CorrelationLoader.new(event_store:)
         )
@@ -30,6 +31,7 @@ module Coordinator::Write
         @stream_factory = stream_factory
         @request_marker = request_marker
         @execution_lane = execution_lane
+        @task_loader = task_loader
         @correlation_resolver = correlation_resolver
       end
 
@@ -111,12 +113,7 @@ module Coordinator::Write
         return Failure(incomplete_submission(registration.command_id)) unless task_event
 
         payload = load(task_event)
-        Success(
-          Domain::CoordinationTasks::State.reduce(
-            [ payload ],
-            occurred_at: [ task_event.created_at.utc.iso8601(6) ]
-          )
-        )
+        Success(@task_loader.call(payload.task_id).state)
       end
 
       def generated_identity_collision(command)

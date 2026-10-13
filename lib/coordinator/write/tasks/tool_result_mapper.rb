@@ -5,6 +5,8 @@ module Coordinator::Write
     class ToolResultMapper
       STATUS_BY_CODE = DomainErrorV1::ERROR_CODES.to_h { [ _1, "denied" ] }.merge(
         saga_execution_failed: "failed",
+        operation_batch_partial_failure: "partial_failure",
+        operation_batch_cancelled: "cancelled",
         command_id_reused: "command_id_reused",
         repository_already_registered: "conflict",
         repository_identity_conflict: "conflict",
@@ -126,7 +128,7 @@ module Coordinator::Write
         structured_content = if result.success?
                                success_content(result.value!, contract:)
         else
-                               failure_content(result.failure, command_id:)
+                               failure_content(result.failure, command_id:, tool_name:)
         end
 
         ToolResultV1.new(
@@ -153,11 +155,12 @@ module Coordinator::Write
           context_token: nil,
           data:,
           warnings: completion.warnings,
-          next_actions: completion.next_actions
+          next_actions: completion.next_actions,
+          completion: CompletionGuaranteeBuilder.new.success(tool_name: contract.tool_name, data:, emitted_events: completion.emitted_events)
         )
       end
 
-      def failure_content(error, command_id:)
+      def failure_content(error, command_id:, tool_name:)
         domain_error = DomainErrorV1::Type[
           {
             code: error.code.to_s,
@@ -174,7 +177,8 @@ module Coordinator::Write
           context_token: nil,
           data: domain_error,
           warnings: [],
-          next_actions: failure_next_actions(domain_error)
+          next_actions: failure_next_actions(domain_error),
+          completion: CompletionGuaranteeBuilder.new.rejection(tool_name:, error: domain_error)
         )
       end
 

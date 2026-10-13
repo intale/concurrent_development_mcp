@@ -2,6 +2,7 @@ module Coordinator
   module Mcp
     module Tasks
       class SemanticResultPresenterV1
+        def initialize: (?completion_note: CompletionNote) -> void
         def call: (Coordinator::Write::Tasks::SemanticResultV1::value result) -> ResultV1::CallToolResult
       end
     end

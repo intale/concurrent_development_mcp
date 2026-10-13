@@ -20,7 +20,8 @@ module Coordinator::Processes
         command_builder: OperationBatches::CommandBuilder.new,
         process_step_planner: Coordinator::Processes::ProcessStepPlanner.new(event_store:),
         batch_executor: Coordinator::Write::Operations::ExecuteOperationBatchCommand.new(event_store:),
-        item_failure: Coordinator::Write::Operations::ExecuteRecordOperationBatchItemFailure.new(event_store:)
+        item_failure: Coordinator::Write::Operations::ExecuteRecordOperationBatchItemFailure.new(event_store:),
+        task_completer: OperationBatches::TaskCompleter.new(event_store:)
       )
         @source_builder = source_builder
         @event_store = event_store
@@ -31,6 +32,7 @@ module Coordinator::Processes
         @process_step_planner = process_step_planner
         @batch_executor = batch_executor
         @item_failure = item_failure
+        @task_completer = task_completer
       end
 
       def call(event)
@@ -41,6 +43,8 @@ module Coordinator::Processes
           process_page(source)
         when Coordinator::Write::Events::OperationBatchCancellationRequestedV2
           complete_cancellation(source)
+        when Coordinator::Write::Events::OperationBatchCompletedV2, Coordinator::Write::Events::OperationBatchCancelledV2
+          @task_completer.call(source.event)
         end
         nil
       end

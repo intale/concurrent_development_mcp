@@ -1,0 +1,11 @@
+module Coordinator
+  module Mcp
+    module Tasks
+      class CompletionNote
+        READ_NOTE: String
+
+        def call: (Coordinator::Write::Tasks::CompletionGuaranteeV1 completion) -> String
+      end
+    end
+  end
+end

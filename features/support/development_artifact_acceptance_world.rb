@@ -238,6 +238,7 @@ module DevelopmentArtifactAcceptanceWorld
     batch_id = SecureRandom.uuid_v7
     task_id = submit_and_execute(
       "development_artifact_relation_declare_batch",
+      task_timeout_seconds: LiveSubscriptions::HIGH_VOLUME_TIMEOUT_SECONDS,
       command_id: "cmd-cuc-artifact-relation-batch-#{command_suffix}",
       actor: { kind: "agent", id: "artifact-batch-agent" },
       batch_id:,

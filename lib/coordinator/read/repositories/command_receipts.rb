@@ -47,7 +47,7 @@ module Coordinator::Read
       private
 
       def build(record)
-        CommandResults::ResultV1.new(deep_symbolize(record.completion))
+        Coordinator::Write::CommandResults::ResultV1.new(deep_symbolize(record.completion))
       end
 
       def deep_symbolize(value)

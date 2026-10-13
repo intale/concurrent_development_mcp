@@ -12,6 +12,7 @@ module Coordinator
         def data: () -> data
         def warnings: () -> Array[String]
         def next_actions: () -> Array[NextAction]
+        def completion: () -> CompletionGuaranteeV1
       end
     end
   end

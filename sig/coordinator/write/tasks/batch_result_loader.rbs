@@ -1,0 +1,13 @@
+module Coordinator
+  module Write
+    module Tasks
+      class BatchResultLoader
+        def initialize: (event_store: Write::_EventStore, ?loader: Write::OperationBatches::Loader, ?schema_registry: Write::EventSchemaRegistry) -> void
+        def call: (Write::Commands::CreateOperationBatch command) -> CommandReceiptData::OperationBatchCompletion
+        private
+        def failed?: (OperationBatches::outcome outcome) -> bool
+        def effects: (OperationBatches::State state, failures: Array[OperationBatches::outcome]) -> String
+      end
+    end
+  end
+end

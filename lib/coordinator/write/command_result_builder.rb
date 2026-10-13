@@ -505,12 +505,7 @@ module Coordinator::Write
           publication_event: event_reference(publication_event),
           published_at: publication_event.created_at.utc.iso8601(6)
         ),
-        next_actions: [
-          NextAction.new(
-            tool: "skill_get",
-            arguments: NextAction::SkillArguments.new(name: command.name, scope: command.scope)
-          )
-        ],
+        next_actions: [],
         input_digest:,
         persisted_events:,
         completed_at:
@@ -543,15 +538,7 @@ module Coordinator::Write
           recorded_at: recorded_event&.created_at&.utc&.iso8601(6) ||
             (granular ? completed_at : decision.observation.recorded_at)
         ),
-        next_actions: [
-          NextAction.new(
-            tool: "development_artifact_get",
-            arguments: NextAction::DevelopmentArtifactArguments.new(
-              artifact_id: artifact.artifact_id,
-              observation_id: observation.observation_id
-            )
-          )
-        ],
+        next_actions: [],
         input_digest:,
         persisted_events:,
         completed_at:
@@ -697,6 +684,13 @@ module Coordinator::Write
         persisted_events:,
         completed_at:
       )
+    end
+
+    def operation_batch_complete(command:, batch:, input_digest:, persisted_events:, completed_at:)
+      build_completion(command:, tool_name: "#{command.target_tool}_batch",
+        summary: "Operation Batch settled: #{batch.succeeded} succeeded, #{batch.rejected} rejected, #{batch.failed} failed, #{batch.not_run} not run.",
+        data: batch, next_actions: [ operation_batch_next_action(command.batch_id) ],
+        input_digest:, persisted_events:, completed_at:)
     end
 
     def operation_batch_transition(command:, event:, input_digest:, persisted_events:, completed_at:)

@@ -32,8 +32,12 @@ Then("the Skill is available unchanged through the MCP read side") do
 end
 
 Then("telemetry records all three subscription sets and their Rails SQL") do
-  handlers = observed_spans.select { _1.kind == :consumer }
   expected_sets = %w[coordinator-process-managers-v1 coordinator-task-results-v1 coordinator-read-models-v1]
+  handlers = eventually("all three subscription sets to emit handler telemetry") do
+    observed = observed_spans.select { _1.kind == :consumer }
+    sets = observed.map { _1.attributes.fetch("subscription.set") }.uniq
+    [ (expected_sets - sets).empty?, observed ]
+  end
   actual_sets = handlers.map { _1.attributes.fetch("subscription.set") }.uniq
   assert_acceptance_equal(expected_sets.sort, actual_sets.sort, "Observed subscription sets")
   handler_ids = handlers.map(&:span_id)

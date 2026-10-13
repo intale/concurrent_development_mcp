@@ -357,7 +357,8 @@ module Coordinator::Read
           context_token: nil,
           data: receipt.data,
           warnings: receipt.warnings,
-          next_actions: receipt.next_actions
+          next_actions: receipt.next_actions,
+          completion: receipt.semantic_result.completion
         )
       end
 
@@ -367,7 +368,8 @@ module Coordinator::Read
         error = Coordinator::Write::Tasks::DomainErrorV1::Type[symbolize(outcome.result.fetch("error"))]
         Coordinator::Write::Tasks::StructuredContentV1.new(
           status: error.code == "saga_execution_failed" ? "failed" : "command_id_reused", summary: error.message, command_id: item.command_id,
-          receipt: nil, context_token: nil, data: error, warnings: [], next_actions: []
+          receipt: nil, context_token: nil, data: error, warnings: [], next_actions: [],
+          completion: Coordinator::Write::Tasks::CompletionGuaranteeBuilder.new.rejection(tool_name: item.target_tool, error:)
         )
       end
 

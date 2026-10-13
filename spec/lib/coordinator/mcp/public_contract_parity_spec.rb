@@ -51,7 +51,7 @@ RSpec.describe "MCP public contract parity" do
     mutation_tools.each do |tool|
       contract = Coordinator::Write::Tasks::TargetContractRegistry.fetch(tool.tool_name)
       data_schemas = tool.output_schema.to_h.dig(:properties, :data, :oneOf)
-      receipt_schema = data_schemas.find { _1[:title] == contract.receipt_class.name }
+      receipt_schema = data_schemas.find { _1[:title] == contract.task_receipt_class.name }
 
       expect(receipt_schema).to include(type: "object", additionalProperties: false), tool.tool_name
       expect(receipt_schema.fetch(:properties).values).not_to include({}), tool.tool_name

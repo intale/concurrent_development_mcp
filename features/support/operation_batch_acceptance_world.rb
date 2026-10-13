@@ -24,10 +24,13 @@ module OperationBatchAcceptanceWorld
       command_ids: [ @operation_batch_command_id ]
     ) if pause_at
     start_process_subscriptions
-    @operation_batch_task = await_task_terminal(
-      @operation_batch_task_id,
-      client_id: "import-agent"
-    )
+    @operation_batch_task = response
+    if pause_at
+      await_contention_evidence
+      @operation_batch_task = task_request("tasks/get", @operation_batch_task_id, client_id: "import-agent")
+    else
+      @operation_batch_task = await_task_terminal(@operation_batch_task_id, client_id: "import-agent")
+    end
   end
 
   def batch_skill_item(index:, name:, expected_revision: 0)

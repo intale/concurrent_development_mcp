@@ -12,6 +12,9 @@ module Coordinator
         def input_document_type: () -> untyped
         def command_type: () -> untyped
         def receipt_type: () -> untyped
+        def task_receipt_class: () -> Class
+        def task_receipt_type: () -> Dry::Types::Type
+        def completion_scope: () -> String
         def builder_method: () -> Symbol
         def executor_variable: () -> Symbol
       end

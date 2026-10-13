@@ -1,0 +1,6 @@
+module Coordinator::Write
+  module CommandResults
+    class WorkIntentionMemberEvidenceV1 < Coordinator::Shared::Value
+    end
+  end
+end

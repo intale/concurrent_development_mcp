@@ -210,7 +210,6 @@ RSpec.describe "MCP work_intention_set_declare Task boundary", :event_store do
   def execute_task(task_id)
     submitted = task_events(task_id).find { _1.type == "CoordinationTaskSubmitted" }
     Coordinator::Container["process_managers.coordination_task_executor"].call(submitted)
-    CommandResultFixture.project(task_id, event_store:)
   end
 
   def seed_active_attempts(attempts)
@@ -322,5 +321,4 @@ RSpec.describe "MCP work_intention_set_declare Task boundary", :event_store do
       )
     end
   end
-
 end

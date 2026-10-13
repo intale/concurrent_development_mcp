@@ -38,7 +38,8 @@ RSpec.describe Coordinator::Mcp::Tasks::ResultMapper do
       ttlMs: nil,
       pollIntervalMs: 500,
       resultType: "task",
-      status: "working"
+      status: "working",
+      statusMessage: mapper.detailed(state(submitted)).statusMessage
     )
   end
 
@@ -53,7 +54,7 @@ RSpec.describe Coordinator::Mcp::Tasks::ResultMapper do
     expect(result).to include(
       resultType: "complete",
       status: "working",
-      statusMessage: "Cancellation requested; execution may still complete"
+      statusMessage: a_string_including("Cancellation requested; execution may still complete", "request is durably recorded")
     )
   end
 
@@ -62,7 +63,7 @@ RSpec.describe Coordinator::Mcp::Tasks::ResultMapper do
 
     result = mapper.detailed(
       state(submitted, started, completed),
-      projected_result: semantic_success
+      semantic_result: semantic_success
     ).to_h
 
     expect(result).to include(resultType: "complete", status: "completed")
@@ -71,17 +72,16 @@ RSpec.describe Coordinator::Mcp::Tasks::ResultMapper do
     )
   end
 
-  it "keeps polling available while an immutable terminal result projection catches up" do
+  it "never disguises an authoritative terminal state as projection-pending work" do
     completed = Coordinator::Write::Events::CoordinationTaskCompletedV3.new(task_id:)
 
-    result = mapper.projection_pending(state(submitted, started, completed)).to_h
+    expect { mapper.detailed(state(submitted, started, completed)) }.to raise_error(KeyError, /authoritative result/)
+  end
 
-    expect(result).to include(
-      resultType: "complete",
-      status: "working",
-      statusMessage: "Command completed; its result projection is catching up."
-    )
-    expect(result).not_to have_key(:result)
+  it "preserves the actual terminal status when replay returns the original Task handle" do
+    completed = Coordinator::Write::Events::CoordinationTaskCompletedV3.new(task_id:)
+    result = mapper.created(state(submitted, started, completed)).to_h
+    expect(result).to include(status: "completed", statusMessage: a_string_including("original Task is completed", "tasks/get"))
   end
 
   it "keeps JSON-RPC failure and cancellation as distinct terminal wire variants" do
@@ -101,12 +101,12 @@ RSpec.describe Coordinator::Mcp::Tasks::ResultMapper do
 
     expect(failed_result).to include(
       status: "failed",
-      statusMessage: "Internal error",
+      statusMessage: a_string_including("Internal error", "does not establish whether target effects committed"),
       error: { code: -32_603, message: "Internal error" }
     )
     expect(cancelled_result).to include(
       status: "cancelled",
-      statusMessage: "Cancelled before execution"
+      statusMessage: a_string_including("Cancelled before execution", "does not roll back")
     )
     expect(cancelled_result).not_to have_key(:error)
     expect(cancelled_result).not_to have_key(:result)
@@ -129,7 +129,9 @@ RSpec.describe Coordinator::Mcp::Tasks::ResultMapper do
         change_set_id: "CS-task-wire"
       ),
       warnings: [],
-      next_actions: []
+      next_actions: [],
+      completion: Coordinator::Write::Tasks::CompletionGuaranteeV1.new(scope: "command", outcome: "succeeded",
+        effects: "committed", read_back_required: false, read_models: "eventually_consistent")
     )
   end
 end

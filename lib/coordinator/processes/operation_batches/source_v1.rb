@@ -5,7 +5,9 @@ module Coordinator::Processes
     class SourceV1 < Coordinator::Shared::Value
       Payload = Coordinator::Shared::Types.Instance(Coordinator::Write::Events::OperationBatchCreatedV2) |
                 Coordinator::Shared::Types.Instance(Coordinator::Write::Events::OperationBatchContinuationRequestedV2) |
-                Coordinator::Shared::Types.Instance(Coordinator::Write::Events::OperationBatchCancellationRequestedV2)
+                Coordinator::Shared::Types.Instance(Coordinator::Write::Events::OperationBatchCancellationRequestedV2) |
+                Coordinator::Shared::Types.Instance(Coordinator::Write::Events::OperationBatchCompletedV2) |
+                Coordinator::Shared::Types.Instance(Coordinator::Write::Events::OperationBatchCancelledV2)
 
       attribute :event, Coordinator::Shared::Types::Any
       attribute :payload, Payload

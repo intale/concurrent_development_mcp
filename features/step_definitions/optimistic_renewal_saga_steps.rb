@@ -66,6 +66,15 @@ Then("the renewal Task completes with an accountable partial failure") do
   assert_acceptance_equal("saga_execution_failed", result.dig("data", "code"), "Saga failure code")
   assert_acceptance_equal(true, result.dig("data", "details", "effects_committed"), "Committed partial effects")
   assert_acceptance_equal("work_intention_set_inactive", result.dig("data", "details", "reason_code"), "Lost liveness race")
+  assert_acceptance_equal("partial_failure", result.dig("completion", "outcome"), "Explicit partial outcome")
+  assert_acceptance_equal("partial", result.dig("completion", "effects"), "Retained extensions")
+  assert_acceptance_equal(false, result.dig("completion", "read_back_required"), "No persistence read-back")
+  details = result.dig("data", "details")
+  assert_acceptance_equal([ @optimistic_renewed_intention_id ], details.fetch("completed_intention_ids"), "Completed members in terminal receipt")
+  failed = @optimistic_renewal_set.fetch("intentions").map { _1.fetch("intention_id") } - [ @optimistic_renewed_intention_id ]
+  assert_acceptance_equal(failed.sole, details.fetch("failed_intention_id"), "Failed member in terminal receipt")
+  assert_acceptance_equal([], details.fetch("pending_intention_ids"), "Remaining members in terminal receipt")
+  assert_acceptance(result.fetch("summary").include?("not rolled back"), "Partial failure explanation")
 end
 
 Then("the first member keeps its committed extension while the second was not renewed") do
@@ -116,6 +125,8 @@ end
 Then("the renewal Task completes successfully with two no-op member outcomes") do
   terminal = task_request("tasks/get", @optimistic_renewal_task_id, client_id: @optimistic_renewal_agent.fetch(:client_id))
   assert_acceptance_equal(false, terminal.dig("result", "result", "isError"), "No-op renewal result")
+  assert_acceptance_equal("unchanged", terminal.dig("result", "result", "structuredContent", "completion", "effects"), "Already satisfied target state")
+  assert_acceptance_equal(false, terminal.dig("result", "result", "structuredContent", "completion", "read_back_required"), "No-op needs no persistence read-back")
   facts = work_intention_events_for_attempt(@optimistic_renewal_agent.fetch(:attempt_id))
   assert_acceptance_equal([], facts.select { _1.type == "ResourceWorkIntentionRenewed" }, "No duplicate/no-op lifecycle facts")
 end

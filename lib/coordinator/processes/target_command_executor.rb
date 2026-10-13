@@ -148,8 +148,9 @@ module Coordinator::Processes
         snapshot = @command_loader.call(command.command_id)
         validate_registration!(snapshot.state, command:, contract:, requested_digest: preparation.requested_digest)
         return Success(target_execution(snapshot)) if snapshot.state.terminal?
-        if command.is_a?(Coordinator::Write::Commands::RenewWorkIntentionSet)
-          return request_renewal(handler, command, snapshot:, preparation:, contract:, caused_by:)
+        if command.is_a?(Coordinator::Write::Commands::RenewWorkIntentionSet) ||
+           command.is_a?(Coordinator::Write::Commands::CreateOperationBatch)
+          return request_saga(handler, command, snapshot:, preparation:, contract:, caused_by:)
         end
 
         effects = committed_effects(command.command_id)
@@ -180,9 +181,12 @@ module Coordinator::Processes
 
       private
 
-      def request_renewal(handler, command, snapshot:, preparation:, contract:, caused_by:)
+      def request_saga(handler, command, snapshot:, preparation:, contract:, caused_by:)
+        if batch_request_recorded?(command)
+          return Success(Coordinator::Write::Tasks::TargetExecution.new(command_state: snapshot.state, terminal_event: nil))
+        end
         result, failure = execute_target(handler, command, preparation:, caused_by:)
-        if result&.success?
+        if result&.success? || batch_request_recorded?(command)
           return Success(Coordinator::Write::Tasks::TargetExecution.new(command_state: snapshot.state, terminal_event: nil))
         end
         transition = if failure
@@ -193,6 +197,21 @@ module Coordinator::Processes
             event_id: preparation.terminal_event_id, caused_by:)
         end
         execution_result(transition, command_id: command.command_id)
+      end
+
+      def batch_request_recorded?(command)
+        return false unless command.is_a?(Coordinator::Write::Commands::CreateOperationBatch)
+
+        event = @event_store.read_marked(Coordinator::Write::StreamFactory.new.operation_batch(command.batch_id),
+          Coordinator::Write::MarkedEventReadCriteria.new(event_type: "OperationBatchCreated",
+            marker: "command:#{command.command_id}", maximum_count: 1, direction: :asc)).first
+        return false unless event
+
+        unless event.data.fetch("batch_id") == command.batch_id &&
+               event.metadata.fetch("manifest_digest") == command.manifest_digest
+          raise Coordinator::Write::InvalidCommandHistory, "Recorded Batch request differs from its canonical instruction"
+        end
+        true
       end
 
       def prepare_target(handler, command, caused_by:)

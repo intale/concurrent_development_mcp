@@ -23,6 +23,22 @@ module Coordinator::Write
         Types.Instance(receipt_class)
       end
 
+      def task_receipt_class
+        command_class == Commands::CreateOperationBatch ? CommandReceiptData::OperationBatchCompletion : receipt_class
+      end
+
+      def task_receipt_type
+        Types.Instance(task_receipt_class)
+      end
+
+      def completion_scope
+        case command_class.name
+        when Commands::CreateOperationBatch.name, Commands::RenewWorkIntentionSet.name then "saga"
+        when Commands::CancelOperationBatch.name then "request"
+        else "command"
+        end
+      end
+
       def builder_method
         :"build_#{command_class.name.demodulize.underscore}"
       end

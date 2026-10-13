@@ -168,7 +168,6 @@ RSpec.describe "VER-02 MCP compatibility assessments", :event_store do
     Rails.error.subscribe(collector)
     Coordinator::Container["process_managers.coordination_task_executor"].call(submitted)
     raise collector.errors.first if collector.errors.any?
-    CommandResultFixture.project(task_id, event_store:)
   ensure
     Rails.error.unsubscribe(collector) if collector
   end

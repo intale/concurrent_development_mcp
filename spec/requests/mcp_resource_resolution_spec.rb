@@ -72,7 +72,6 @@ module McpResourceResolutionSpec
     threads.each(&:join)
     raise errors.pop unless errors.empty?
 
-    task_ids.each { CommandResultFixture.project(_1, event_store:) }
     results = task_ids.map { task_request(_1).dig("result", "result") }
     resource_ids = results.map { _1.dig("structuredContent", "data", "resource_id") }
 
@@ -212,7 +211,6 @@ module McpResourceResolutionSpec
     Rails.error.subscribe(collector)
     Coordinator::Container["process_managers.coordination_task_executor"].call(submitted)
     raise collector.errors.first if collector.errors.any?
-    CommandResultFixture.project(task_id, event_store:)
 
     task_request(task_id).dig("result", "result")
   ensure

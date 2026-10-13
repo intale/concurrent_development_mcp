@@ -1,0 +1,46 @@
+# frozen_string_literal: true
+
+module Coordinator::Write
+  module CommandResults
+    class CommandState < Value
+      attribute :command_id, Types::CommandId
+      attribute :request_id, Types::RequestId
+      attribute :tool_name, Types::CoordinationToolName
+      attribute :canonical_input_digest, Types::Sha256Digest
+      attribute :status, Types::String.enum("registered", "succeeded", "rejected", "failed")
+
+      def self.reduce(events:, payloads:, contract: Coordinator::Write::Contracts::CommandHistory.new)
+        validation = contract.call(events: payloads)
+        raise InvalidCommandHistory, validation.errors.to_h.inspect if validation.failure?
+
+        registration = payloads.first
+        terminal = payloads.last
+        status = case terminal
+        when Coordinator::Write::Events::CommandSucceededV1 then "succeeded"
+        when Coordinator::Write::Events::CommandRejectedV2 then "rejected"
+        when Coordinator::Write::Events::OptimisticSagas::CommandExecutionFailedV1 then "failed"
+        else "registered"
+        end
+        new(
+          command_id: registration.command_id,
+          request_id: registration.request_id,
+          tool_name: registration.tool_name,
+          canonical_input_digest: events.first.metadata.fetch("canonical_input_digest"),
+          status:
+        )
+      end
+
+      def terminal?
+        status != "registered"
+      end
+
+      def rejected?
+        status == "rejected"
+      end
+
+      def failed?
+        status == "failed"
+      end
+    end
+  end
+end

@@ -27,17 +27,10 @@ RSpec.describe "BAT-01 MCP Operation Batches" do
     created = call_tool("skill_publish_batch", arguments, id: 1)
     task_id = created.dig("result", "taskId")
     execute_task(task_id)
-    completed_task = task_request("tasks/get", task_id, id: 2)
-    receipt = completed_task.dig("result", "result", "structuredContent")
-    expect(receipt).to include(
-      "status" => "ok",
-      "data" => include(
-        "batch_id" => batch_id,
-        "target_tool" => "skill_publish",
-        "total" => 2,
-        "status" => "accepted"
-      )
-    )
+    accepted_task = task_request("tasks/get", task_id, id: 2)
+    expect(accepted_task.fetch("result")).to include("status" => "working",
+      "statusMessage" => a_string_including("requested effects are not yet confirmed"))
+    expect(accepted_task.fetch("result")).not_to have_key("result")
 
     creation_events = batch_events(batch_id)
     created_event = creation_events.find { _1.type == "OperationBatchCreated" }
@@ -59,6 +52,12 @@ RSpec.describe "BAT-01 MCP Operation Batches" do
 
     Coordinator::Container["process_managers.operation_batch_runner"].call(created_event)
     persisted_batch_events = batch_events(batch_id)
+    Coordinator::Container["process_managers.operation_batch_runner"].call(persisted_batch_events.last)
+    terminal_result = task_request("tasks/get", task_id, id: 3).dig("result", "result")
+    expect(terminal_result).to include("isError" => true,
+      "structuredContent" => include("status" => "partial_failure",
+        "completion" => include("scope" => "saga", "effects" => "partial", "read_back_required" => false),
+        "data" => include("details" => include("succeeded" => 1, "rejected" => 1, "not_run" => 0))))
     expect(persisted_batch_events.map(&:type)).to eq(%w[
       OperationBatchCreated
       OperationBatchTargetSelected
@@ -214,7 +213,6 @@ RSpec.describe "BAT-01 MCP Operation Batches" do
     Rails.error.subscribe(collector)
     Coordinator::Container["process_managers.coordination_task_executor"].call(submitted)
     raise collector.errors.first if collector.errors.any?
-    CommandResultFixture.project(task_id, event_store:)
   ensure
     Rails.error.unsubscribe(collector) if collector
   end

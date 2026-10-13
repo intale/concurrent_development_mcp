@@ -74,8 +74,8 @@ RSpec.describe Coordinator::Processes::TargetCommandExecutor, :event_store do
       decider: Coordinator::Write::Domain::CommandLifecycles::Fail.new,
       actor: target.actor, tool_name: "change_set_create", caused_by: completion.terminal_event
     ).value!
-    source = Coordinator::Read::CommandResults::SourceLoader.new(event_store:).call(transition.terminal_event)
-    result = Coordinator::Read::CommandResults::Assembler.new(event_store:).call(source)
+    source = Coordinator::Write::CommandResults::SourceLoader.new(event_store:).call(transition.terminal_event)
+    result = Coordinator::Write::CommandResults::Assembler.new(event_store:).call(source)
     expect(result.status).to eq("failed")
     expect(result.data.code).to eq("saga_execution_failed")
     expect(result.data.details).to have_attributes(effects_committed: true, attempts: 3, retryable: true)

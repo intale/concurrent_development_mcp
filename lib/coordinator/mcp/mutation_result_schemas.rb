@@ -7,15 +7,18 @@ module Coordinator
 
       def for(tool_name)
         contract = Coordinator::Write::Tasks::TargetContractRegistry.fetch(tool_name)
-        Schemas.envelope(
+        envelope = Schemas.envelope(
           data: {
             oneOf: [
-              receipt(contract.receipt_class),
+              receipt(contract.task_receipt_class),
               domain_error
             ]
           },
           next_action: NextActionSchemas.schema
         )
+        envelope[:properties][:completion] = DryStructSchema.new.call(Coordinator::Write::Tasks::CompletionGuaranteeV1)
+        envelope[:required] << "completion"
+        envelope
       end
 
       def receipt(receipt_class)

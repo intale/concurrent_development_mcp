@@ -8,6 +8,8 @@ module Coordinator::Write
       attribute :status, Types::String.enum(
         "ok",
         "failed",
+        "partial_failure",
+        "cancelled",
         "invalid",
         "command_id_reused",
         "denied",
@@ -25,6 +27,7 @@ module Coordinator::Write
       attribute :data, Data
       attribute :warnings, Types::Array.of(Types::String).constrained(max_size: 100)
       attribute :next_actions, Types::Array.of(NextAction).constrained(max_size: 100)
+      attribute :completion, CompletionGuaranteeV1
     end
   end
 end

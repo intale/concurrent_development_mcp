@@ -39,7 +39,7 @@ RSpec.describe Coordinator::Write::Tasks::TargetContractRegistry do
       receipt_schema, error_schema = data_variants
 
       expect(receipt_schema.fetch(:required)).to contain_exactly(
-        *contract.receipt_class.schema.keys.map { _1.name.to_s }
+        *contract.task_receipt_class.schema.keys.map { _1.name.to_s }
       )
       expect(error_schema.dig(:properties, :code, :enum)).to contain_exactly(
         *Coordinator::Write::Tasks::DomainErrorV1::ERROR_CODES.map(&:to_s)

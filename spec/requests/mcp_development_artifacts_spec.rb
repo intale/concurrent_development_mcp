@@ -915,7 +915,6 @@ RSpec.describe "ART-01 MCP Development Artifacts" do
   def execute_task(task_id)
     submitted = task_events(task_id).find { _1.type == "CoordinationTaskSubmitted" }
     Coordinator::Container["process_managers.coordination_task_executor"].call(submitted)
-    CommandResultFixture.project(task_id, event_store:)
   end
 
   def run_batch(batch_id)
@@ -1002,8 +1001,8 @@ RSpec.describe "ART-01 MCP Development Artifacts" do
       streams.command(command_id),
       Coordinator::Write::EventQueries::COMMAND_HISTORY
     ).last
-    source = Coordinator::Read::CommandResults::SourceLoader.new(event_store:).call(terminal)
-    Coordinator::Read::CommandResults::Assembler.new(event_store:).call(
+    source = Coordinator::Write::CommandResults::SourceLoader.new(event_store:).call(terminal)
+    Coordinator::Write::CommandResults::Assembler.new(event_store:).call(
       source
     )
   end

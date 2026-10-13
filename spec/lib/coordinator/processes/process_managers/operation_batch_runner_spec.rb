@@ -150,6 +150,8 @@ RSpec.describe Coordinator::Processes::ProcessManagers::OperationBatchRunner, :e
           OperationBatchCreated
           OperationBatchContinuationRequested
           OperationBatchCancellationRequested
+            OperationBatchCompleted
+            OperationBatchCancelled
         ]
       }
     )

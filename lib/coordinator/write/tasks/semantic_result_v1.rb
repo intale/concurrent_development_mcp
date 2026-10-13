@@ -11,12 +11,15 @@ module Coordinator::Write
         attribute :data, CommandReceiptData::Type
         attribute :warnings, Types::Array.of(Types::String).constrained(max_size: 100)
         attribute :next_actions, Types::Array.of(NextAction).constrained(max_size: 100)
+        attribute :completion, CompletionGuaranteeV1
       end
 
       class DomainRejection < Value
         attribute :kind, Types::String.enum("domain_rejection")
         attribute :status, Types::String.enum(
           "failed",
+          "partial_failure",
+          "cancelled",
           "command_id_reused",
           "denied",
           "conflict",
@@ -30,6 +33,7 @@ module Coordinator::Write
         attribute :command_id, Types::Identifier
         attribute :error, DomainErrorV1::Type
         attribute :next_actions, Types::Array.of(NextAction).constrained(max_size: 100)
+        attribute :completion, CompletionGuaranteeV1
       end
 
       Type = Success | DomainRejection

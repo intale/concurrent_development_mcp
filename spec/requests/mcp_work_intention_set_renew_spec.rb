@@ -196,7 +196,6 @@ RSpec.describe "MCP work_intention_set_renew Task boundary", :event_store do
     request = event_store.read(streams.work_intention_set_renewal(task.command_id), Coordinator::Write::EventQueries::WORK_INTENTION_RENEWAL_HISTORY).first
     Coordinator::Processes::ProcessManagers::WorkIntentionSetRenewal.new(event_store:).call(request) if request
     raise collector.errors.first if collector.errors.any?
-    CommandResultFixture.project(task_id, event_store:)
   ensure
     Rails.error.unsubscribe(collector) if collector
   end

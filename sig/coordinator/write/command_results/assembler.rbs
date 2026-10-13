@@ -1,0 +1,23 @@
+module Coordinator
+  module Write
+    module CommandResults
+      class Assembler
+        def initialize: (
+          event_store: _EventStore,
+          ?completion_builder: CommandResultBuilder,
+          ?semantic_result_mapper: Tasks::SemanticResultMapper,
+          ?schema_registry: EventSchemaRegistry,
+          ?stream_factory: StreamFactory,
+          ?repository_registration_loader: RepositoryRegistrationLoader,
+          ?repository_natural_key_marker: Repositories::NaturalKeyMarker,
+          ?development_artifact_marker_builder: DevelopmentArtifacts::MarkerBuilder,
+          ?release_set_preparation_loader: ReleaseSetPreparationLoader,
+          ?batch_result_loader: Tasks::BatchResultLoader,
+          ?work_intention_set_evidence_loader: WorkIntentionSetEvidenceLoader,
+          ?skill_publication_source_loader: SkillPublicationSourceLoader
+        ) -> void
+        def call: (Source source) -> ResultV1
+      end
+    end
+  end
+end

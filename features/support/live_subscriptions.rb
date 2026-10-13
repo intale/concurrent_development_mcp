@@ -72,8 +72,8 @@ module LiveSubscriptions
     end
   end
 
-  def await_task_terminal(task_id, client_id: "default", timeout_seconds: DEFAULT_TIMEOUT_SECONDS)
-    start_task_result_subscriptions
+  def await_task_terminal(task_id, client_id: "default", timeout_seconds: DEFAULT_TIMEOUT_SECONDS, project_task_results: true)
+    start_task_result_subscriptions if project_task_results
     eventually("Task #{task_id} to reach a terminal state", timeout_seconds:) do
       state = task_request("tasks/get", task_id, client_id:)
       [ TERMINAL_TASK_STATUSES.include?(state.dig("result", "status")), state ]

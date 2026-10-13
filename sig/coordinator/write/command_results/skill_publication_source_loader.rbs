@@ -1,0 +1,14 @@
+module Coordinator::Write
+  module CommandResults
+    class SkillPublicationSourceLoader
+      def initialize: (event_store: Coordinator::Write::_EventStore, ?schema_registry: Coordinator::Write::EventSchemaRegistry, ?stream_factory: Coordinator::Write::StreamFactory, ?marker_builder: Coordinator::Write::Skills::MarkerBuilder) -> void
+      def call: (Source source) -> PgEventstore::Event
+
+      private
+
+      def registration_for: (Coordinator::Write::Commands::PublishSkillRevision command, through_position: Integer) -> Coordinator::Write::Events::SkillRegisteredV1
+      def load_payload: (PgEventstore::Event event) -> Coordinator::Write::Events::Base
+      def skill_stream?: (PgEventstore::Event event, String skill_id) -> bool
+    end
+  end
+end

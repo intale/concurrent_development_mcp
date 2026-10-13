@@ -1,0 +1,10 @@
+module Coordinator
+  module Write
+    module CommandResults
+      class SourceLoader
+        def initialize: (event_store: Write::_EventStore, **untyped) -> void
+        def call: (PgEventstore::Event event) -> Source?
+      end
+    end
+  end
+end

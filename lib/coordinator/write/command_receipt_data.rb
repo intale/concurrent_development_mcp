@@ -496,6 +496,21 @@ module Coordinator::Write
       attribute :status, Types::String.enum("cancellation_requested")
     end
 
+    class OperationBatchCompletion < Value
+      Count = Types::Integer.constrained(gteq: 0, lteq: Types::OPERATION_BATCH_MAXIMUM_ITEMS)
+      attribute :batch_id, Types::OperationBatchId
+      attribute :target_tool, Types::OperationBatchTargetTool
+      attribute :total, Types::OperationBatchTotal
+      attribute :succeeded, Count
+      attribute :rejected, Count
+      attribute :failed, Count
+      attribute :not_run, Count
+      attribute :status, Types::String.enum("completed", "cancelled")
+      attribute :effects, Types::String.enum("committed", "none", "partial", "unknown")
+      attribute :completion_event, EventReference
+      attribute :completed_at, Types::Timestamp
+    end
+
     class OperationBatchTransition < Value
       attribute :batch_id, Types::OperationBatchId
       attribute :transition, Types::String.enum(
@@ -550,6 +565,7 @@ module Coordinator::Write
            DevelopmentArtifactClassification |
            DevelopmentArtifactRelation |
            OperationBatchAcceptance |
+           OperationBatchCompletion |
            OperationBatchCancellation |
            OperationBatchTransition
   end

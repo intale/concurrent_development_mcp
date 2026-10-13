@@ -16,8 +16,16 @@ module Coordinator
         Actor fields are attribution labels, not authenticated identities.
         Every application request requires the io.modelcontextprotocol/tasks capability.
         Mutations return durable Task handles: persist each taskId, poll tasks/get at
-        pollIntervalMs, and use tasks/cancel for cooperative cancellation. Reuse command_id
-        after an unknown mutation result. Read tools return the latest available projection,
+        pollIntervalMs, and use tasks/cancel for cooperative cancellation. Initial acceptance
+        confirms only that the request is durable. Terminal results describe exactly which
+        effects are durable: inspect result.isError and structuredContent.completion, not the
+        Task status alone. A successful terminal receipt needs no entity read-back to prove
+        persistence. Bounded Batch/renewal Tasks stay working until their Saga settles; partial
+        failures retain committed steps. Request-only tools confirm intent, not downstream completion.
+        tasks/get uses authoritative event facts and never waits for a projection. Next-action
+        reads are optional context, not persistence checks. Reuse the exact command_id and payload
+        after an unknown response; a changed/corrective intent after a known outcome needs a new command_id.
+        Read tools return the latest available projection,
         which may be stale; command decisions recheck authoritative event-store facts.
         Use development_search to find context without loading whole Skills, Artifact observations,
         Guidance, Choices, Decisions or WorkItem histories. Supply explicit whitelisted fields and
@@ -59,8 +67,10 @@ module Coordinator
         the observed classification_revision; it never changes bytes, media type, or provenance.
         Preserve a cited URL without saved response bytes only as an external_reference whose
         exact content is the URL plus one newline. First form a dry-run inventory; use stable
-        command and Batch identities for resumption; poll both Tasks and Operation Batches; verify
-        projected bytes, digests, assets, relations, outcomes, counts, and exact replay; capture an
+        command and Batch identities for resumption; poll Tasks for authoritative completion.
+        Use Operation Batch/entity reads only for per-item context and semantic inspection of
+        projected bytes, assets and relations, never to prove that a successful write persisted.
+        Preserve terminal outcome counts and exact replay evidence; capture an
         import_manifest last. Do not fabricate live coordination facts from historical material or
         retire local sources before successful verification and explicit user authorization.
         Use skill_list to discover persisted AI Skills and select an exact, case-sensitive name and scope;

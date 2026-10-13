@@ -13,7 +13,9 @@ RSpec.describe Coordinator::Mcp::Tasks::SemanticResultPresenterV1 do
         change_set_id: "CS-present-success"
       ),
       warnings: [],
-      next_actions: []
+      next_actions: [],
+      completion: Coordinator::Write::Tasks::CompletionGuaranteeV1.new(scope: "command", outcome: "succeeded",
+        effects: "committed", read_back_required: false, read_models: "eventually_consistent")
     )
 
     result = presenter.call(semantic)
@@ -25,6 +27,8 @@ RSpec.describe Coordinator::Mcp::Tasks::SemanticResultPresenterV1 do
       receipt: semantic.receipt,
       data: semantic.data
     )
+    expect(result.structuredContent.summary).to include("durably committed", "No read-back is needed", "optional context")
+    expect(result.structuredContent.completion).to eq(semantic.completion)
     expect(JSON.parse(result.content.sole.text)).to eq(
       JSON.parse(JSON.generate(result.structuredContent.to_h))
     )
@@ -44,7 +48,9 @@ RSpec.describe Coordinator::Mcp::Tasks::SemanticResultPresenterV1 do
       summary: error.message,
       command_id: "cmd-present-denial",
       error:,
-      next_actions: []
+      next_actions: [],
+      completion: Coordinator::Write::Tasks::CompletionGuaranteeV1.new(scope: "command", outcome: "denied",
+        effects: "none", read_back_required: false, read_models: "eventually_consistent")
     )
 
     result = presenter.call(semantic)

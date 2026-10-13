@@ -180,7 +180,6 @@ RSpec.describe "GDN-01 MCP guidance evidence" do
   def execute_task(task_id)
     submitted = task_events(task_id).find { _1.type == "CoordinationTaskSubmitted" }
     Coordinator::Container["process_managers.coordination_task_executor"].call(submitted)
-    CommandResultFixture.project(task_id, event_store:)
   end
 
   def task_events(task_id)

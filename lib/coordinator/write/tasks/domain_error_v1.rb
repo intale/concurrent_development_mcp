@@ -4,6 +4,22 @@ module Coordinator::Write
   module Tasks
     module DomainErrorV1
       class SagaExecutionFailureDetails < ExecutionFailureV1
+        attribute? :renewal_id, Types::UuidV7
+        attribute? :completed_intention_ids, Types::Array.of(Types::UuidV7).constrained(max_size: 32)
+        attribute? :failed_intention_id, Types::UuidV7
+        attribute? :pending_intention_ids, Types::Array.of(Types::UuidV7).constrained(max_size: 32)
+      end
+
+      class OperationBatchPartialFailureError < Value
+        attribute :code, Types::String.enum("operation_batch_partial_failure")
+        attribute :message, Types::String
+        attribute :details, CommandReceiptData::OperationBatchCompletion
+      end
+
+      class OperationBatchCancelledError < Value
+        attribute :code, Types::String.enum("operation_batch_cancelled")
+        attribute :message, Types::String
+        attribute :details, CommandReceiptData::OperationBatchCompletion
       end
 
       class SagaExecutionFailedError < Value

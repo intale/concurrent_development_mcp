@@ -76,10 +76,10 @@ RSpec.describe Coordinator::Write::Operations::ExecuteOperationBatchCommand, :ev
       caused_by: enqueued
     ).value!
 
-    source = Coordinator::Read::CommandResults::SourceLoader.new(event_store:).call(
+    source = Coordinator::Write::CommandResults::SourceLoader.new(event_store:).call(
       execution.terminal_event
     )
-    result = Coordinator::Read::CommandResults::Assembler.new(event_store:).call(source)
+    result = Coordinator::Write::CommandResults::Assembler.new(event_store:).call(source)
 
     expect(source.command).to eq(target)
     expect(result).to have_attributes(

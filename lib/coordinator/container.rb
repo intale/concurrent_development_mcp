@@ -880,7 +880,7 @@ module Coordinator
     end
 
     register("command_results.source_loader", memoize: true) do
-      Read::CommandResults::SourceLoader.new(
+      Write::CommandResults::SourceLoader.new(
         event_store: self["event_store"],
         schema_registry: self["event_schema_registry"],
         stream_factory: self["stream_factory"],
@@ -889,7 +889,7 @@ module Coordinator
     end
 
     register("command_results.assembler", memoize: true) do
-      Read::CommandResults::Assembler.new(
+      Write::CommandResults::Assembler.new(
         event_store: self["event_store"],
         semantic_result_mapper: self["tasks.semantic_result_mapper"],
         schema_registry: self["event_schema_registry"],
@@ -1225,10 +1225,8 @@ module Coordinator
 
     register("mcp.settings", memoize: true) { Mcp::SettingsLoader.new.call }
     register("mcp.tasks.result_mapper", memoize: true) { Mcp::Tasks::ResultMapper.new }
-    register("mcp.tasks.projected_result_resolver", memoize: true) do
-      Mcp::Tasks::ProjectedResultResolver.new(
-        receipts: self["repositories.command_receipts"]
-      )
+    register("tasks.result_resolver", memoize: true) do
+      Write::Tasks::ResultResolver.new(event_store: self["event_store"])
     end
     register("mcp.tasks.extension", memoize: true) do
       Mcp::Tasks::Extension.new(
@@ -1236,7 +1234,7 @@ module Coordinator
         acknowledge_task_input: self["operations.acknowledge_task_input"],
         cancel_task: self["operations.cancel_coordination_task"],
         result_mapper: self["mcp.tasks.result_mapper"],
-        projected_result_resolver: self["mcp.tasks.projected_result_resolver"],
+        result_resolver: self["tasks.result_resolver"],
         terminal_result_validator: Mcp::Tasks::TerminalResultValidator.new
       )
     end

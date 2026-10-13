@@ -5,6 +5,8 @@ module Coordinator
       def call: (Coordinator::Write::coordination_command command, caused_by: PgEventstore::Event) -> Dry::Monads::Result
       def prepare: (Coordinator::Write::coordination_command command, ?caused_by: PgEventstore::Event?) -> Coordinator::Write::Tasks::TargetPreparationV1
       def call_prepared: (Coordinator::Write::coordination_command command, preparation: Coordinator::Write::Tasks::TargetPreparationV1, caused_by: PgEventstore::Event) -> Dry::Monads::Result
+      private
+      def batch_request_recorded?: (Coordinator::Write::coordination_command command) -> bool
     end
   end
 end

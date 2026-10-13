@@ -1,0 +1,11 @@
+module Dry
+  module Types
+    # Minimal external protocol; keep application return types concrete.
+    module Type
+      def call: (?untyped input) ?{ (untyped) -> untyped } -> untyped
+      def []: (?untyped input) ?{ (untyped) -> untyped } -> untyped
+      def valid?: (?untyped input) -> untyped
+      def ===: (untyped input) -> untyped
+    end
+  end
+end

@@ -1,0 +1,13 @@
+module Coordinator
+  module Write
+    module CommandResults
+      class ReleaseSetPreparationV1 < Shared::Value
+        def release_set_id: () -> String
+        def change_set_id: () -> String
+        def release_digest: () -> String
+        def policy_version: () -> String
+        def ordered_members: () -> Array[Write::ReleaseSets::MemberSummaryV2]
+      end
+    end
+  end
+end

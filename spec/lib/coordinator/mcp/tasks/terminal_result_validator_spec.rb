@@ -5,7 +5,7 @@ RSpec.describe Coordinator::Mcp::Tasks::TerminalResultValidator do
 
   it "accepts a terminal result matching its persisted originating tool" do
     result = semantic_result(data: change_set_receipt)
-    expect(validator.call(completed_state, projected_result: result)).to be_a(
+    expect(validator.call(completed_state, semantic_result: result)).to be_a(
       Coordinator::Write::Domain::CoordinationTasks::State
     )
   end
@@ -14,7 +14,7 @@ RSpec.describe Coordinator::Mcp::Tasks::TerminalResultValidator do
     expect do
       validator.call(
         completed_state,
-        projected_result: semantic_result(
+        semantic_result: semantic_result(
           data: Coordinator::Write::CommandReceiptData::WorkItem.new(
             change_set_id: "CS-terminal-schema",
             work_item_id: "W-terminal-schema"
@@ -35,7 +35,7 @@ RSpec.describe Coordinator::Mcp::Tasks::TerminalResultValidator do
     expect do
       validator.call(
         completed_state,
-        projected_result: semantic_result(data: change_set_receipt, next_actions: [ action ])
+        semantic_result: semantic_result(data: change_set_receipt, next_actions: [ action ])
       )
     end.to raise_error(::MCP::Tool::OutputSchema::ValidationError)
   end
@@ -78,7 +78,9 @@ RSpec.describe Coordinator::Mcp::Tasks::TerminalResultValidator do
       receipt: target_command.command_id,
       data:,
       warnings: [],
-      next_actions:
+      next_actions:,
+      completion: Coordinator::Write::Tasks::CompletionGuaranteeV1.new(scope: "command", outcome: "succeeded",
+        effects: "committed", read_back_required: false, read_models: "eventually_consistent")
     )
   end
 

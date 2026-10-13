@@ -12,7 +12,7 @@ module Coordinator::Mcp
         acknowledge_task_input:,
         cancel_task:,
         result_mapper: ResultMapper.new,
-        projected_result_resolver: ProjectedResultResolver.new,
+        result_resolver:,
         terminal_result_validator: TerminalResultValidator.new,
         get_contract: Contracts::GetTaskRequest.new,
         update_contract: Contracts::UpdateTaskRequest.new,
@@ -22,7 +22,7 @@ module Coordinator::Mcp
         @acknowledge_task_input = acknowledge_task_input
         @cancel_task = cancel_task
         @result_mapper = result_mapper
-        @projected_result_resolver = projected_result_resolver
+        @result_resolver = result_resolver
         @terminal_result_validator = terminal_result_validator
         @get_contract = get_contract
         @update_contract = update_contract
@@ -46,11 +46,9 @@ module Coordinator::Mcp
           params
         )
 
-        projected_result = @projected_result_resolver.call(state) if state.status == "completed"
-        return @result_mapper.projection_pending(state).to_h if state.status == "completed" && !projected_result
-
-        @terminal_result_validator.call(state, projected_result:)
-        @result_mapper.detailed(state, projected_result:).to_h
+        semantic_result = @result_resolver.call(state) if state.status == "completed"
+        @terminal_result_validator.call(state, semantic_result:)
+        @result_mapper.detailed(state, semantic_result:).to_h
       end
 
       def update_task(params, server_context:)

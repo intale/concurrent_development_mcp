@@ -1,0 +1,13 @@
+module Coordinator
+  module Write
+    module Tasks
+      class CompletionGuaranteeV1 < Shared::Value
+        def scope: () -> String
+        def outcome: () -> String
+        def effects: () -> String
+        def read_back_required: () -> bool
+        def read_models: () -> String
+      end
+    end
+  end
+end
