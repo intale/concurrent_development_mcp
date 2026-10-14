@@ -2,15 +2,8 @@ module Coordinator
   module Read
     module Projectors
       class AgentChoicesV1
-        PROJECTION: ProjectionDefinition
-
-        def initialize: (
-          ?contract: Contracts::AgentChoiceSourceEvent,
-          ?schema_registry: Write::EventSchemaRegistry,
-          ?choices: Repositories::AgentChoices,
-          ?processed_events: Repositories::ProcessedProjectionEvents
-        ) -> void
-        def call: (PgEventstore::Event event) -> void
+        def initialize: (?assessment_loader: Read::AgentChoiceImpacts::_AssessmentLoader?) -> void
+        def call: (Array[PgEventstore::Event] events) -> nil
       end
     end
   end

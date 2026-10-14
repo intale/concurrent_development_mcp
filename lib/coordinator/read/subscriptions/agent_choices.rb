@@ -2,7 +2,7 @@
 
 module Coordinator::Read
   module Subscriptions
-    class AgentChoices < Coordinator::Shared::Subscriptions::Registration
+    class AgentChoices < BatchRegistration
       DEFINITION = ReadModelDefinition.new(
         set_name: ReadModelSet::SET_NAME,
         subscription_name: "agent-choices-v1",
@@ -12,7 +12,7 @@ module Coordinator::Read
             stream_name: "AgentChoice"
           )
         ],
-        event_types: %w[AgentChoiceRecorded AgentChoiceAccepted]
+        event_types: %w[AgentChoiceRecorded AgentChoiceAccepted AgentChoiceInvalidatedByDecision]
       )
 
       def initialize(handler:, pull_interval: 1.0)

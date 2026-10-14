@@ -308,7 +308,7 @@ When("the impact assessment for {string} reaches the read side") do |choice_id|
 end
 
 Then(
-  "Attempt {string} exposes the invalidating assessment and AgentChoice {string} is invalidated"
+  "Attempt {string} exposes the invalidating assessment for AgentChoice {string}"
 ) do |attempt_id, choice_id|
   item = impact_page(attempt_id:).fetch("items").sole
   choice = agent_choice_view(choice_id).dig("data", "choice")
@@ -320,7 +320,6 @@ Then(
     item.dig("assessment_evidence", "actor", "id"),
     "Assessment actor"
   )
-  assert_acceptance_equal("invalidated", choice.fetch("observation_status"), "Converged Choice status")
   assert_acceptance(
     (choice.keys & %w[active fresh pending projection_status stream_revision]).empty?,
     "Lagging Choice must not expose a freshness gate"

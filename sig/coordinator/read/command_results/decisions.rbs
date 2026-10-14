@@ -11,7 +11,6 @@ module Coordinator
         def correction: (Source source) -> document
         def choice: (Source source) -> document
         def partitions: (Source source, Array[document] definitions) -> Array[document]
-        def partition_descriptors: (document definition) -> Array[document]
         def slot_document: (document definition) -> document
         def slot: (String id, document document) -> document
         def digest: (document document) -> String

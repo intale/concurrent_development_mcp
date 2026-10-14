@@ -187,12 +187,19 @@ RSpec.describe Coordinator::Read::Subscriptions::ReadModelSet do
   end
 
   it "opts converted builders into native batches without changing process-manager delivery" do
-    registrations = [ repository_registration, resource_registration, utterance_registration ]
+    registrations = [ agent_choice_registration, agent_choice_impact_registration,
+      repository_registration, resource_registration, utterance_registration ]
     registrations << Coordinator::Container["subscriptions.work_intention_renewals"]
 
     expect(registrations.map(&:in_batches)).to all(be(true))
     expect(registrations.map(&:handler)).to all(be_a(Coordinator::Shared::Observability::BatchSubscriptionHandler))
     expect(Coordinator::Container["subscription_registrations.process_managers"].map(&:in_batches)).to all(be(false))
+  end
+
+  it "assigns Choice lifecycle to one builder and keeps Impact records independent" do
+    expect(agent_choice_registration.definition.event_types).to include("AgentChoiceInvalidatedByDecision")
+    expect(agent_choice_impact_registration.definition.event_types).not_to include("AgentChoiceInvalidatedByDecision")
+    expect(agent_choice_impact_registration.definition.streams.map(&:stream_name)).to eq([ "AgentChoiceImpact" ])
   end
 
   def build_set

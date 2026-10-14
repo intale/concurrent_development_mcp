@@ -2,17 +2,8 @@ module Coordinator
   module Read
     module Projectors
       class AgentChoiceImpactsV1
-        PROJECTION: ProjectionDefinition
-
-        def initialize: (
-          assessment_loader: Coordinator::Read::AgentChoiceImpacts::_AssessmentLoader,
-          ?contract: Contracts::AgentChoiceImpactSourceEvent,
-          ?schema_registry: Write::EventSchemaRegistry,
-          ?impacts: Repositories::AgentChoiceImpacts,
-          ?choices: Repositories::AgentChoices,
-          ?processed_events: Repositories::ProcessedProjectionEvents
-        ) -> void
-        def call: (PgEventstore::Event event) -> void
+        def initialize: (assessment_loader: Read::AgentChoiceImpacts::_AssessmentLoader) -> void
+        def call: (Array[PgEventstore::Event] events) -> nil
       end
     end
   end

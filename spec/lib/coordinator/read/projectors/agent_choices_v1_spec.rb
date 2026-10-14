@@ -11,8 +11,8 @@ RSpec.describe Coordinator::Read::Projectors::AgentChoicesV1, :read_model do
   it "projects recorded and accepted evidence idempotently without withholding either stage" do
     recorded, accepted = choice_events
 
-    projector.call(recorded)
-    projector.call(recorded)
+    projector.call([ recorded ])
+    projector.call([ recorded ])
 
     available = repository.fetch(choice_id)
     expect(available).to have_attributes(
@@ -30,8 +30,8 @@ RSpec.describe Coordinator::Read::Projectors::AgentChoicesV1, :read_model do
       correlation_id: recorded.correlation_id
     )
 
-    projector.call(accepted)
-    projector.call(accepted)
+    projector.call([ accepted ])
+    projector.call([ accepted ])
 
     projected = repository.fetch(choice_id)
     expect(projected).to have_attributes(
@@ -47,28 +47,24 @@ RSpec.describe Coordinator::Read::Projectors::AgentChoicesV1, :read_model do
       correlation_id: accepted.correlation_id
     )
     expect(Coordinator::Read::AgentChoice.count).to eq(1)
-    expect(processed_events.count).to eq(2)
+    expect(Coordinator::Read::ProcessedProjectionEvent.count).to eq(0)
   end
 
-  it "rolls back the idempotency claim when accepted evidence arrives first" do
-    recorded, accepted = choice_events
+  it "patches acceptance without validating unrelated projected context" do
+    row = create(:coordinator_read_agent_choice, choice_id:)
+    original = row.attributes.slice("selected", "decision_context", "context_digest", "recorded_event")
+    _, accepted = choice_events
 
-    expect { projector.call(accepted) }.to raise_error(
-      Coordinator::Read::ProjectionStateError,
-      "AgentChoiceRecorded must be projected before AgentChoiceAccepted"
-    )
-    expect(processed_events).to be_empty
+    projector.call([ accepted ])
 
-    projector.call(recorded)
-    projector.call(accepted)
-    expect(repository.fetch(choice_id)).to have_attributes(observation_status: "accepted")
+    expect(row.reload.observation_status).to eq("accepted")
+    expect(row.attributes.slice(*original.keys)).to eq(original)
   end
 
   it "reconstructs projection-only context fields from narrow V2 evidence" do
     recorded, accepted = choice_events
 
-    projector.call(recorded)
-    projector.call(accepted)
+    projector.call([ recorded, accepted ])
 
     projected = repository.fetch(choice_id)
     expect(projected).to have_attributes(
@@ -81,6 +77,36 @@ RSpec.describe Coordinator::Read::Projectors::AgentChoicesV1, :read_model do
       )
     )
     expect(projected.accepted.metadata).to include("context_digest" => decision_context.digest)
+  end
+
+  it "preserves accepted-only columns when the registration portion is redelivered" do
+    recorded, accepted = choice_events
+    projector.call([ recorded, accepted ])
+    row = Coordinator::Read::AgentChoice.find(choice_id)
+    original = row.attributes.slice("observation_status", "assessment", "accepted_event", "accepted_metadata")
+
+    projector.call([ recorded ])
+
+    expect(row.reload.attributes.slice(*original.keys)).to eq(original)
+  end
+
+  it "updates a thousand independent accepted Choices through bounded compatible SQL statements" do
+    rows = Array.new(1000) { attributes_for(:coordinator_read_agent_choice) }
+    Coordinator::Read::AgentChoice.insert_all!(rows)
+    _, prototype = choice_events
+    events = rows.map do |attributes|
+      event = prototype.dup
+      event.id = SecureRandom.uuid_v7
+      event.data = prototype.data.merge("choice_id" => attributes.fetch(:choice_id))
+      event
+    end
+    statements = []
+    ActiveSupport::Notifications.subscribed(->(*args) { statements << args.last.fetch(:sql) }, "sql.active_record") do
+      projector.call(events)
+    end
+
+    expect(statements.count { _1.start_with?("UPDATE") }).to be_between(1, 2)
+    expect(Coordinator::Read::AgentChoice.where(observation_status: "accepted").count).to eq(1000)
   end
 
   def choice_events
@@ -184,12 +210,5 @@ RSpec.describe Coordinator::Read::Projectors::AgentChoicesV1, :read_model do
 
   def repository
     @repository ||= Coordinator::Read::Repositories::AgentChoices.new
-  end
-
-  def processed_events
-    Coordinator::Read::ProcessedProjectionEvent.where(
-      projection_name: "agent_choices",
-      projection_version: 1
-    )
   end
 end

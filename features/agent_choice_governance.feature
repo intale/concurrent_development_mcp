@@ -38,7 +38,7 @@ Feature: Agent choice governance
   Rule: Decision changes assess accepted choices through an internal resumable Saga
 
     @CDM-IMPACT-001 @stale-view
-    Scenario: Impact evidence is available before the terminal Choice projection catches up
+    Scenario: Impact evidence and terminal Choice status converge independently
       Given agent "agent-a" has active Attempt "A-CUC-IMPACT-1" for WorkItem "W-CUC-IMPACT-1" in ChangeSet "CS-CUC-IMPACT-1" and repository "billing"
       When the agent resolves the available testing-framework context
       And the agent records testing-framework choice "rspec" as "CHO-CUC-IMPACT-1" through a Task
@@ -48,7 +48,8 @@ Feature: Agent choice governance
       And the impact Saga processes and redrives the Decision change
       Then one invalidating assessment and one terminal invalidation are durable for "CHO-CUC-IMPACT-1"
       When the impact assessment for "CHO-CUC-IMPACT-1" reaches the read side
-      Then Attempt "A-CUC-IMPACT-1" exposes the invalidating assessment and AgentChoice "CHO-CUC-IMPACT-1" is invalidated
+      Then Attempt "A-CUC-IMPACT-1" exposes the invalidating assessment for AgentChoice "CHO-CUC-IMPACT-1"
+      When the invalidation for AgentChoice "CHO-CUC-IMPACT-1" reaches the read side
       And AgentChoice "CHO-CUC-IMPACT-1" is invalidated and tells the agent to resolve current Decisions
 
     @CDM-IMPACT-002

@@ -12,14 +12,12 @@ RSpec.describe Coordinator::Read::Projectors::AgentChoiceImpactsV1, :read_model,
   let(:decision_changed_at) { decision_source_event.created_at.utc.iso8601(6) }
   let(:assessment_loader) { Coordinator::Read::AgentChoiceImpacts::AssessmentLoader.new(event_store:) }
 
-  it "projects exact assessment sources and invalidation evidence idempotently" do
+  it "folds exact assessment sources idempotently without changing the Choice projection" do
     create_accepted_choice
-    assessment, accepted_link, decision_link, invalidation = impact_events
+    assessment, accepted_link, decision_link, = impact_events
 
-    [ assessment, accepted_link, decision_link, invalidation ].each do |event|
-      projector.call(event)
-      projector.call(event)
-    end
+    batch = [ assessment, accepted_link, decision_link ]
+    2.times { projector.call(batch) }
 
     impact = impact_repository.page(
       Coordinator::Read::AgentChoiceImpactListQueryV1.new(
@@ -44,37 +42,40 @@ RSpec.describe Coordinator::Read::Projectors::AgentChoiceImpactsV1, :read_model,
     )
 
     choice = Coordinator::Read::Repositories::AgentChoices.new.fetch(choice_id)
-    expect(choice).to have_attributes(
-      observation_status: "invalidated",
-      invalidation: have_attributes(
-        reason: "blocking_policy_introduced",
-        assessment_event: event_reference(assessment),
-        decision_change_event: decision_change.source_event,
-        evidence: have_attributes(
-          event: event_reference(invalidation),
-          causation_id: invalidation.causation_id,
-          correlation_id: invalidation.correlation_id
-        )
-      )
-    )
+    expect(choice).to have_attributes(observation_status: "accepted", invalidation: nil)
     expect(Coordinator::Read::AgentChoiceImpact.count).to eq(1)
-    expect(processed_events.count).to eq(4)
+    expect(Coordinator::Read::ProcessedProjectionEvent.count).to eq(0)
   end
 
-  it "rolls back the invalidation claim until the accepted Choice projection is available" do
-    invalidation = impact_events.last
+  it "lets the Choice builder own invalidation without waiting for an Impact or accepted Choice projection" do
+    assessment, _, _, invalidation = impact_events
+    row = create(:coordinator_read_agent_choice, choice_id:)
+    original = row.attributes.slice("selected", "context", "accepted_event", "recorded_event")
+    choices = Coordinator::Read::Projectors::AgentChoicesV1.new(assessment_loader:)
 
-    expect { projector.call(invalidation) }.to raise_error(
-      Coordinator::Read::ProjectionStateError,
-      "AgentChoiceAccepted must be projected before invalidation"
-    )
-    expect(processed_events).to be_empty
+    2.times { choices.call([ invalidation ]) }
 
-    create_accepted_choice
-    projector.call(invalidation)
-    expect(Coordinator::Read::Repositories::AgentChoices.new.fetch(choice_id)).to have_attributes(
-      observation_status: "invalidated"
-    )
+    choice = Coordinator::Read::Repositories::AgentChoices.new.fetch(choice_id)
+    expect(choice).to have_attributes(observation_status: "invalidated", invalidation: have_attributes(
+      reason: "blocking_policy_introduced", assessment_event: event_reference(assessment),
+      decision_change_event: decision_change.source_event, evidence: have_attributes(
+        event: event_reference(invalidation), causation_id: invalidation.causation_id, correlation_id: invalidation.correlation_id
+      )
+    ))
+    expect(row.reload.attributes.slice(*original.keys)).to eq(original)
+    expect(Coordinator::Read::AgentChoiceImpact.count).to eq(0)
+  end
+
+  it "replays a source-link-only batch without replacing assessment columns" do
+    assessment, accepted_link, decision_link, = impact_events
+    projector.call([ assessment, accepted_link, decision_link ])
+    row = Coordinator::Read::AgentChoiceImpact.find(assessment_id)
+    row.update!(reason: "current reason", outcome: "retained")
+
+    projector.call([ accepted_link, decision_link ])
+
+    expect(row.reload).to have_attributes(reason: "current reason", outcome: "retained")
+    expect(Coordinator::Read::AgentChoiceImpact.count).to eq(1)
   end
 
   def impact_events
@@ -260,8 +261,9 @@ RSpec.describe Coordinator::Read::Projectors::AgentChoiceImpactsV1, :read_model,
   end
 
   def decision_change
-    Coordinator::Read::AgentChoiceImpacts::DecisionChangeLoader.new(event_store:)
-      .call(event_reference(decision_source_event)).evidence
+    document = Coordinator::Read::AgentChoiceImpacts::DecisionChangeLoader.new(event_store:)
+      .call(event_reference(decision_source_event).to_h).fetch(:evidence)
+    Coordinator::Write::AgentChoiceImpacts::DecisionChangeEvidenceV2.new(document)
   end
 
   def accepted_choice_event
@@ -304,12 +306,5 @@ RSpec.describe Coordinator::Read::Projectors::AgentChoiceImpactsV1, :read_model,
 
   def impact_repository
     @impact_repository ||= Coordinator::Read::Repositories::AgentChoiceImpacts.new
-  end
-
-  def processed_events
-    Coordinator::Read::ProcessedProjectionEvent.where(
-      projection_name: "agent_choice_impacts",
-      projection_version: 1
-    )
   end
 end

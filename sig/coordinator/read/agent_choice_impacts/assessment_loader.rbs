@@ -1,27 +1,22 @@
-module Coordinator::Read
-  module AgentChoiceImpacts
-    interface _AssessmentLoader
-      def call: (String assessment_id) -> AssessmentViewV2?
-    end
+module Coordinator
+  module Read
+    module AgentChoiceImpacts
+      type assessment_source = {
+        assessment_id: String, choice_id: String, attempt_id: String,
+        assessment: CommandResults::document, accepted_choice: CommandResults::document,
+        decision_change: CommandResults::document, decision_changed_at: String,
+        assessment_event: PgEventstore::Event
+      }
 
-    class AssessmentLoader
-      @event_store: untyped
+      interface _AssessmentLoader
+        def call: (String assessment_id) -> assessment_source
+      end
 
-      @stream_factory: untyped
-
-      @schema_registry: untyped
-
-      @decision_change_loader: untyped
-
-      EVENT_TYPES: ::Array["AgentChoiceImpactAssessmentRecorded" | "AgentChoiceImpactSourceLinked"]
-
-      def initialize: (event_store: untyped, ?stream_factory: untyped, ?schema_registry: untyped, ?decision_change_loader: untyped) -> void
-
-      def call: (untyped assessment_id) -> untyped
-
-      private
-
-      def load_event: (untyped event) -> untyped
+      class AssessmentLoader
+        EVENT_TYPES: Array[String]
+        def initialize: (event_store: Write::_EventStore, ?stream_factory: Write::StreamFactory, ?decision_change_loader: DecisionChangeLoader) -> void
+        def call: (String assessment_id) -> assessment_source
+      end
     end
   end
 end

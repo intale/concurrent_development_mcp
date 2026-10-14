@@ -68,26 +68,10 @@ module Coordinator::Read
       end
 
       def partitions(source, definitions)
-        descriptors = definitions.flat_map { partition_descriptors(_1) }.to_h { [ _1.fetch(:partition_id), _1 ] }
+        descriptors = definitions.flat_map { Projections::DecisionPartitions.new.call(_1) }.to_h { [ _1.fetch(:partition_id), _1 ] }
         source.events("DecisionAddedToPartition", "DecisionRemovedFromPartition").map do |event|
           { partition: descriptors.fetch(event.data.fetch("partition_id")), partition_revision: event.stream_revision }
         end
-      end
-
-      def partition_descriptors(definition)
-        scope, root = definition.fetch(:scope), definition.fetch(:topic).fetch(:topic_id).split(".", 2).first
-        anchor = [ [ :candidate_id, "candidate" ], [ :attempt_id, "attempt" ], [ :work_item_id, "workitem" ], [ :change_set_id, "changeset" ] ]
-          .find { |key, _| scope[key] }
-        anchors = if anchor
-                    [ [ anchor.last, scope.fetch(anchor.first) ] ]
-        elsif scope.fetch(:repository_ids).any?
-                    scope.fetch(:repository_ids).uniq.map { [ "repo", _1 ] }
-        elsif scope[:workspace_id]
-                    [ [ "workspace", scope.fetch(:workspace_id) ] ]
-        else
-                    []
-        end
-        anchors.map { |kind, id| { partition_id: "#{kind}:#{id}:#{root}", topic_root: root, anchor_kind: kind, anchor_id: id } }
       end
 
       def slot_document(definition)

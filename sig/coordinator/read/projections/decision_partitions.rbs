@@ -1,0 +1,9 @@
+module Coordinator
+  module Read
+    module Projections
+      class DecisionPartitions
+        def call: (CommandResults::document definition) -> Array[CommandResults::document]
+      end
+    end
+  end
+end

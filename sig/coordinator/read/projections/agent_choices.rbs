@@ -1,0 +1,12 @@
+module Coordinator
+  module Read
+    module Projections
+      class AgentChoices
+        def initialize: (patches: Batches::ColumnPatches, ?invalidations: Hash[String, Read::AgentChoiceImpacts::assessment_source]) -> void
+        def apply: (PgEventstore::Event event) -> nil
+        private
+        def evidence: (PgEventstore::Event event, Symbol prefix) -> Hash[Symbol, Batches::column_value]
+      end
+    end
+  end
+end

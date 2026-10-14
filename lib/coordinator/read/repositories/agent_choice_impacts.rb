@@ -3,8 +3,6 @@
 module Coordinator::Read
   module Repositories
     class AgentChoiceImpacts
-      include EventTimestamped
-
       def fetch(assessment_id)
         record = Coordinator::Read::AgentChoiceImpact.find_by(assessment_id:)
         record && build(record)
@@ -16,33 +14,6 @@ module Coordinator::Read
         assessment_ids.filter_map do |assessment_id|
           records[assessment_id] && build(records.fetch(assessment_id))
         end
-      end
-
-      def store_assessment(event:, projection_event: event, impact:)
-        assessment = impact.assessment
-        create_from_event(Coordinator::Read::AgentChoiceImpact, event: projection_event, attributes: {
-          assessment_id: impact.assessment_id,
-          choice_id: impact.choice_id,
-          attempt_id: impact.attempt_id,
-          outcome: assessment.outcome,
-          reason: assessment.reason,
-          policy_version: event.metadata.fetch("policy_version"),
-          accepted_choice: impact.accepted_choice.to_h,
-          decision_change: impact.decision_change.to_h.merge(
-            changed_at: impact.decision_changed_at
-          ),
-          assessment: assessment.to_h,
-          assessment_event: event_reference(event).to_h,
-          source_actor: attributed_actor(impact.decision_change.source_actor).to_h,
-          assessment_actor: actor(event).to_h,
-          markers: event.markers,
-          metadata: event.metadata,
-          causation_id: event.causation_id,
-          correlation_id: event.correlation_id,
-          event_global_position: event.global_position,
-          assessed_at_domain: event.created_at,
-          assessed_at_store: event.created_at
-        })
       end
 
       def page(query)
@@ -101,29 +72,6 @@ module Coordinator::Read
           persisted_at: record.assessed_at_store.utc.iso8601(6),
           causation_id: record.causation_id,
           correlation_id: record.correlation_id
-        )
-      end
-
-      def attributed_actor(actor)
-        AttributedActorV1.new(kind: actor.kind, id: actor.id, authenticated: false)
-      end
-
-      def actor(event)
-        AttributedActorV1.new(
-          kind: event.metadata.fetch("actor_kind"),
-          id: event.metadata.fetch("actor_id"),
-          authenticated: false
-        )
-      end
-
-      def event_reference(event)
-        Coordinator::Write::EventReference.new(
-          event_id: event.id,
-          type: event.type,
-          stream_context: event.stream.context,
-          stream_name: event.stream.stream_name,
-          stream_id: event.stream.stream_id,
-          stream_revision: event.stream_revision
         )
       end
 

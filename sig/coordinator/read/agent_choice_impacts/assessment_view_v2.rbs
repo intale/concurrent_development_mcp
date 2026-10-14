@@ -1,6 +1,0 @@
-module Coordinator::Read
-  module AgentChoiceImpacts
-    class AssessmentViewV2 < Coordinator::Shared::Value
-    end
-  end
-end

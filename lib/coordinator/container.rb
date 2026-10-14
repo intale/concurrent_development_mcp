@@ -938,9 +938,7 @@ module Coordinator
 
     register("projectors.agent_choices_v1", memoize: true) do
       Read::Projectors::AgentChoicesV1.new(
-        schema_registry: self["event_schema_registry"],
-        choices: self["repositories.agent_choices"],
-        processed_events: self["repositories.processed_projection_events"]
+        assessment_loader: Read::AgentChoiceImpacts::AssessmentLoader.new(event_store: self["event_store"])
       )
     end
 
@@ -948,11 +946,7 @@ module Coordinator
       Read::Projectors::AgentChoiceImpactsV1.new(
         assessment_loader: Read::AgentChoiceImpacts::AssessmentLoader.new(
           event_store: self["event_store"]
-        ),
-        schema_registry: self["event_schema_registry"],
-        impacts: self["repositories.agent_choice_impacts"],
-        choices: self["repositories.agent_choices"],
-        processed_events: self["repositories.processed_projection_events"]
+        )
       )
     end
 

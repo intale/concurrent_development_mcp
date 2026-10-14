@@ -1,31 +1,12 @@
-module Coordinator::Read
-  module AgentChoiceImpacts
-    class DecisionChangeLoader
-      @event_store: untyped
-
-      @schema_registry: untyped
-
-      @partition_builder: untyped
-
-      @canonical_json: untyped
-
-      def initialize: (event_store: untyped, ?schema_registry: untyped, ?partition_builder: untyped, ?canonical_json: untyped) -> void
-
-      def call: (untyped reference) -> untyped
-
-      private
-
-      def definition_for: (untyped event, untyped payload) -> untyped
-
-      def affected_partitions: (untyped event, untyped payload, untyped definition) -> untyped
-
-      def change_kind: (untyped payload) -> ("activated" | "corrected")
-
-      def definition_before: (untyped event) -> untyped
-
-      def normalize_definition: (untyped document) -> untyped
-
-      def load_event: (untyped event) -> untyped
+module Coordinator
+  module Read
+    module AgentChoiceImpacts
+      class DecisionChangeLoader
+        def initialize: (event_store: Write::_EventStore, ?partition_builder: Projections::DecisionPartitions, ?canonical_json: Shared::CanonicalJson) -> void
+        def call: (CommandResults::document reference) -> { evidence: CommandResults::document, changed_at: String }
+        private
+        def definition_before: (PgEventstore::Event event) -> CommandResults::document
+      end
     end
   end
 end
