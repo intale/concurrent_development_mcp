@@ -1,7 +1,7 @@
 module Coordinator
   module Read
     module Subscriptions
-      class OperationBatches < Shared::Subscriptions::Registration
+      class OperationBatches < BatchRegistration
         DEFINITION: ReadModelDefinition
 
         def initialize: (handler: Projectors::OperationBatchesV2, ?pull_interval: Integer | Float) -> void

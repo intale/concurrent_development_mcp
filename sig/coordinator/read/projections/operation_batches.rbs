@@ -1,0 +1,17 @@
+module Coordinator
+  module Read
+    module Projections
+      class OperationBatches
+        type item_key = [String, Integer]
+        OUTCOMES: Hash[String, String]
+        def initialize: (headers: Batches::ColumnPatches, items: Batches::ColumnPatches, outcomes: Batches::ColumnPatches, ?item_sources: Hash[item_key, CommandResults::document], ?arguments: Read::OperationBatchArguments) -> void
+        def apply: (PgEventstore::Event event) -> nil
+        private
+        def enqueue: (PgEventstore::Event event) -> nil
+        def outcome: (PgEventstore::Event event) -> nil
+        def result: (PgEventstore::Event event) -> Hash[String | Symbol, CommandResults::json]
+        def item_identity: (Hash[String, CommandResults::json] data) -> Batches::column_attributes
+      end
+    end
+  end
+end

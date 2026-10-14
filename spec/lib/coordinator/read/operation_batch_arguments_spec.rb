@@ -28,7 +28,7 @@ RSpec.describe Coordinator::Read::OperationBatchArguments do
     }
     command = Coordinator::Write::Operations::PreparePublishSkillRevision.new.call(input).value!
 
-    expect(builder.call(input_digest.document(command))).to eq(input)
+    expect(builder.call(input_digest.document(command).to_h)).to eq(input)
   end
 
   it "reconstructs exact public UTF-8 Artifact arguments from canonical bytes" do
@@ -50,7 +50,7 @@ RSpec.describe Coordinator::Read::OperationBatchArguments do
     }
     command = Coordinator::Write::Operations::PrepareCaptureDevelopmentArtifact.new.call(input).value!
 
-    expect(builder.call(input_digest.document(command))).to eq(input)
+    expect(builder.call(input_digest.document(command).to_h)).to eq(input)
   end
 
   it "reconstructs exact public relation arguments without the derived relation identity" do
@@ -72,6 +72,6 @@ RSpec.describe Coordinator::Read::OperationBatchArguments do
     }
     command = Coordinator::Write::Operations::PrepareDeclareDevelopmentArtifactRelation.new.call(input).value!
 
-    expect(builder.call(input_digest.document(command))).to eq(input)
+    expect(builder.call(input_digest.document(command).to_h)).to eq(input)
   end
 end

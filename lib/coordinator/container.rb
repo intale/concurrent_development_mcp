@@ -989,11 +989,7 @@ module Coordinator
     end
 
     register("projectors.operation_batches_v2", memoize: true) do
-      Read::Projectors::OperationBatchesV2.new(
-        schema_registry: self["event_schema_registry"],
-        batches: self["repositories.operation_batches"],
-        processed_events: self["repositories.processed_projection_events"]
-      )
+      Read::Projectors::OperationBatchesV2.new
     end
 
     register("projectors.verification_obligations_v1", memoize: true) do

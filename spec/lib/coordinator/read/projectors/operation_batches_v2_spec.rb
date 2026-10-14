@@ -15,8 +15,11 @@ RSpec.describe Coordinator::Read::Projectors::OperationBatchesV2, :read_model do
       reason: "Three attempts exhausted; this request may succeed if retried", retryable: true,
       effects_committed: false, attempts: 3), revision: manifest.length, position: 200, causation_id: manifest.first.id)
     completed = batch_event(Coordinator::Write::Events::OperationBatchCompletedV2.new(batch_id:),
-      revision: manifest.length + 1, position: 201, causation_id: failed.id)
-    [ *manifest, failed, completed ].each { projector.call(_1) }
+      revision: manifest.length + 3, position: 203, causation_id: failed.id)
+    number = unsuccessful_number(1, revision: manifest.length + 1, position: 201)
+    outcome = batch_event(Coordinator::Write::Events::ProjectionNumbers::OperationBatchOutcomeRecordedV1.new(
+      batch_id:, outcome: "completed_with_errors"), revision: manifest.length + 2, position: 202)
+    projector.call([ *manifest, failed, number, outcome, completed ])
     view = fetch(limit: 100)
     expect(view).to have_attributes(status: "completed_with_errors", rejected: 1, pending: 0)
     expect(view.items.sole.status).to eq("failed")
@@ -30,8 +33,7 @@ RSpec.describe Coordinator::Read::Projectors::OperationBatchesV2, :read_model do
     events = completed_events
     created = events.find { _1.type == "OperationBatchCreated" }
 
-    events.each { projector.call(_1) }
-    events.reverse_each { projector.call(_1) }
+    2.times { projector.call(events) }
 
     first = fetch(limit: 1)
     expect(first).to have_attributes(
@@ -60,7 +62,7 @@ RSpec.describe Coordinator::Read::Projectors::OperationBatchesV2, :read_model do
     expect(Coordinator::Read::OperationBatch.count).to eq(1)
     expect(Coordinator::Read::OperationBatchItem.count).to eq(2)
     expect(Coordinator::Read::OperationBatchOutcome.count).to eq(2)
-    expect(processed_events.count).to eq(events.length)
+    expect(Coordinator::Read::ProcessedProjectionEvent.count).to eq(0)
   end
 
   it "exposes accepted cancellation before terminal completion and marks only terminal remainder not run" do
@@ -73,8 +75,7 @@ RSpec.describe Coordinator::Read::Projectors::OperationBatchesV2, :read_model do
       causation_id: created.id
     )
 
-    manifest.each { projector.call(_1) }
-    projector.call(cancellation)
+    projector.call([ *manifest, cancellation ])
     cancelling = fetch(limit: 100)
     expect(cancelling).to have_attributes(status: "cancelling", pending: 2, not_run: 0)
     expect(cancelling.items.map(&:status)).to eq(%w[pending pending])
@@ -83,11 +84,13 @@ RSpec.describe Coordinator::Read::Projectors::OperationBatchesV2, :read_model do
 
     cancelled = batch_event(
       Coordinator::Write::Events::OperationBatchCancelledV2.new(batch_id:),
-      revision: manifest.length + 1,
+      revision: manifest.length + 2,
       position: 300,
       causation_id: cancellation.id
     )
-    projector.call(cancelled)
+    outcome = batch_event(Coordinator::Write::Events::ProjectionNumbers::OperationBatchOutcomeRecordedV1.new(
+      batch_id:, outcome: "cancelled"), revision: manifest.length + 1, position: 299)
+    projector.call([ outcome, cancelled ])
 
     terminal = fetch(limit: 100)
     expect(terminal).to have_attributes(status: "cancelled", pending: 0, not_run: 2)
@@ -97,9 +100,7 @@ RSpec.describe Coordinator::Read::Projectors::OperationBatchesV2, :read_model do
 
   it "projects a Development Artifact relation batch using its current command envelope" do
     item = relation_item
-    manifest_events([ item ], target_tool: "development_artifact_relation_declare").each do |event|
-      projector.call(event)
-    end
+    projector.call(manifest_events([ item ], target_tool: "development_artifact_relation_declare"))
 
     batch = fetch(limit: 100)
     expect(batch).to have_attributes(
@@ -117,7 +118,8 @@ RSpec.describe Coordinator::Read::Projectors::OperationBatchesV2, :read_model do
   end
 
   it "projects a canonical assignment onto a factory-created item without changing its submitted request" do
-    batch = create(:coordinator_read_operation_batch, batch_id:, status: "running", terminal_kind: nil, total: 1)
+    batch = create(:coordinator_read_operation_batch, batch_id:, status: "running", terminal_kind: nil, total: 1,
+      succeeded_count: 0, rejected_count: 0)
     item = create(
       :coordinator_read_operation_batch_item, operation_batch: batch, item_index: 0,
       target_command_id: nil, updated_at: Time.utc(2026, 8, 29)
@@ -128,7 +130,7 @@ RSpec.describe Coordinator::Read::Projectors::OperationBatchesV2, :read_model do
       revision: 3, position: 200
     )
 
-    2.times { projector.call(assigned) }
+    2.times { projector.call([ assigned ]) }
 
     expect(item.reload).to have_attributes(target_command_id: command_id, command_id: item.arguments.fetch("command_id"))
     expect(item.updated_at).to eq(assigned.created_at)
@@ -152,7 +154,8 @@ RSpec.describe Coordinator::Read::Projectors::OperationBatchesV2, :read_model do
       Coordinator::Write::Events::OperationBatchItemRegistrationRejectedV1.new(batch_id:, index: 0, error:),
       revision: 3, position: 200
     )
-    2.times { projector.call(rejected) }
+    number = unsuccessful_number(1, revision: 4, position: 201)
+    2.times { projector.call([ rejected, number ]) }
 
     outcome = Coordinator::Read::OperationBatchOutcome.find_by!(batch_id:, item_index: 0)
     expect(outcome.target_command_id).to be_nil
@@ -160,7 +163,57 @@ RSpec.describe Coordinator::Read::Projectors::OperationBatchesV2, :read_model do
       status: "command_id_reused", command_id: item.command_id, receipt: nil, data: error
     )
     expect(fetch(limit: 1)).to have_attributes(rejected: 1, pending: 0)
-    expect(processed_events.count).to eq(1)
+    expect(Coordinator::Read::ProcessedProjectionEvent.count).to eq(0)
+  end
+
+  it "preserves canonical assignments and terminal progress when only creation and item facts are replayed" do
+    batch = create(:coordinator_read_operation_batch, batch_id:, total: 1, succeeded_count: 1, rejected_count: 0,
+      status: "completed", terminal_kind: "completed")
+    target_id = SecureRandom.uuid_v7
+    item = create(:coordinator_read_operation_batch_item, operation_batch: batch, item_index: 0, target_command_id: target_id)
+    outcome = create(:coordinator_read_operation_batch_outcome, operation_batch: batch, item_index: 0,
+      command_id: item.command_id, target_command_id: target_id)
+    original = batch.attributes.slice("status", "succeeded_count", "rejected_count", "terminal_event", "terminal_kind")
+    facts = manifest_events(skill_items.first(1)).reject do |event|
+      %w[OperationBatchSucceededItemsNumberChanged OperationBatchUnsuccessfulItemsNumberChanged].include?(event.type)
+    end
+
+    projector.call(facts)
+
+    expect(batch.reload.attributes.slice(*original.keys)).to eq(original)
+    expect(item.reload.target_command_id).to eq(target_id)
+    expect(outcome.reload.target_command_id).to eq(target_id)
+    expect(outcome.command_id).to eq("item-1")
+  end
+
+  it "assigns authoritative absolute counts without counting projected item outcomes" do
+    batch = create(:coordinator_read_operation_batch, batch_id:, total: 20, succeeded_count: 10, rejected_count: 5)
+    create(:coordinator_read_operation_batch_outcome, operation_batch: batch)
+    event = batch_event(Coordinator::Write::Events::ProjectionNumbers::OperationBatchSucceededItemsNumberChangedV1.new(
+      batch_id:, items_number: 7), revision: 30, position: 300)
+
+    2.times { projector.call([ event ]) }
+
+    expect(batch.reload).to have_attributes(succeeded_count: 7, rejected_count: 5)
+    expect(Coordinator::Read::OperationBatchOutcome.count).to eq(1)
+  end
+
+  it "updates a thousand canonical assignments with one child mask and one parent timestamp update" do
+    create(:coordinator_read_operation_batch, batch_id:, total: 1000)
+    rows = Array.new(1000) { |index| attributes_for(:coordinator_read_operation_batch_item, batch_id:, item_index: index) }
+    Coordinator::Read::OperationBatchItem.insert_all!(rows)
+    events = rows.map.with_index do |attributes, index|
+      batch_event(Coordinator::Write::Events::OperationBatchItemCommandAssignedV1.new(
+        batch_id:, index: attributes.fetch(:item_index), command_id: SecureRandom.uuid_v7), revision: index + 1000, position: index + 2000)
+    end
+    statements = []
+    ActiveSupport::Notifications.subscribed(->(*args) { statements << args.last.fetch(:sql) }, "sql.active_record") do
+      projector.call(events)
+    end
+
+    expect(statements.count { _1.start_with?("UPDATE") }).to eq(2)
+    expect(Coordinator::Read::OperationBatchItem.where.not(target_command_id: nil).count).to eq(1000)
+    expect(Coordinator::Read::ProcessedProjectionEvent.count).to eq(0)
   end
 
   def completed_events
@@ -203,11 +256,16 @@ RSpec.describe Coordinator::Read::Projectors::OperationBatchesV2, :read_model do
     )
     completed = batch_event(
       Coordinator::Write::Events::OperationBatchCompletedV2.new(batch_id:),
-      revision: events.length + 4,
+      revision: events.length + 7,
       position: 400,
       causation_id: events.first.id
     )
-    [ *events, succeeded, succeeded_link, rejected, rejected_link, completed ]
+    succeeded_number = batch_event(Coordinator::Write::Events::ProjectionNumbers::OperationBatchSucceededItemsNumberChangedV1.new(
+      batch_id:, items_number: 1), revision: events.length + 4, position: 360)
+    rejected_number = unsuccessful_number(1, revision: events.length + 5, position: 370)
+    outcome = batch_event(Coordinator::Write::Events::ProjectionNumbers::OperationBatchOutcomeRecordedV1.new(
+      batch_id:, outcome: "completed_with_errors"), revision: events.length + 6, position: 380)
+    [ *events, succeeded, succeeded_link, rejected, rejected_link, succeeded_number, rejected_number, outcome, completed ]
   end
 
   def skill_items
@@ -279,6 +337,9 @@ RSpec.describe Coordinator::Read::Projectors::OperationBatchesV2, :read_model do
     payloads = [
       Coordinator::Write::Events::OperationBatchCreatedV2.new(batch_id:),
       Coordinator::Write::Events::OperationBatchTargetSelectedV1.new(batch_id:, target_tool:),
+      Coordinator::Write::Events::ProjectionNumbers::OperationBatchManifestAcceptedV1.new(batch_id:),
+      Coordinator::Write::Events::ProjectionNumbers::OperationBatchSucceededItemsNumberChangedV1.new(batch_id:, items_number: 0),
+      Coordinator::Write::Events::ProjectionNumbers::OperationBatchUnsuccessfulItemsNumberChangedV1.new(batch_id:, items_number: 0),
       *items.map do |item|
         Coordinator::Write::Events::OperationBatchItemEnqueuedV1.new(
           batch_id:,
@@ -289,7 +350,7 @@ RSpec.describe Coordinator::Read::Projectors::OperationBatchesV2, :read_model do
       end
     ]
     payloads.each_with_index.map do |payload, revision|
-      batch_event(payload, revision:, position: 100 + revision)
+      batch_event(payload, revision:, position: 100 + revision, manifest_count: items.length)
     end
   end
 
@@ -314,7 +375,12 @@ RSpec.describe Coordinator::Read::Projectors::OperationBatchesV2, :read_model do
     )
   end
 
-  def batch_event(payload, revision:, position:, causation_id: nil)
+  def unsuccessful_number(count, revision:, position:)
+    batch_event(Coordinator::Write::Events::ProjectionNumbers::OperationBatchUnsuccessfulItemsNumberChangedV1.new(
+      batch_id:, items_number: count), revision:, position:)
+  end
+
+  def batch_event(payload, revision:, position:, causation_id: nil, manifest_count: nil)
     ProjectionEventFactory.build(
       payload:,
       stream:,
@@ -322,7 +388,7 @@ RSpec.describe Coordinator::Read::Projectors::OperationBatchesV2, :read_model do
       global_position: position,
       command_id: "cmd-batch-projector-#{revision}",
       policy_version: "operation-batch/v2",
-      metadata: batch_metadata(payload, revision:),
+      metadata: batch_metadata(payload, revision:, manifest_count:),
       actor_id: "agent-1",
       correlation_id:,
       causation_id:,
@@ -330,7 +396,7 @@ RSpec.describe Coordinator::Read::Projectors::OperationBatchesV2, :read_model do
     )
   end
 
-  def batch_metadata(payload, revision:)
+  def batch_metadata(payload, revision:, manifest_count: nil)
     common = {
       command_id: "cmd-batch-projector-#{revision}",
       actor_kind: "agent",
@@ -344,6 +410,10 @@ RSpec.describe Coordinator::Read::Projectors::OperationBatchesV2, :read_model do
         **common,
         manifest_digest: "sha256:#{'d' * 64}",
         page_size: Coordinator::Shared::Types::OPERATION_BATCH_PAGE_SIZE
+      )
+    when Coordinator::Write::Events::ProjectionNumbers::OperationBatchManifestAcceptedV1
+      Coordinator::Write::Metadata::OperationBatchManifestV1.new(
+        **common, item_count: manifest_count, encoded_byte_size: manifest_count * 500
       )
     when Coordinator::Write::Events::OperationBatchItemEnqueuedV1
       Coordinator::Write::Metadata::OperationBatchItemV1.new(
@@ -363,13 +433,6 @@ RSpec.describe Coordinator::Read::Projectors::OperationBatchesV2, :read_model do
   def fetch(after_index: nil, limit:)
     repository.fetch(
       Coordinator::Read::OperationBatchGetQueryV1.new(batch_id:, after_index:, limit:)
-    )
-  end
-
-  def processed_events
-    Coordinator::Read::ProcessedProjectionEvent.where(
-      projection_name: "operation_batches",
-      projection_version: 2
     )
   end
 end

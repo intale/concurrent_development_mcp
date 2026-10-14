@@ -1,78 +1,36 @@
 # frozen_string_literal: true
 
 module Coordinator::Read
+  # Formats already validated command instructions for public read responses.
   class OperationBatchArguments
     def call(document)
-      case document
-      when Coordinator::Write::CommandInputDocuments::PublishSkillRevisionV2
-        skill_arguments(document)
-      when Coordinator::Write::CommandInputDocuments::CaptureDevelopmentArtifactV2
-        artifact_arguments(document)
-      when Coordinator::Write::CommandInputDocuments::DeclareDevelopmentArtifactRelationV1
-        relation_arguments(document)
+      document = CommandResults::Source.document(document)
+      input = document.fetch(:input)
+      actor = input.fetch(:actor)
+      common = { command_id: document.fetch(:command_id),
+        actor: { kind: actor.fetch(:actor_kind), id: actor.fetch(:actor_id) } }
+      case document.fetch(:tool_name)
+      when "skill_publish"
+        common.merge(input.slice(:name, :scope, :expected_revision, :description, :instructions)).merge(
+          assets: input.fetch(:assets).map { _1.slice(:path, :executable).merge(content: content(_1.fetch(:content))) }
+        )
+      when "development_artifact_capture"
+        artifact = input.fetch(:artifact)
+        common.merge(artifact.slice(:scope, :title, :kind, :labels, :source)).merge(content: content(artifact.fetch(:content)))
+      when "development_artifact_relation_declare"
+        relation = input.fetch(:artifact_relation)
+        arguments = common.merge(relation.slice(:source_artifact_id, :relation, :target)).merge(attributes: relation.fetch(:attributes).compact)
+        if input[:supersedes_relation_id]
+          arguments[:supersedes] = { relation_id: input.fetch(:supersedes_relation_id), reason: input.fetch(:supersession_reason) }
+        end
+        arguments
       end
     end
 
     private
 
-    def skill_arguments(document)
-      input = document.input
-      common_arguments(document).merge(
-        name: input.name,
-        scope: input.scope,
-        expected_revision: input.expected_revision,
-        description: input.description,
-        instructions: input.instructions,
-        assets: input.assets.map do |asset|
-          {
-            path: asset.path,
-            executable: asset.executable,
-            content: asset.content.to_h.slice(:encoding, :media_type, :text, :base64)
-          }
-        end
-      )
-    end
-
-    def artifact_arguments(document)
-      artifact = document.input.artifact
-      common_arguments(document).merge(
-        scope: artifact.scope,
-        title: artifact.title,
-        kind: artifact.kind,
-        labels: artifact.labels,
-        content: artifact_content(artifact.content),
-        source: artifact.source.to_h
-      )
-    end
-
-      def artifact_content(content)
-        content.to_h.slice(:encoding, :media_type, :text, :base64)
-      end
-
-    def relation_arguments(document)
-      input = document.input
-      relation = input.artifact_relation
-      arguments = common_arguments(document).merge(
-        source_artifact_id: relation.source_artifact_id,
-        relation: relation.relation,
-        target: relation.target.to_h,
-        attributes: relation.relation_attributes.to_h.compact
-      )
-      if input.supersedes_relation_id
-        arguments[:supersedes] = {
-          relation_id: input.supersedes_relation_id,
-          reason: input.supersession_reason
-        }
-      end
-      arguments
-    end
-
-    def common_arguments(document)
-      actor = document.input.actor
-      {
-        command_id: document.command_id,
-        actor: { kind: actor.actor_kind, id: actor.actor_id }
-      }
+    def content(document)
+      document.slice(:encoding, :media_type, :text, :base64)
     end
   end
 end

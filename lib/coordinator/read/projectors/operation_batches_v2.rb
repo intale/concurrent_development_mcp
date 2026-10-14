@@ -1,67 +1,36 @@
 # frozen_string_literal: true
 
-module Coordinator::Read
-  module Projectors
-    class OperationBatchesV2
-      PROJECTION = ProjectionDefinition.new(name: "operation_batches", version: 2)
-
-      def initialize(
-        contract: Contracts::OperationBatchSourceEvent.new,
-        schema_registry: Coordinator::Write::EventSchemaRegistry.new,
-        batches: Repositories::OperationBatches.new,
-        processed_events: Repositories::ProcessedProjectionEvents.new
-      )
-        @contract = contract
-        @schema_registry = schema_registry
-        @batches = batches
-        @processed_events = processed_events
-      end
-
-      def call(event)
-        validate_source!(event)
-        payload = @schema_registry.load(
-          type: event.type,
-          schema_version: event.metadata.fetch("schema_version"),
-          data: event.data
-        )
-        raise InvalidProjectionSource, "Batch ID does not match source stream" unless payload.batch_id == event.stream.stream_id
-
-        identity = ProjectionEventIdentity.from_event(event)
-        ApplicationRecord.transaction do
-          next unless @processed_events.claim(
-            definition: PROJECTION,
-            identity:,
-            processed_at: event.created_at
-          )
-
-          @batches.store(event:, payload:)
+module Coordinator::Read::Projectors
+  class OperationBatchesV2
+    def call(events)
+      model = Coordinator::Read::OperationBatch
+      model.connection_pool.with_connection do |connection|
+        connection.transaction do
+          headers = Coordinator::Read::Projections::Batches::ColumnPatches.new(identity_columns: [ :batch_id ])
+          items = Coordinator::Read::Projections::Batches::ColumnPatches.new(identity_columns: [ :batch_id, :item_index ])
+          outcomes = Coordinator::Read::Projections::Batches::ColumnPatches.new(identity_columns: [ :batch_id, :item_index ])
+          fold = Coordinator::Read::Projections::OperationBatches.new(headers:, items:, outcomes:, item_sources: item_sources(events))
+          events.each { fold.apply(_1) }
+          [ [ model, headers ], [ Coordinator::Read::OperationBatchItem, items ],
+            [ Coordinator::Read::OperationBatchOutcome, outcomes ] ].each do |table, patches|
+            Coordinator::Read::Repositories::BatchWriter.new(model: table, patches:).call
+          end
         end
-        nil
       end
+      nil
+    end
 
-      private
+    private
 
-      def validate_source!(event)
-        result = @contract.call(
-          event_type: event.type,
-          schema_version: event.metadata["schema_version"],
-          stream_context: event.stream.context,
-          stream_name: event.stream.stream_name,
-          stream_id: event.stream.stream_id,
-          stream_revision: event.stream_revision,
-          global_position: event.global_position,
-          command_id: event.metadata["command_id"],
-          actor_kind: event.metadata["actor_kind"],
-          actor_id: event.metadata["actor_id"],
-          recorded_by: event.metadata["recorded_by"],
-          policy_version: event.metadata["policy_version"],
-          manifest_digest: event.metadata["manifest_digest"],
-          page_size: event.metadata["page_size"],
-          canonical_input_digest: event.metadata["canonical_input_digest"],
-          encoded_byte_size: event.metadata["encoded_byte_size"]
-        )
-        raise InvalidProjectionSource, result.errors.to_h.inspect if result.failure?
-      end
+    def item_sources(events)
+      pairs = events.select { Coordinator::Read::Projections::OperationBatches::OUTCOMES.key?(_1.type) }
+        .map { [ _1.data.fetch("batch_id"), _1.data.fetch("index") ] }.uniq
+      return {} if pairs.empty?
+
+      Coordinator::Read::OperationBatchItem.where([ :batch_id, :item_index ] => pairs)
+        .pluck(:batch_id, :item_index, :command_id, :canonical_input_digest).to_h do |batch, index, command, digest|
+          [ [ batch, index ], { command_id: command, canonical_input_digest: digest } ]
+        end
     end
   end
 end

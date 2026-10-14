@@ -2,7 +2,7 @@
 
 module Coordinator::Read
   module Subscriptions
-    class OperationBatches < Coordinator::Shared::Subscriptions::Registration
+    class OperationBatches < BatchRegistration
       DEFINITION = ReadModelDefinition.new(
         set_name: ReadModelSet::SET_NAME,
         subscription_name: "operation-batches-v2",
@@ -15,6 +15,10 @@ module Coordinator::Read
         event_types: %w[
           OperationBatchCreated
           OperationBatchTargetSelected
+          OperationBatchManifestAccepted
+          OperationBatchSucceededItemsNumberChanged
+          OperationBatchUnsuccessfulItemsNumberChanged
+          OperationBatchOutcomeRecorded
           OperationBatchItemEnqueued
           OperationBatchItemCommandAssigned
           OperationBatchItemExecutionStarted

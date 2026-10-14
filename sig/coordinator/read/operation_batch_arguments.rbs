@@ -1,7 +1,9 @@
 module Coordinator
   module Read
     class OperationBatchArguments
-      def call: (Write::CommandInputDocuments::PublishSkillRevisionV2 | Write::CommandInputDocuments::CaptureDevelopmentArtifactV2 | Write::CommandInputDocuments::DeclareDevelopmentArtifactRelationV1 document) -> Hash[Symbol, untyped]
+      def call: (Hash[String | Symbol, CommandResults::json] document) -> CommandResults::document
+      private
+      def content: (CommandResults::document document) -> CommandResults::document
     end
   end
 end
