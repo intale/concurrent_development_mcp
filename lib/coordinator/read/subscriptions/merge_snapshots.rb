@@ -2,7 +2,7 @@
 
 module Coordinator::Read
   module Subscriptions
-    class MergeSnapshots < Coordinator::Shared::Subscriptions::Registration
+    class MergeSnapshots < BatchRegistration
       DEFINITION = ReadModelDefinition.new(
         set_name: ReadModelSet::SET_NAME,
         subscription_name: "merge-snapshots-v1",

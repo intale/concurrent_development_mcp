@@ -1,5 +1,5 @@
 module Coordinator::Read::Subscriptions
-  class MergeSnapshots < Coordinator::Shared::Subscriptions::Registration
+  class MergeSnapshots < Coordinator::Read::Subscriptions::BatchRegistration
     DEFINITION: ReadModelDefinition
 
     def initialize: (

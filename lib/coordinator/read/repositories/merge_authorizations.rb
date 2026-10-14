@@ -3,37 +3,12 @@
 module Coordinator::Read
   module Repositories
     class MergeAuthorizations
-      include EventTimestamped
-
       def latest_for(merge_snapshot_id)
         record = Coordinator::Read::MergeAuthorization
           .where(merge_snapshot_id:)
           .order(source_global_position: :desc)
           .first
         record && build_view(record)
-      end
-
-      def store(event:, decision:)
-        create_from_event(Coordinator::Read::MergeAuthorization, event:, attributes: {
-          authorization_id: decision.authorization_id,
-          merge_snapshot_id: decision.merge_snapshot_id,
-          outcome: outcome(decision),
-          policy_version: event.metadata.fetch("policy_version"),
-          snapshot_binding: decision.snapshot_binding.to_h,
-          expected_impact_policy: event.metadata["expected_impact_policy"],
-          evaluation: decision.evaluation.to_h,
-          input_digest: event.metadata.fetch("input_digest"),
-          decision_digest: event.metadata.fetch("decision_digest"),
-          decided_at_domain: event.created_at,
-          source_event: event_reference(event).to_h,
-          source_actor: actor(event).to_h,
-          source_markers: event.markers,
-          source_metadata: event.metadata,
-          source_causation_id: event.causation_id,
-          source_correlation_id: event.correlation_id,
-          source_global_position: event.global_position,
-          source_persisted_at: event.created_at
-        })
       end
 
       private
@@ -74,29 +49,6 @@ module Coordinator::Read
           causation_id: record.source_causation_id,
           correlation_id: record.source_correlation_id
         )
-      end
-
-      def actor(event)
-        AttributedActorV1.new(
-          kind: event.metadata.fetch("actor_kind"),
-          id: event.metadata.fetch("actor_id"),
-          authenticated: false
-        )
-      end
-
-      def event_reference(event)
-        Coordinator::Write::EventReference.new(
-          event_id: event.id,
-          type: event.type,
-          stream_context: event.stream.context,
-          stream_name: event.stream.stream_name,
-          stream_id: event.stream.stream_id,
-          stream_revision: event.stream_revision
-        )
-      end
-
-      def outcome(decision)
-        decision.is_a?(Coordinator::Write::Events::MergeAuthorizationGrantedV2) ? "granted" : "denied"
       end
 
       def symbolize(value)

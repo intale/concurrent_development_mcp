@@ -997,12 +997,8 @@ module Coordinator
     register("projectors.merge_snapshots_v1", memoize: true) do
       Read::Projectors::MergeSnapshotsV1.new(
         registration_loader: Read::MergeSnapshots::RegistrationLoader.new(
-          candidate_loader: Read::Candidates::SubmissionLoader.new(event_store: self["event_store"])
-        ),
-        schema_registry: self["event_schema_registry"],
-        snapshots: self["repositories.merge_snapshots"],
-        authorizations: self["repositories.merge_authorizations"],
-        processed_events: self["repositories.processed_projection_events"]
+          event_store: self["event_store"]
+        )
       )
     end
 

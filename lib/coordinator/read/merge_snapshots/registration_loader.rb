@@ -1,69 +1,32 @@
 # frozen_string_literal: true
 
-module Coordinator::Read
-  module MergeSnapshots
-    class RegistrationLoader
-      def initialize(candidate_loader:)
-        @candidate_loader = candidate_loader
+module Coordinator::Read::MergeSnapshots
+  class RegistrationLoader
+    FACT_TYPES = %w[CandidateAssignedToAttempt CandidateAssignedToRepository CandidateTargetBranchSelected
+      CandidateCommitRangeDeclared CandidateChangeManifestCaptured CandidateSubmitted].freeze
+
+    def initialize(event_store:, stream_factory: Coordinator::Write::StreamFactory.new)
+      @event_store, @stream_factory = event_store, stream_factory
+    end
+
+    def call(event)
+      data = Coordinator::Read::CommandResults::Source.document(event.data)
+      members = data.fetch(:ordered_candidates).map do |id|
+        events = @event_store.read(@stream_factory.candidate(id), Coordinator::Write::EventReadCriteria.new(
+          event_types: FACT_TYPES, maximum_count: FACT_TYPES.length, direction: :asc))
+        facts = events.to_h { [ _1.type, _1 ] }
+        attempt = Coordinator::Read::CommandResults::Source.document(facts.fetch("CandidateAssignedToAttempt").data)
+        range = Coordinator::Read::CommandResults::Source.document(facts.fetch("CandidateCommitRangeDeclared").data)
+        { candidate_id: id,
+          **attempt.slice(:change_set_id, :work_item_id, :attempt_id),
+          repository_id: facts.fetch("CandidateAssignedToRepository").data.fetch("repository_id"),
+          target_branch: facts.fetch("CandidateTargetBranchSelected").data.fetch("target_branch"),
+          **range.slice(:object_format, :base_commit_oid, :head_commit_oid),
+          manifest_digest: facts.fetch("CandidateChangeManifestCaptured").metadata.fetch("manifest_digest"),
+          candidate_event: Coordinator::Read::Projections::Source.reference(facts.fetch("CandidateSubmitted")),
+          manifest_event: Coordinator::Read::Projections::Source.reference(facts.fetch("CandidateChangeManifestCaptured")) }
       end
-
-      def call(event, registration:)
-        members = registration.ordered_candidates.map do |candidate_id|
-          candidate = @candidate_loader.call(candidate_id)
-          unless candidate.repository_id == registration.repository_id &&
-                 candidate.target_branch == registration.target_branch &&
-                 candidate.object_format == registration.object_format
-            raise InvalidProjectionSource,
-                  "Merge snapshot Candidate #{candidate_id} does not match its registration"
-          end
-
-          Coordinator::Write::MergeSnapshots::CandidateMemberV1.new(
-            candidate_id: candidate.candidate_id,
-            change_set_id: candidate.change_set_id,
-            work_item_id: candidate.work_item_id,
-            attempt_id: candidate.attempt_id,
-            repository_id: candidate.repository_id,
-            target_branch: candidate.target_branch,
-            object_format: candidate.object_format,
-            base_commit_oid: candidate.base_commit_oid,
-            head_commit_oid: candidate.head_commit_oid,
-            manifest_digest: candidate.manifest_digest,
-            candidate_event: event_reference(candidate.submitted_event),
-            manifest_event: event_reference(candidate.manifest_event)
-          )
-        end
-
-        MergeSnapshotRegistrationViewV2.new(
-          merge_snapshot_id: registration.merge_snapshot_id,
-          repository_id: registration.repository_id,
-          target_branch: registration.target_branch,
-          object_format: registration.object_format,
-          target_base_commit_oid: registration.target_base_commit_oid,
-          ordered_candidates: members,
-          merge_commit_oid: registration.merge_commit_oid,
-          producer: registration.producer,
-          run_id: registration.run_id,
-          produced_at: registration.produced_at,
-          snapshot_digest: event.metadata.fetch("snapshot_digest"),
-          policy_version: event.metadata.fetch("policy_version"),
-          evidence_status: "attributed_unverified"
-        )
-      rescue Dry::Struct::Error, KeyError => error
-        raise InvalidProjectionSource, error.message
-      end
-
-      private
-
-      def event_reference(event)
-        Coordinator::Write::EventReference.new(
-          event_id: event.id,
-          type: event.type,
-          stream_context: event.stream.context,
-          stream_name: event.stream.stream_name,
-          stream_id: event.stream.stream_id,
-          stream_revision: event.stream_revision
-        )
-      end
+      data.merge(ordered_candidates: members)
     end
   end
 end

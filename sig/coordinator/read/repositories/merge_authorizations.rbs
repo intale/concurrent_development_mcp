@@ -1,6 +1,5 @@
 module Coordinator::Read::Repositories
   class MergeAuthorizations
     def latest_for: (String merge_snapshot_id) -> Coordinator::Read::MergeAuthorizationViewV1?
-    def store: (event: PgEventstore::Event, decision: Coordinator::Write::Events::MergeAuthorizationGrantedV2 | Coordinator::Write::Events::MergeAuthorizationDeniedV2) -> Coordinator::Read::MergeAuthorization
   end
 end

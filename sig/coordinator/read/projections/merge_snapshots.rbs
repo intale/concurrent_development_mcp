@@ -1,0 +1,20 @@
+module Coordinator
+  module Read
+    module Projections
+      class MergeSnapshots
+        def initialize: (snapshots: Batches::ColumnPatches, authorizations: Batches::ColumnPatches, ?documents: Hash[String, CommandResults::document]) -> void
+        def apply: (PgEventstore::Event event, ?registration: CommandResults::document?) -> nil
+        private
+        def register: (PgEventstore::Event event, CommandResults::document registration) -> nil
+        def submission: (PgEventstore::Event event, CommandResults::document data) -> nil
+        def verified: (PgEventstore::Event event, CommandResults::document data) -> nil
+        def authorization: (PgEventstore::Event event, CommandResults::document data) -> nil
+        def observation: (PgEventstore::Event event, CommandResults::document data) -> nil
+        def assign: (String id, **CommandResults::json attributes) -> nil
+        def value: (String id, Symbol column, CommandResults::json default) -> CommandResults::json
+        def timestamp: (PgEventstore::Event event) -> String
+        def evidence: (PgEventstore::Event event) -> CommandResults::document
+      end
+    end
+  end
+end

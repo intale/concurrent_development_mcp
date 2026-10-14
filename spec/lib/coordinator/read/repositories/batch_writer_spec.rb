@@ -21,7 +21,8 @@ RSpec.describe Coordinator::Read::Repositories::BatchWriter, :read_model do
   end
 
   it "updates only introduced columns without an incomplete insert or replacing other fields" do
-    row = create(:coordinator_read_repository, paths: [ "/keep" ], remotes: [ "https://keep.test/repo" ])
+    row = create(:coordinator_read_repository, paths: [ "/keep" ], remotes: [ "https://keep.test/repo" ],
+      created_at: event_time - 120, updated_at: event_time - 60)
     original = row.attributes
     patches.assign(repository_id: row.repository_id, display_name: "changed", updated_at: event_time)
 
