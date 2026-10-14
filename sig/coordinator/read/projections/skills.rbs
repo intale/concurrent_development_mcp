@@ -1,0 +1,10 @@
+module Coordinator
+  module Read
+    module Projections
+      class Skills
+        def initialize: (heads: Batches::ColumnPatches, revisions: Batches::ColumnPatches, assets: Batches::ColumnPatches) -> void
+        def apply: (Read::Skills::publication_source source) -> nil
+      end
+    end
+  end
+end

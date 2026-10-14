@@ -1,72 +1,34 @@
 # frozen_string_literal: true
 
-module Coordinator::Read
-  module Projectors
-    class SkillsV1
-      PROJECTION = ProjectionDefinition.new(name: "skills", version: 4)
+module Coordinator::Read::Projectors
+  class SkillsV1
+    def initialize(publication_loader:)
+      @publication_loader = publication_loader
+    end
 
-      def initialize(
-        contract: Contracts::SkillSourceEvent.new,
-        projection_builder:,
-        skills: Repositories::Skills.new,
-        processed_events: Repositories::ProcessedProjectionEvents.new
-      )
-        @contract = contract
-        @projection_builder = projection_builder
-        @skills = skills
-        @processed_events = processed_events
-      end
+    def call(events)
+      latest = events.to_h { [ _1.data.fetch("skill_id"), _1 ] }
+      sources = latest.values.map { @publication_loader.call(_1) }
+      return if sources.empty?
 
-      def call(event)
-        publication = load_publication(event)
-        verify_stream_identity!(event, publication)
-        identity = ProjectionEventIdentity.from_event(event)
-
-        ApplicationRecord.transaction do
-          next unless @processed_events.claim(
-            definition: PROJECTION,
-            identity:,
-            processed_at: event.created_at
-          )
-
-          @skills.store_revision(event:, publication:)
+      models = [ Coordinator::Read::Skill, Coordinator::Read::SkillRevision, Coordinator::Read::SkillAsset ]
+      models.first.connection_pool.with_connection do |connection|
+        connection.transaction do
+          pairs = sources.map { [ _1.fetch(:skill_id), _1.fetch(:revision) ] }
+          models.drop(1).each do |model|
+            model.where(skill_id: latest.keys).where.not([ :skill_id, :revision ] => pairs).delete_all
+          end
+          heads = Coordinator::Read::Projections::Batches::ColumnPatches.new(identity_columns: [ :skill_id ])
+          revisions = Coordinator::Read::Projections::Batches::ColumnPatches.new(identity_columns: [ :skill_id, :revision ])
+          assets = Coordinator::Read::Projections::Batches::ColumnPatches.new(identity_columns: [ :skill_id, :revision, :path ])
+          fold = Coordinator::Read::Projections::Skills.new(heads:, revisions:, assets:)
+          sources.each { fold.apply(_1) }
+          models.zip([ heads, revisions, assets ]).each do |model, patches|
+            Coordinator::Read::Repositories::BatchWriter.new(model:, patches:).call
+          end
         end
-
-        nil
       end
-
-      private
-
-      def load_publication(event)
-        result = @contract.call(
-          event_type: event.type,
-          schema_version: event.metadata["schema_version"],
-          stream_context: event.stream.context,
-          stream_name: event.stream.stream_name,
-          stream_id: event.stream.stream_id,
-          stream_revision: event.stream_revision,
-          global_position: event.global_position,
-          command_id: event.metadata["command_id"],
-          actor_kind: event.metadata["actor_kind"],
-          actor_id: event.metadata["actor_id"],
-          recorded_by: event.metadata["recorded_by"],
-          policy_version: event.metadata["policy_version"]
-        )
-        raise InvalidProjectionSource, result.errors.to_h.inspect if result.failure?
-
-        publication = @projection_builder.call(event)
-        raise InvalidProjectionSource, publication.failure.to_h.inspect if publication.failure?
-
-        publication.value!
-      end
-
-      def verify_stream_identity!(event, publication)
-        matches = event.stream.stream_id == publication.skill_id &&
-                  event.stream_revision == publication.revision
-        return if matches
-
-        raise InvalidProjectionSource, "Skill identity or logical revision does not match its source stream"
-      end
+      nil
     end
   end
 end

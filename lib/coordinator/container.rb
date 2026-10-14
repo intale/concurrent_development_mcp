@@ -972,13 +972,10 @@ module Coordinator
 
     register("projectors.skills_v1", memoize: true) do
       Read::Projectors::SkillsV1.new(
-        projection_builder: Write::Skills::PublicationProjectionBuilderV3.new(
+        publication_loader: Read::Skills::PublicationLoader.new(
           event_store: self["event_store"],
-          schema_registry: self["event_schema_registry"],
           stream_factory: self["stream_factory"]
-        ),
-        skills: self["repositories.skills"],
-        processed_events: self["repositories.processed_projection_events"]
+        )
       )
     end
 

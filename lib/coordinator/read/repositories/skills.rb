@@ -81,108 +81,7 @@ module Coordinator::Read
         )
       end
 
-      def store_revision(event:, publication:)
-        record = Coordinator::Read::Skill.lock.find_by(skill_id: publication.skill_id)
-        verify_identity!(record, publication) if record
-        verify_tuple_owner!(publication)
-        return record if record && publication.revision <= record.revision
-
-        record ||= create_head(event, publication)
-        store_snapshot(event, publication)
-        record.assign_attributes(revision: publication.revision)
-        record.updated_at = [ record.updated_at, event.created_at ].compact.max
-        record.save!(touch: false)
-        record
-      end
-
       private
-
-      def create_head(event, publication)
-        Coordinator::Read::Skill.create!(
-          skill_id: publication.skill_id,
-          name: publication.name,
-          scope: publication.scope,
-          revision: publication.revision,
-          created_at: event.created_at,
-          updated_at: event.created_at
-        )
-      end
-
-      def store_snapshot(event, publication)
-        Coordinator::Read::SkillAsset.where(skill_id: publication.skill_id).delete_all
-        Coordinator::Read::SkillRevision.where(skill_id: publication.skill_id).delete_all
-        snapshot = Coordinator::Read::SkillRevision.create!(
-          revision_attributes(event, publication).merge(
-            created_at: event.created_at,
-            updated_at: event.created_at
-          )
-        )
-        store_assets(event, publication)
-        snapshot
-      end
-
-      def revision_attributes(event, publication)
-        {
-          skill_id: publication.skill_id,
-          revision: publication.revision,
-          description: publication.description,
-          instructions: publication.instructions,
-          content_digest: publication.content_digest,
-          asset_count: publication.assets.length,
-          published_event: event_reference(event).to_h,
-          published_actor: actor(event).to_h,
-          published_markers: event.markers,
-          published_metadata: event.metadata,
-          published_causation_id: event.causation_id,
-          published_correlation_id: event.correlation_id,
-          published_global_position: event.global_position,
-          published_at_domain: publication.published_at,
-          published_at_store: event.created_at
-        }
-      end
-
-      def store_assets(event, publication)
-        return if publication.assets.empty?
-
-        Coordinator::Read::SkillAsset.insert_all!(
-          publication.assets.map do |asset|
-            asset_attributes(asset).merge(
-              skill_id: publication.skill_id,
-              revision: publication.revision,
-              created_at: event.created_at,
-              updated_at: event.created_at
-            )
-          end,
-          record_timestamps: false
-        )
-      end
-
-      def asset_attributes(asset)
-        content = asset.content
-        {
-          path: asset.path,
-          media_type: content.media_type,
-          executable: asset.executable,
-          content_encoding: content.encoding,
-          content_text: content.respond_to?(:text) ? content.text : nil,
-          content_base64: content.respond_to?(:base64) ? content.base64 : nil,
-          content_sha256: content.content_sha256,
-          byte_size: content.byte_size
-        }
-      end
-
-      def verify_identity!(record, publication)
-        return if record.name == publication.name && record.scope == publication.scope
-
-        raise ProjectionStateError, "Skill identity changed within its source stream"
-      end
-
-      def verify_tuple_owner!(publication)
-        owner = Coordinator::Read::Skill.find_by(name: publication.name, scope: publication.scope)
-        return unless owner && owner.skill_id != publication.skill_id
-
-        raise ProjectionStateError, "Skill name and scope tuple belongs to another source stream"
-      end
 
       def revision_for(record, revision)
         Coordinator::Read::SkillRevision.find_by(skill_id: record.skill_id, revision:)
@@ -267,25 +166,6 @@ module Coordinator::Read
           persisted_at: record.published_at_store.utc.iso8601(6),
           causation_id: record.published_causation_id,
           correlation_id: record.published_correlation_id
-        )
-      end
-
-      def actor(event)
-        AttributedActorV1.new(
-          kind: event.metadata.fetch("actor_kind"),
-          id: event.metadata.fetch("actor_id"),
-          authenticated: false
-        )
-      end
-
-      def event_reference(event)
-        Coordinator::Write::EventReference.new(
-          event_id: event.id,
-          type: event.type,
-          stream_context: event.stream.context,
-          stream_name: event.stream.stream_name,
-          stream_id: event.stream.stream_id,
-          stream_revision: event.stream_revision
         )
       end
 

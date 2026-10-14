@@ -1,0 +1,21 @@
+module Coordinator
+  module Read
+    module Skills
+      type publication_source = {
+        skill_id: String, skill_revision_id: String, revision: Integer, name: String, scope: String,
+        description: String, instructions: String, asset_count: Integer,
+        assets: Array[CommandResults::document], content_digest: String, registered_at: Time, published_event: PgEventstore::Event
+      }
+
+      class PublicationLoader
+        REVISION_TYPES: Array[String]
+        ASSET_TYPES: Array[String]
+        def initialize: (event_store: Write::_EventStore, ?stream_factory: Write::StreamFactory) -> void
+        def call: (PgEventstore::Event event) -> publication_source
+        private
+        def facts: (Write::StreamReference stream, Array[String] types, Integer maximum) -> Hash[String, Array[PgEventstore::Event]]
+        def asset: (String id) -> CommandResults::document
+      end
+    end
+  end
+end

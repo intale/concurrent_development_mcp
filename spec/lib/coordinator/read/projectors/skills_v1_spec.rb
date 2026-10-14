@@ -3,7 +3,7 @@
 RSpec.describe Coordinator::Read::Projectors::SkillsV1, :read_model, :event_store do
   subject(:projector) do
     described_class.new(
-      projection_builder: Coordinator::Write::Skills::PublicationProjectionBuilderV3.new(event_store:)
+      publication_loader: Coordinator::Read::Skills::PublicationLoader.new(event_store:)
     )
   end
 
@@ -28,15 +28,15 @@ RSpec.describe Coordinator::Read::Projectors::SkillsV1, :read_model, :event_stor
       content: "{}"
     )
 
-    projector.call(first_event)
-    projector.call(first_event)
+    projector.call([ first_event ])
+    projector.call([ first_event ])
     available = repository.fetch(name: "review", scope: "project:alpha")
     expect(available).to have_attributes(revision: 1, instructions: "Inspect the complete diff.")
     expect(search_items("skill.instructions", "complete diff").map(&:entity_id)).to eq([ identity.skill_id ])
     expect(search_items("skill_asset.path", "scripts/check").length).to eq(1)
 
-    projector.call(second_event)
-    projector.call(second_event)
+    projector.call([ second_event ])
+    projector.call([ second_event ])
 
     current = repository.fetch(name: "review", scope: "project:alpha")
     historical = repository.fetch(name: "review", scope: "project:alpha", revision: 1)
@@ -63,7 +63,7 @@ RSpec.describe Coordinator::Read::Projectors::SkillsV1, :read_model, :event_stor
     expect(Coordinator::Read::Skill.count).to eq(1)
     expect(Coordinator::Read::SkillRevision.count).to eq(1)
     expect(Coordinator::Read::SkillAsset.count).to eq(1)
-    expect(processed_events.count).to eq(2)
+    expect(Coordinator::Read::ProcessedProjectionEvent.count).to eq(0)
     expect(current.to_h.keys & %i[fresh pending projection_status]).to be_empty
     [ Coordinator::Read::Skill, Coordinator::Read::SkillRevision, Coordinator::Read::SkillAsset ].each do |model|
       expect(model.sole.updated_at).to eq(second_event.created_at)
@@ -75,7 +75,7 @@ RSpec.describe Coordinator::Read::Projectors::SkillsV1, :read_model, :event_stor
     expect(matched.retrieval_actions.sole.arguments.revision).to eq(2)
   end
 
-  it "builds the newer granular revision first and never regresses on delayed older delivery" do
+  it "reapplies an earlier publication on rewind without a revision or freshness skip" do
     first_event = publication_event(
       revision: 1,
       instructions: "Inspect the complete diff.",
@@ -89,17 +89,17 @@ RSpec.describe Coordinator::Read::Projectors::SkillsV1, :read_model, :event_stor
       content: "{}"
     )
 
-    projector.call(second_event)
-    projector.call(first_event)
+    projector.call([ second_event ])
+    projector.call([ first_event ])
 
     current = repository.fetch(name: "review", scope: "project:alpha")
     historical = repository.fetch(name: "review", scope: "project:alpha", revision: 1)
-    expect(current).to have_attributes(revision: 2, instructions: "Newest.")
-    expect(historical).to be_nil
-    expect(processed_events.count).to eq(2)
+    expect(current).to have_attributes(revision: 1, instructions: "Inspect the complete diff.")
+    expect(historical).to have_attributes(revision: 1)
+    expect(Coordinator::Read::ProcessedProjectionEvent.count).to eq(0)
     expect(Coordinator::Read::Skill.sole.updated_at).to eq(second_event.created_at)
-    expect(search_items("skill.instructions", "complete diff")).to be_empty
-    expect(search_items("skill.instructions", "Newest").sole.updated_at).to eq(second_event.created_at.utc.iso8601(6))
+    expect(search_items("skill.instructions", "complete diff").sole.updated_at).to eq(second_event.created_at.utc.iso8601(6))
+    expect(search_items("skill.instructions", "Newest")).to be_empty
   end
 
   it "preserves attributed historical policy evidence on a current granular publication" do
@@ -111,7 +111,7 @@ RSpec.describe Coordinator::Read::Projectors::SkillsV1, :read_model, :event_stor
       policy_version: "skill-repository/v1"
     )
 
-    projector.call(event)
+    projector.call([ event ])
 
     expect(repository.fetch(name: "review", scope: "project:alpha")).to have_attributes(
       skill_id: identity.skill_id,
@@ -121,19 +121,47 @@ RSpec.describe Coordinator::Read::Projectors::SkillsV1, :read_model, :event_stor
       .to include("policy_version" => "skill-repository/v1", "schema_version" => 3)
   end
 
-  it "rejects a superseded schema before claiming or creating a projection" do
-    event = publication_event(revision: 1, instructions: "Current.", path: "SKILL.md", content: "Current.")
-    event.metadata = event.metadata.merge("schema_version" => 2)
+  it "folds one Skill's publications to the final delivered state and preserves child identities on redelivery" do
+    first = publication_event(revision: 1, instructions: "First.", path: "scripts/check.sh", content: "First asset.")
+    second = publication_event(revision: 2, instructions: "Second.", path: "SKILL.md", content: "Second asset.")
+    batch = [ first, second ]
 
-    expect { projector.call(event) }.to raise_error(Coordinator::Read::InvalidProjectionSource)
-    expect(Coordinator::Read::Skill.count).to eq(0)
-    expect(processed_events.count).to eq(0)
-    expect do
-      Coordinator::Write::EventSchemaRegistry.new.load(type: "SkillRevisionPublished", schema_version: 2, data: {})
-    end.to raise_error(Coordinator::Write::EventSchemaRegistry::UnknownSchema)
+    projector.call(batch)
+    revision_id = Coordinator::Read::SkillRevision.sole.id
+    asset_id = Coordinator::Read::SkillAsset.sole.id
+    projector.call(batch)
+
+    expect(repository.fetch(name: "review", scope: "project:alpha")).to have_attributes(revision: 2, instructions: "Second.")
+    expect(Coordinator::Read::SkillRevision.sole.id).to eq(revision_id)
+    expect(Coordinator::Read::SkillRevision.sole.asset_count).to eq(1)
+    expect(Coordinator::Read::SkillAsset.sole.id).to eq(asset_id)
+    expect(Coordinator::Read::SkillAsset.sole.content_text).to eq("Second asset.")
+    expect(Coordinator::Read::ProcessedProjectionEvent.count).to eq(0)
   end
 
-  def publication_event(revision:, instructions:, path:, content:, policy_version: "skill-repository/v2")
+  it "removes only superseded revisions for each owner in a mixed-Skill batch" do
+    other = Coordinator::Write::Skills::IdentityBuilder.new.call(name: "other-review", scope: "project:beta")
+    first = publication_event(revision: 1, instructions: "First.", path: "SKILL.md", content: "First asset.")
+    publication_event(revision: 1, instructions: "Old other.", path: "old.md", content: "Old other asset.", skill_identity: other)
+    second = publication_event(revision: 2, instructions: "New other.", path: "new.md", content: "New other asset.", skill_identity: other)
+    first_head = create(:coordinator_read_skill, skill_id: identity.skill_id, name: identity.name, scope: identity.scope)
+    first_revision = create(:coordinator_read_skill_revision, skill: first_head)
+    first_asset = create(:coordinator_read_skill_asset, skill: first_head, path: "SKILL.md")
+    other_head = create(:coordinator_read_skill, skill_id: other.skill_id, name: other.name, scope: other.scope)
+    create(:coordinator_read_skill_revision, skill: other_head)
+    old_asset = create(:coordinator_read_skill_asset, skill: other_head, path: "old.md")
+
+    projector.call([ first, second ])
+
+    expect(Coordinator::Read::SkillRevision.pluck(:skill_id, :revision)).to contain_exactly([ identity.skill_id, 1 ], [ other.skill_id, 2 ])
+    expect(Coordinator::Read::SkillRevision.find(first_revision.id).revision).to eq(1)
+    expect(Coordinator::Read::SkillAsset.find(first_asset.id).content_text).to eq("First asset.")
+    expect(Coordinator::Read::SkillAsset.where(id: old_asset.id)).not_to exist
+    expect(repository.fetch_asset(name: other.name, scope: other.scope, path: "new.md").text).to eq("New other asset.")
+  end
+
+  def publication_event(revision:, instructions:, path:, content:, policy_version: "skill-repository/v2", skill_identity: self.identity)
+    identity = skill_identity
     asset_input = {
       path:,
       executable: false,
@@ -182,6 +210,11 @@ RSpec.describe Coordinator::Read::Projectors::SkillsV1, :read_model, :event_stor
     append_facts(streams.skill_revision(revision_id), [
       events::SkillAssetAddedToRevisionV1.new(skill_revision_id: revision_id, skill_id:, revision:, asset_id:)
     ], metadata)
+    append_facts(streams.skill_revision(revision_id), [
+      events::ProjectionNumbers::SkillRevisionRepresentationRecordedV1.new(skill_revision_id: revision_id)
+    ], Coordinator::Write::Metadata::SkillRevisionRepresentationV1.new(
+      **metadata.to_h, asset_count: revision_content.assets.length
+    ))
     append_facts(streams.skill(skill_id), [
       events::SkillRevisionPublishedV3.new(skill_id:, skill_revision_id: revision_id, revision:)
     ], Coordinator::Write::Metadata::SkillPublicationV3.new(
@@ -196,13 +229,6 @@ RSpec.describe Coordinator::Read::Projectors::SkillsV1, :read_model, :event_stor
       payloads.map do |payload|
         factory.build!(event: payload, event_id: SecureRandom.uuid_v7, metadata:, markers: [])
       end
-    )
-  end
-
-  def processed_events
-    Coordinator::Read::ProcessedProjectionEvent.where(
-      projection_name: "skills",
-      projection_version: 4
     )
   end
 
