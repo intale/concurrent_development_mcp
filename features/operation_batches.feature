@@ -8,6 +8,12 @@ Feature: Bounded command batches for checkpointed agent imports
 
   Rule: A Batch Saga resumes from durable facts and crosses bounded process pages
 
+    @BATCH-PROJECTION-1000 @event-contract
+    Scenario: A maximum-sized import remains observable through native Read batches
+      When the agent imports 1000 independent Skills through one MCP Batch
+      Then the maximum-sized Batch and all Skill projections converge without read-back confirmation loops
+      And Batch number facts record 1000 successes and 0 unsuccessful items
+
     @CDM-BATCH-001 @AUD-BATCH-RESUME-01 @AUD-BATCH-PAGE-REPLAY-04 @event-contract
     Scenario: An import-sized Skill batch resumes after a page-boundary worker restart
       When the agent submits a batch of 51 independent Skill publications

@@ -267,6 +267,52 @@ See [Prometheus OTLP configuration](https://prometheus.io/docs/guides/openteleme
 and [Grafana Tempo provisioning](https://grafana.com/docs/grafana/latest/datasources/tempo/configure-tempo-data-source/provision/)
 for the upstream receiver, translation and correlation conventions.
 
+### Native Read projection batching and historical initialization
+
+All 17 Read-model builders consume native ordered batches (up to 1,000 events).
+They fold only columns introduced by those facts, then combine compatible patches
+into bounded SQL statements in a Read-database transaction. Explicit null clears
+a value; absent columns remain unchanged. Stable child identities prevent duplicate
+rows. Builders do not revalidate immutable facts, maintain a delivery ledger, infer
+a rebuild, reset data, or make availability depend on projection freshness.
+
+For existing EventStore history, an explicit development-only initializer adds
+missing modeled counts and representation metadata using authoritative facts and
+single-stream optimistic concurrency. It does not change Skill logical revisions,
+replace original events, reset Read rows, or rewind ordinary subscriptions. The
+separate seven-subscription set is **not** started by the normal application config.
+Start it once through the public CLI:
+
+```sh
+bundle exec pg-eventstore subscriptions start -r ./config/environment.rb -r ./config/pg_eventstore_projection_initialization.rb -p ./tmp/pids/projection-initialization.pid
+```
+
+Progress-only inspection (read-only SDK queries; no lifecycle mutation):
+
+```sh
+bin/rails runner 'rows = PgEventstore::Subscription.using_connection(:default).subscription_queries.find_all(set: Coordinator::Processes::Subscriptions::ProjectionInitializationSet::SET_NAME); puts(rows.empty? ? "not started" : rows.sort_by { _1.fetch(:name) }.map { "#{_1.fetch(:name)} position=#{_1.fetch(:current_position)} processed=#{_1.fetch(:total_processed_events)}" })'
+```
+
+Positions above are native **subscription positions**, not event global positions.
+Inspect failures and backlog in `/eventstore/subscriptions?set_name=coordinator-projection-initialization-v1`.
+Stop the initializer gracefully with `kill -TERM <PID>` from its project-local
+pidfile. If a Read rebuild is wanted afterward, resetting rows or rewinding an
+ordinary subscription is a **separate operator action**; this initializer does neither.
+Existing-source replay is idempotent, and revision races are retried at most three times.
+Production initialization requires a separately approved operational procedure.
+
+To sample isolated patch persistence, with no other test suites running:
+
+```sh
+COORDINATOR_BENCHMARK_REPORT=1 bin/parallel-rspec-plain -n 1 spec/lib/coordinator/read/repositories/batch_writer_performance_spec.rb
+```
+
+It compares 1,000 individual updates with one compatible bulk patch, reports SQL
+and wall time, allocations, RSS change and cluster-wide WAL upper bounds, and
+executes captured statements once more with `EXPLAIN (ANALYZE, BUFFERS, WAL)` for
+statement-local WAL and trigger measurements. These measurements use test fixtures;
+they do not reset PostgreSQL statistics or enforce host-dependent timing thresholds.
+
 ### Import your development environment
 
 MCP can act as the repository for your development assets, such as AI skills, user decisions, and build state. To import

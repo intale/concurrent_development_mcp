@@ -1,0 +1,7 @@
+module Coordinator::Processes::Subscriptions
+  # Constructor/registration are Rails adapter glue and deliberately unasserted.
+  class ProjectionInitializationSet
+    SET_NAME: String
+    def start: () -> void
+  end
+end

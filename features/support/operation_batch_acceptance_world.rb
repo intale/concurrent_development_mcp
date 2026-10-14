@@ -1,7 +1,7 @@
 # frozen_string_literal: true
 
 module OperationBatchAcceptanceWorld
-  def submit_skill_batch(items, pause_at: nil)
+  def submit_skill_batch(items, pause_at: nil, timeout_seconds: LiveSubscriptions::DEFAULT_TIMEOUT_SECONDS, wait_for_terminal: true)
     @operation_batch_id ||= SecureRandom.uuid_v7
     @submitted_operation_batch_items = JSON.parse(JSON.generate(items))
     @operation_batch_request_id = "cmd-cuc-batch-#{@operation_batch_id}"
@@ -28,8 +28,8 @@ module OperationBatchAcceptanceWorld
     if pause_at
       await_contention_evidence
       @operation_batch_task = task_request("tasks/get", @operation_batch_task_id, client_id: "import-agent")
-    else
-      @operation_batch_task = await_task_terminal(@operation_batch_task_id, client_id: "import-agent")
+    elsif wait_for_terminal
+      @operation_batch_task = await_task_terminal(@operation_batch_task_id, client_id: "import-agent", timeout_seconds:)
     end
   end
 

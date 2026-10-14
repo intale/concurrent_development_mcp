@@ -155,7 +155,8 @@ end
 
 Given("projected knowledge rows contain related parent and child artifacts with a superseded edge") do
   create_knowledge_browser_project
-  create_knowledge_browser_artifact(knowledge_browser_parent_id, "Parent README", "README.md", 2_101)
+  create_knowledge_browser_artifact(knowledge_browser_parent_id, "Parent README", "README.md", 2_101,
+    active_relations_number: 1, lifetime_relations_number: 2)
   create_knowledge_browser_artifact(knowledge_browser_child_id, "Child guide", "docs/guide.md", 2_102)
   create_knowledge_browser_relation("contains", 2_201)
   superseded = create_knowledge_browser_relation("references", 2_202)
@@ -211,7 +212,7 @@ def create_knowledge_browser_project
   )
 end
 
-def create_knowledge_browser_artifact(identifier, title, locator, position)
+def create_knowledge_browser_artifact(identifier, title, locator, position, **attributes)
   artifact = FactoryBot.create(
     :coordinator_read_development_artifact,
     artifact_id: identifier,
@@ -219,7 +220,8 @@ def create_knowledge_browser_artifact(identifier, title, locator, position)
     title:,
     source_locator: locator,
     content_text: "# #{title}",
-    captured_global_position: position
+    captured_global_position: position,
+    **attributes
   )
   FactoryBot.create(
     :coordinator_read_development_artifact_observation,

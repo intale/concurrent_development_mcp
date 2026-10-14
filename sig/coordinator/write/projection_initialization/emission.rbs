@@ -1,0 +1,10 @@
+module Coordinator
+  module Write
+    module ProjectionInitialization
+      class Emission < Coordinator::Shared::Value
+        def event: () -> Events::Base
+        def metadata: () -> EventMetadata
+      end
+    end
+  end
+end

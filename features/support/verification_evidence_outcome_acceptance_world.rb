@@ -134,11 +134,7 @@ module VerificationEvidenceOutcomeAcceptanceWorld
   def verification_obligation_history
     event_store.read(
       streams.verification_obligation(@obligation_id),
-      Coordinator::Write::EventReadCriteria.new(
-        event_types: Coordinator::Read::Contracts::VerificationObligationSourceEvent::EVENT_TYPES,
-        maximum_count: 40,
-        direction: :asc
-      )
+      Coordinator::Write::EventQueries::VERIFICATION_OBLIGATION_OUTCOME
     )
   end
 

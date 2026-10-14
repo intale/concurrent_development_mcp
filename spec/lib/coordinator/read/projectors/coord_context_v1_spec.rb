@@ -162,7 +162,8 @@ RSpec.describe Coordinator::Read::Projectors::CoordContextV1, :read_model, :even
     ActiveSupport::Notifications.subscribed(->(*args) { statements << args.last.fetch(:sql) }, "sql.active_record") { projector.call(events) }
     context_updates = statements.select { _1.start_with?('UPDATE "coordinator_contexts"') }
     expect(context_updates.length).to be_between(1, 20)
-    expect(Coordinator::Read::CoordContext.first.document.fetch("work_items")).to eq(rows.first.fetch(:document).fetch("work_items"))
+    first = Coordinator::Read::CoordContext.find(rows.first.fetch(:change_set_id))
+    expect(first.document.fetch("work_items")).to eq(rows.first.fetch(:document).fetch("work_items"))
     expect(Coordinator::Read::CoordContext.pluck(:document).map { _1.fetch("change_set").fetch("status") }.uniq).to eq([ "active" ])
   end
 

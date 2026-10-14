@@ -1,0 +1,16 @@
+module Coordinator
+  module Write
+    module Domain
+      module ProjectionInitialization
+        class InitializeFacts
+          def call: (command: Commands::InitializeProjectionFacts, state: Coordinator::Write::ProjectionInitialization::SourceState) -> Array[Coordinator::Write::ProjectionInitialization::Emission]
+          private
+          def emission: (Events::Base, metadata: EventMetadata) -> Coordinator::Write::ProjectionInitialization::Emission
+          def batch: (Coordinator::Write::ProjectionInitialization::SourceState, metadata: EventMetadata) -> Array[Coordinator::Write::ProjectionInitialization::Emission]
+          def verification: (Coordinator::Write::ProjectionInitialization::SourceState, metadata: EventMetadata) -> Array[Coordinator::Write::ProjectionInitialization::Emission]
+          def release: (Coordinator::Write::ProjectionInitialization::SourceState, metadata: EventMetadata) -> Array[Coordinator::Write::ProjectionInitialization::Emission]
+        end
+      end
+    end
+  end
+end

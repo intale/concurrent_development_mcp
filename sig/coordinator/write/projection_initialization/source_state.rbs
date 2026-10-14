@@ -1,0 +1,17 @@
+module Coordinator
+  module Write
+    module ProjectionInitialization
+      class SourceState < ::Data
+        def self.new: (definition: Definition, stream: StreamReference, source: PgEventstore::Event,
+          latest_revision: Integer, existing_types: Array[String], history: Array[PgEventstore::Event], corrections_number: Integer) -> SourceState
+        def definition: () -> Definition
+        def stream: () -> StreamReference
+        def source: () -> PgEventstore::Event
+        def latest_revision: () -> Integer
+        def existing_types: () -> Array[String]
+        def history: () -> Array[PgEventstore::Event]
+        def corrections_number: () -> Integer
+      end
+    end
+  end
+end
