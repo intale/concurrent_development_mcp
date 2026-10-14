@@ -1,106 +1,49 @@
 # frozen_string_literal: true
 
-module Coordinator::Read
-  module Projectors
-    class DecisionGovernanceV1
-      PROJECTION = ProjectionDefinition.new(name: "decision_governance", version: 1)
+module Coordinator::Read::Projectors
+  class DecisionGovernanceV1
+    def initialize(source_loader:)
+      @source_loader = source_loader
+    end
 
-      def initialize(
-        contract: Contracts::DecisionGovernanceSourceEvent.new,
-        interpretation_evidence_loader:,
-        schema_registry: Coordinator::Write::EventSchemaRegistry.new,
-        governance: Repositories::DecisionGovernance.new,
-        processed_events: Repositories::ProcessedProjectionEvents.new
-      )
-        @contract = contract
-        @interpretation_evidence_loader = interpretation_evidence_loader
-        @schema_registry = schema_registry
-        @governance = governance
-        @processed_events = processed_events
-      end
-
-      def call(event)
-        payload = load_payload(event)
-        verify_stream_identity!(event, payload)
-        identity = ProjectionEventIdentity.from_event(event)
-
-        ApplicationRecord.transaction do
-          next unless @processed_events.claim(
-            definition: PROJECTION,
-            identity:,
-            processed_at: event.created_at
-          )
-
-          project(event, payload)
+    def call(events)
+      sources = events.uniq(&:id).to_h { [ _1.id, @source_loader.call(_1) ] }
+      model = Coordinator::Read::DecisionDefinition
+      model.connection_pool.with_connection do |connection|
+        connection.transaction do
+          definitions = Coordinator::Read::Projections::Batches::ColumnPatches.new(identity_columns: [ :decision_id ])
+          slots = Coordinator::Read::Projections::Batches::ColumnPatches.new(identity_columns: [ :slot_id ])
+          partitions = Coordinator::Read::Projections::Batches::ColumnPatches.new(identity_columns: [ :partition_id ])
+          fold = Coordinator::Read::Projections::DecisionGovernance.new(definitions:, slots:, partitions:,
+            slot_states: load_slots(events), partition_states: load_partitions(events))
+          events.each { fold.apply(_1, source: sources.fetch(_1.id)) }
+          [ [ model, definitions ], [ Coordinator::Read::DecisionSlotHead, slots ],
+            [ Coordinator::Read::DecisionPartitionHead, partitions ] ].each do |table, patches|
+            Coordinator::Read::Repositories::BatchWriter.new(model: table, patches:).call
+          end
         end
-
-        nil
       end
+      nil
+    end
 
-      private
+    private
 
-      def load_payload(event)
-        result = @contract.call(
-          event_type: event.type,
-          schema_version: event.metadata["schema_version"],
-          stream_context: event.stream.context,
-          stream_name: event.stream.stream_name,
-          stream_id: event.stream.stream_id,
-          stream_revision: event.stream_revision,
-          actor_kind: event.metadata["actor_kind"],
-          actor_id: event.metadata["actor_id"]
-        )
-        raise InvalidProjectionSource, result.errors.to_h.inspect if result.failure?
+    def load_slots(events)
+      ids = events.select { %w[DecisionSlotOpened DecisionSlotHeadChanged].include?(_1.type) }.map { _1.data.fetch("slot_id") }.uniq
+      return {} if ids.empty?
 
-        @schema_registry.load(
-          type: event.type,
-          schema_version: event.metadata.fetch("schema_version"),
-          data: event.data
-        )
+      Coordinator::Read::DecisionSlotHead.where(slot_id: ids).pluck(:slot_id, :decision_id, :slot).to_h do |id, owner, slot|
+        [ id, { decision_id: owner, slot: Coordinator::Read::CommandResults::Source.document(slot) } ]
       end
+    end
 
-      def verify_stream_identity!(event, payload)
-        expected_id = case payload
-        when Coordinator::Write::Events::DecisionRecordedV2,
-             Coordinator::Write::Events::DecisionActivatedV2,
-             Coordinator::Write::Events::DecisionDefinitionCorrectedV2
-          payload.decision_id
-        when Coordinator::Write::Events::DecisionSlotOpenedV2,
-             Coordinator::Write::Events::DecisionSlotHeadChangedV2
-          payload.slot_id
-        when Coordinator::Write::Events::DecisionAddedToPartitionV1,
-             Coordinator::Write::Events::DecisionRemovedFromPartitionV1
-          payload.partition_id
-        end
-        return if event.stream.stream_id == expected_id
+    def load_partitions(events)
+      ids = events.select { %w[DecisionAddedToPartition DecisionRemovedFromPartition].include?(_1.type) }
+        .map { _1.data.fetch("partition_id") }.uniq
+      return {} if ids.empty?
 
-        raise InvalidProjectionSource, "Decision governance identity does not match its source stream"
-      end
-
-      def project(event, payload)
-        case payload
-        when Coordinator::Write::Events::DecisionRecordedV2
-          @governance.store_decision(
-            event:,
-            decision: payload,
-            interpretation: @interpretation_evidence_loader.call(payload.interpretation_id)
-          )
-        when Coordinator::Write::Events::DecisionActivatedV2
-          @governance.activate_decision(event:, activation: payload)
-        when Coordinator::Write::Events::DecisionDefinitionCorrectedV2
-          @governance.correct_decision(
-            event:,
-            correction: payload,
-            interpretation: @interpretation_evidence_loader.call(payload.interpretation_id)
-          )
-        when Coordinator::Write::Events::DecisionSlotOpenedV2
-          @governance.open_slot(event:, opening: payload)
-        when Coordinator::Write::Events::DecisionSlotHeadChangedV2
-          @governance.change_slot_head(event:, change: payload)
-        when Coordinator::Write::Events::DecisionAddedToPartitionV1,
-             Coordinator::Write::Events::DecisionRemovedFromPartitionV1
-          @governance.apply_partition_delta(event:, delta: payload)
-        end
+      Coordinator::Read::DecisionPartitionHead.where(partition_id: ids).pluck(:partition_id, :active_decisions).to_h do |id, entries|
+        [ id, entries.to_h { [ _1.fetch("decision_id"), Coordinator::Read::CommandResults::Source.document(_1) ] } ]
       end
     end
   end

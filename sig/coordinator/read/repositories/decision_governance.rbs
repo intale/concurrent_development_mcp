@@ -5,15 +5,7 @@ module Coordinator
         def fetch: (String decision_id) -> DecisionViewV1?
         def fetch_many: (Array[String] decision_ids) -> Array[DecisionViewV1]
         def page: (DecisionListQueryV1 query) -> DecisionPageV1
-        def partition_observations: (
-          Array[Write::Decisions::DecisionPartitionV1] partitions
-        ) -> Array[DecisionResolution::PartitionObservationV1]
-        def store_decision: (event: PgEventstore::Event, decision: Write::Events::DecisionRecordedV2, interpretation: DecisionInterpretationEvidenceV2) -> DecisionDefinition
-        def activate_decision: (event: PgEventstore::Event, activation: Write::Events::DecisionActivatedV2) -> DecisionDefinition
-        def correct_decision: (event: PgEventstore::Event, correction: Write::Events::DecisionDefinitionCorrectedV2, interpretation: DecisionInterpretationEvidenceV2) -> DecisionDefinition
-        def open_slot: (event: PgEventstore::Event, opening: Write::Events::DecisionSlotOpenedV2) -> DecisionDefinition?
-        def change_slot_head: (event: PgEventstore::Event, change: Write::Events::DecisionSlotHeadChangedV2) -> DecisionDefinition?
-        def apply_partition_delta: (event: PgEventstore::Event, delta: Write::Events::DecisionAddedToPartitionV1 | Write::Events::DecisionRemovedFromPartitionV1) -> DecisionPartitionHead?
+        def partition_observations: (Array[Write::Decisions::DecisionPartitionV1] partitions) -> Array[DecisionResolution::PartitionObservationV1]
       end
     end
   end

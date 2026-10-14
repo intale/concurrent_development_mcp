@@ -3,7 +3,7 @@
 RSpec.describe Coordinator::Read::Projectors::DecisionGovernanceV1, :read_model, :event_store do
   subject(:projector) do
     described_class.new(
-      interpretation_evidence_loader: Coordinator::Read::Decisions::InterpretationEvidenceLoader.new(event_store:)
+      source_loader: Coordinator::Read::Decisions::ProjectionSourceLoader.new(event_store:)
     )
   end
 
@@ -16,8 +16,8 @@ RSpec.describe Coordinator::Read::Projectors::DecisionGovernanceV1, :read_model,
     lifecycle = activation_lifecycle
     recorded = lifecycle.fetch(:recorded)
     activated = lifecycle.fetch(:activated)
-    projector.call(recorded)
-    projector.call(recorded)
+    projector.call([ recorded ])
+    projector.call([ recorded ])
 
     available = repository.fetch("D-project")
     expect(available).to have_attributes(
@@ -30,7 +30,7 @@ RSpec.describe Coordinator::Read::Projectors::DecisionGovernanceV1, :read_model,
       correlation_id:
     )
 
-    lifecycle.fetch(:events).drop(1).each { projector.call(_1); projector.call(_1) }
+    2.times { projector.call(lifecycle.fetch(:events).drop(1)) }
     projected = repository.fetch("D-project")
     expect(projected).to have_attributes(policy_status: "active")
     expect(projected.definition.document).to have_attributes(effect: "prefer", modality: "should")
@@ -43,10 +43,10 @@ RSpec.describe Coordinator::Read::Projectors::DecisionGovernanceV1, :read_model,
       include("decision_id" => "D-project", "decision_revision" => 1)
     )
     expect(Coordinator::Read::DecisionDefinition.count).to eq(1)
-    expect(processed_events.count).to eq(lifecycle.fetch(:events).length)
+    expect(Coordinator::Read::ProcessedProjectionEvent.count).to eq(0)
   end
 
-  it "accumulates ordered membership deltas across decisions and ignores older duplicate delivery" do
+  it "reapplies ordered membership deltas without skipping already projected events" do
     first = activation_lifecycle(
       decision_id: "D-A", interpretation_id: "I-A", message_id: "M-A",
       topic_id: "testing.required_suites", effect: "require", modality: "must",
@@ -57,18 +57,18 @@ RSpec.describe Coordinator::Read::Projectors::DecisionGovernanceV1, :read_model,
       topic_id: "testing.required_suites", effect: "require", modality: "must",
       value: InterpretationInput.string_set(%w[rspec mutation])
     )
-    [ first, second ].each { |lifecycle| lifecycle.fetch(:events).each { projector.call(_1) } }
-    projector.call(first.fetch(:events).last)
+    [ first, second ].each { |lifecycle| projector.call(lifecycle.fetch(:events)) }
+    projector.call([ first.fetch(:events).last ])
 
     partition = Coordinator::Read::DecisionPartitionHead.sole
-    expect(partition).to have_attributes(partition_revision: 1, decision_id: "D-B")
+    expect(partition).to have_attributes(partition_revision: 0, decision_id: "D-A")
     expect(partition.active_decisions.map { _1.fetch("decision_id") }).to eq(%w[D-A D-B])
     expect(partition.updated_at).to eq(second.fetch(:events).last.created_at)
   end
 
   it "moves corrected policy between slots and partitions without withholding the earlier projection" do
     initial = activation_lifecycle
-    initial.fetch(:events).each { projector.call(_1) }
+    projector.call(initial.fetch(:events))
     earlier = repository.fetch("D-project")
     definition = decision_definition(
       interpretation_id: "I-correction", message_id: "M-correction",
@@ -85,8 +85,9 @@ RSpec.describe Coordinator::Read::Projectors::DecisionGovernanceV1, :read_model,
       streams.decision("D-project"), caused_by: initial.fetch(:activated)
     )
     expect(repository.fetch("D-project").definition.digest).to eq(earlier.definition.digest)
-    projector.call(correction)
-    projector.call(correction)
+    number = append_event(Coordinator::Write::Events::ProjectionNumbers::DecisionCorrectionsNumberChangedV1.new(
+      decision_id: "D-project", corrections_number: 1), streams.decision("D-project"), caused_by: correction)
+    2.times { projector.call([ correction, number ]) }
 
     corrected = repository.fetch("D-project")
     expect(corrected).to have_attributes(
@@ -96,7 +97,7 @@ RSpec.describe Coordinator::Read::Projectors::DecisionGovernanceV1, :read_model,
     expect(corrected.definition.document.value.name).to eq("minitest")
     expect(corrected.correction_rationale.code).to eq("corrected")
     expect(corrected.corrected.event.event_id).to eq(correction.id)
-    expect(Coordinator::Read::DecisionDefinition.sole.updated_at).to eq(correction.created_at)
+    expect(Coordinator::Read::DecisionDefinition.sole.updated_at).to eq(number.created_at)
 
     new_slot = Coordinator::Write::Decisions::DecisionSlotBuilder.new.call(definition)
     head = decision_head("D-project", correction)
@@ -109,7 +110,7 @@ RSpec.describe Coordinator::Read::Projectors::DecisionGovernanceV1, :read_model,
       partition_event(initial.fetch(:partitions).sole, "D-project", removed: true),
       partition_event(Coordinator::Write::Decisions::DecisionPartitionBuilder.new.call(definition).sole, "D-project")
     ]
-    changes.each { projector.call(_1); projector.call(_1) }
+    2.times { projector.call(changes) }
     expect(Coordinator::Read::DecisionSlotHead.find(initial.fetch(:slot).slot_id).head).to be_nil
     expect(Coordinator::Read::DecisionSlotHead.find(new_slot.slot_id).decision_id).to eq("D-project")
     expect(repository.fetch("D-project").slot.slot_id).to eq(new_slot.slot_id)
@@ -123,26 +124,67 @@ RSpec.describe Coordinator::Read::Projectors::DecisionGovernanceV1, :read_model,
     expect(new_partition.updated_at).to eq(changes.last.created_at)
   end
 
-  it "rolls back the delivery claim when activation arrives before its recorded projection" do
+  it "updates only activation columns on a factory-created Decision" do
     lifecycle = activation_lifecycle
-    expect { projector.call(lifecycle.fetch(:activated)) }.to raise_error(ActiveRecord::RecordNotFound)
-    expect(processed_events).to be_empty
-    lifecycle.fetch(:events).each { projector.call(_1) }
+    record = create(:coordinator_read_decision_definition, decision_id: "D-project", repository_id:, correction_count: 7)
+    recorded_source = record.recorded_event
+    projector.call([ lifecycle.fetch(:activated) ])
     expect(repository.fetch("D-project").policy_status).to eq("active")
+    expect(record.reload).to have_attributes(correction_count: 7, recorded_event: recorded_source)
+    expect(Coordinator::Read::ProcessedProjectionEvent.count).to eq(0)
   end
 
-  it "rejects mismatched identity and missing interpretation evidence before committing a delivery claim" do
-    definition = decision_definition(interpretation_id: "I-missing", message_id: "M-missing")
-    payload = Coordinator::Write::Events::DecisionRecordedV2.new(
-      decision_id: "D-missing", interpretation_id: "I-missing", source_message_id: "M-missing",
-      definition: definition.document
-    )
-    wrong = append_event(payload, streams.decision("D-other"))
-    expect { projector.call(wrong) }.to raise_error(Coordinator::Read::InvalidProjectionSource, /identity/)
-    missing = append_event(payload, streams.decision("D-missing"))
-    expect { projector.call(missing) }.to raise_error(Coordinator::Read::InvalidProjectionSource, /incomplete/)
-    expect(processed_events).to be_empty
-    expect(Coordinator::Read::DecisionDefinition).not_to exist
+  it "preserves independent lifecycle and absolute count columns when recording facts are replayed" do
+    lifecycle = activation_lifecycle
+    record = create(:coordinator_read_decision_definition, decision_id: "D-project", repository_id:,
+      policy_status: "active", correction_count: 7)
+    projector.call([ lifecycle.fetch(:recorded) ])
+
+    expect(record.reload).to have_attributes(policy_status: "active", correction_count: 7, interpretation_id: "I-project")
+    expect(Coordinator::Read::ProcessedProjectionEvent.count).to eq(0)
+  end
+
+  it "bounds immutable head enrichment by the delivered partition fact rather than a future correction" do
+    initial = activation_lifecycle
+    definition = decision_definition(interpretation_id: "I-later", message_id: "M-later",
+      value: InterpretationInput.named_choice("minitest"),
+      relations: { corrects: [ "D-project" ], supersedes: [], exception_to: [], revokes: [] })
+    persist_interpretation("I-later", "M-later", definition)
+    append_event(Coordinator::Write::Events::DecisionDefinitionCorrectedV2.new(
+      decision_id: "D-project", interpretation_id: "I-later", source_message_id: "M-later",
+      definition: definition.document, rationale: "A later accepted correction."), streams.decision("D-project"))
+
+    projector.call(initial.fetch(:events))
+
+    partition = Coordinator::Read::DecisionPartitionHead.sole
+    expect(partition).to have_attributes(change_kind: "activated")
+    expect(partition.active_decisions.sole.fetch("event").fetch("event_id")).to eq(initial.fetch(:activated).id)
+    expect(repository.fetch("D-project").definition.digest).to eq(initial.fetch(:definition).digest)
+  end
+
+  it "bulk assigns a thousand authoritative counts without calculating from correction rows or prior counters" do
+    rows = Array.new(1000) do |index|
+      attributes_for(:coordinator_read_decision_definition, decision_id: "D-batch-#{index}", repository_id:, correction_count: 99)
+    end
+    Coordinator::Read::DecisionDefinition.insert_all!(rows)
+    events = rows.map.with_index do |row, index|
+      ProjectionEventFactory.build(
+        payload: Coordinator::Write::Events::ProjectionNumbers::DecisionCorrectionsNumberChangedV1.new(
+          decision_id: row.fetch(:decision_id), corrections_number: index),
+        stream: streams.decision(row.fetch(:decision_id)), stream_revision: 10, global_position: index + 2000,
+        policy_version: "decision-governance/v1", actor_kind: "orchestrator", actor_id: "guidance-host")
+    end
+    statements = []
+    ActiveSupport::Notifications.subscribed(->(*args) { statements << args.last.fetch(:sql) }, "sql.active_record") do
+      projector.call(events)
+    end
+
+    expect(statements.count { _1.start_with?("UPDATE") }).to eq(1)
+    expect(statements.count { _1.start_with?("SELECT") && _1.include?('FROM "decision_definitions"') }).to eq(0)
+    expect(Coordinator::Read::DecisionDefinition.order(:correction_count).pluck(:correction_count)).to eq((0...1000).to_a)
+    projector.call(events)
+    expect(Coordinator::Read::DecisionDefinition.sum(:correction_count)).to eq((0...1000).sum)
+    expect(Coordinator::Read::ProcessedProjectionEvent.count).to eq(0)
   end
 
   def activation_lifecycle(decision_id: "D-project", interpretation_id: "I-project", message_id: "M-project",
@@ -232,6 +274,7 @@ RSpec.describe Coordinator::Read::Projectors::DecisionGovernanceV1, :read_model,
   end
 
   def append_event(payload, stream, caused_by: nil, metadata: common_metadata, markers: [])
+    markers |= [ "decision:#{stream.stream_id}" ] if stream.stream_name == "Decision"
     event = Coordinator::Write::EventFactory.new.build!(
       event: payload, event_id: SecureRandom.uuid_v7, metadata:, markers:, caused_by:, correlation_id:
     )
@@ -260,9 +303,5 @@ RSpec.describe Coordinator::Read::Projectors::DecisionGovernanceV1, :read_model,
 
   def repository
     @repository ||= Coordinator::Read::Repositories::DecisionGovernance.new
-  end
-
-  def processed_events
-    Coordinator::Read::ProcessedProjectionEvent.where(projection_name: "decision_governance")
   end
 end

@@ -2,7 +2,7 @@
 
 module Coordinator::Read
   module Subscriptions
-    class DecisionGovernance < Coordinator::Shared::Subscriptions::Registration
+    class DecisionGovernance < BatchRegistration
       DEFINITION = ReadModelDefinition.new(
         set_name: ReadModelSet::SET_NAME,
         subscription_name: "decision-governance-v1",
@@ -12,7 +12,8 @@ module Coordinator::Read
             stream_name:
           )
         end,
-        event_types: Contracts::DecisionGovernanceSourceEvent::EVENT_TYPES
+        event_types: %w[DecisionRecorded DecisionActivated DecisionDefinitionCorrected DecisionCorrectionsNumberChanged
+          DecisionSlotOpened DecisionSlotHeadChanged DecisionAddedToPartition DecisionRemovedFromPartition]
       )
 
       def initialize(handler:, pull_interval: 1.0)

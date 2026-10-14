@@ -1,0 +1,13 @@
+module Coordinator
+  module Read
+    module Decisions
+      class ProjectionSourceLoader
+        def initialize: (event_store: Write::EventStore, ?interpretation_loader: InterpretationEvidenceLoader, ?stream_factory: Write::StreamFactory, ?canonical_json: Shared::CanonicalJson) -> void
+        def call: (PgEventstore::Event event) -> CommandResults::document
+        private
+        def definition_event: (String id, through_revision: Integer) -> PgEventstore::Event?
+        def definition: (Hash[String, CommandResults::json] document) -> CommandResults::document
+      end
+    end
+  end
+end

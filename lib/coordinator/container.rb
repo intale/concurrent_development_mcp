@@ -920,14 +920,7 @@ module Coordinator
 
     register("projectors.decision_governance_v1", memoize: true) do
       Read::Projectors::DecisionGovernanceV1.new(
-        interpretation_evidence_loader: Read::Decisions::InterpretationEvidenceLoader.new(
-          event_store: self["event_store"],
-          schema_registry: self["event_schema_registry"],
-          stream_factory: self["stream_factory"]
-        ),
-        schema_registry: self["event_schema_registry"],
-        governance: self["repositories.decision_governance"],
-        processed_events: self["repositories.processed_projection_events"]
+        source_loader: Read::Decisions::ProjectionSourceLoader.new(event_store: self["event_store"])
       )
     end
 

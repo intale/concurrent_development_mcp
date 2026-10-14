@@ -1,0 +1,18 @@
+module Coordinator
+  module Read
+    module Projections
+      class DecisionGovernance
+        def initialize: (definitions: Batches::ColumnPatches, slots: Batches::ColumnPatches, partitions: Batches::ColumnPatches, ?slot_states: Hash[String, CommandResults::document], ?partition_states: Hash[String, Hash[String, CommandResults::document]], ?slot_builder: DecisionSlots, ?partition_builder: DecisionPartitions) -> void
+        def apply: (PgEventstore::Event event, ?source: CommandResults::document) -> nil
+        private
+        def record: (PgEventstore::Event event, CommandResults::document data, CommandResults::document source) -> nil
+        def correct: (PgEventstore::Event event, CommandResults::document data, CommandResults::document source) -> nil
+        def open_slot: (PgEventstore::Event event, CommandResults::document data) -> nil
+        def slot_head: (PgEventstore::Event event, CommandResults::document data) -> nil
+        def partition_delta: (PgEventstore::Event event, CommandResults::document data, CommandResults::document source) -> nil
+        def lifecycle: (PgEventstore::Event event, Symbol prefix) -> Batches::column_attributes
+        def envelope: (PgEventstore::Event event) -> Batches::column_attributes
+      end
+    end
+  end
+end

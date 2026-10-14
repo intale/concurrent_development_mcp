@@ -2,14 +2,8 @@ module Coordinator
   module Read
     module Decisions
       class InterpretationEvidenceLoader
-        EVENT_TYPES: Array[String]
-
-        def initialize: (
-          event_store: Write::EventStore,
-          ?schema_registry: Write::EventSchemaRegistry,
-          ?stream_factory: Write::StreamFactory
-        ) -> void
-        def call: (String interpretation_id) -> DecisionInterpretationEvidenceV2
+        def initialize: (event_store: Write::EventStore, ?stream_factory: Write::StreamFactory) -> void
+        def call: (String interpretation_id) -> CommandResults::document
       end
     end
   end

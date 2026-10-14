@@ -1,12 +1,5 @@
-module Coordinator
-  module Read
-    module Projectors
-      class DecisionGovernanceV1
-        PROJECTION: ProjectionDefinition
-
-        def initialize: (?contract: Contracts::DecisionGovernanceSourceEvent, interpretation_evidence_loader: Decisions::InterpretationEvidenceLoader, ?schema_registry: Write::EventSchemaRegistry, ?governance: Repositories::DecisionGovernance, ?processed_events: Repositories::ProcessedProjectionEvents) -> void
-        def call: (PgEventstore::Event event) -> void
-      end
-    end
+module Coordinator::Read::Projectors
+  class DecisionGovernanceV1
+    def call: (Array[PgEventstore::Event] events) -> nil
   end
 end

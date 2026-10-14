@@ -1,0 +1,10 @@
+module Coordinator
+  module Read
+    module Projections
+      class DecisionSlots
+        def initialize: (?components: Shared::CanonicalMarkerComponentBuilder, ?canonical_json: Shared::CanonicalJson) -> void
+        def call: (String id, CommandResults::document document) -> CommandResults::document
+      end
+    end
+  end
+end
