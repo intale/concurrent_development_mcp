@@ -2,14 +2,7 @@ module Coordinator
   module Read
     module Projectors
       class DevelopmentArtifactsV1
-        PROJECTION: ProjectionDefinition
-        def initialize: (?contract: Contracts::DevelopmentArtifactSourceEvent, ?schema_registry: Write::EventSchemaRegistry, event_store: Write::_EventStore, ?artifacts: Repositories::DevelopmentArtifacts, ?processed_events: Repositories::ProcessedProjectionEvents) -> void
-        def call: (PgEventstore::Event event) -> void
-
-        private
-
-        def project: (PgEventstore::Event event, Write::Events::Base domain_event, observed_fact: [PgEventstore::Event, Write::Events::Base]?) -> void
-        def resolve_observed_fact: (Write::Events::DevelopmentArtifactObservationFactLinkedV1 link) -> [PgEventstore::Event, Write::Events::Base]
+        def call: (Array[PgEventstore::Event] events) -> nil
       end
     end
   end

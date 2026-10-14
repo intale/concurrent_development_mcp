@@ -11,17 +11,13 @@ module Coordinator::Read
         "GREATEST(#{RELATION_OBSERVED_SEQUENCE_SQL}, " \
         "COALESCE(#{SUPERSESSION_OBSERVED_SEQUENCE_SQL}, 0))"
       OBSERVATION_TABLE_SQL = "development_artifact_observations"
-      ARTIFACT_PROJECTION_COLUMNS = %i[artifact_id stream_revision updated_at].freeze
-      OBSERVATION_PROJECTION_COLUMNS = %i[observation_id artifact_id current_global_position updated_at].freeze
 
       def initialize(
         relation_registry: Coordinator::Shared::DevelopmentArtifactRelationRegistry.new,
-        follow_action: DevelopmentArtifactRelationFollowAction.new,
-        projection_timestamp: ProjectionTimestamp.new
+        follow_action: DevelopmentArtifactRelationFollowAction.new
       )
         @relation_registry = relation_registry
         @follow_action = follow_action
-        @projection_timestamp = projection_timestamp
       end
 
       def fetch(artifact_id, observation_id: nil)
@@ -32,220 +28,6 @@ module Coordinator::Read
         observations = observations.where(observation_id:) if observation_id
         observation = observations.order(observed_global_position: :desc, observation_id: :desc).first
         observation && build_view(artifact, observation)
-      end
-
-      # Granular artifact facts intentionally project one property at a time.
-      # The write-side event data remains cohesive; this repository is the
-      # read-side adapter that folds those facts into the current view.
-      def store_created(event:, created:)
-        record = artifact_projection(created.artifact_id, :captured_event)
-        return record if record.persisted? && record.captured_event.present?
-
-        record.assign_attributes(
-          captured_event: event_reference(event).to_h,
-          captured_actor: actor(event).to_h,
-          captured_markers: event.markers,
-          captured_metadata: event.metadata,
-          captured_causation_id: event.causation_id,
-          captured_correlation_id: event.correlation_id,
-          captured_global_position: event.global_position,
-          captured_at_domain: event.created_at,
-          captured_at_store: event.created_at,
-          stream_revision: [ record.stream_revision.to_i, event.stream_revision ].max
-        )
-        save_projection!(record, event)
-        record
-      end
-
-      def store_property(event:, fact:)
-        record = artifact_projection(fact.artifact_id, *property_columns(fact))
-        attributes = case fact
-        when Coordinator::Write::Events::DevelopmentArtifactScopeChangedV1
-          { scope: fact.scope }
-        when Coordinator::Write::Events::DevelopmentArtifactTitleChangedV1
-          { title: fact.title }
-        when Coordinator::Write::Events::DevelopmentArtifactKindChangedV1
-          { kind: fact.kind }
-        when Coordinator::Write::Events::DevelopmentArtifactLabelAddedV1
-          { labels: (Array(record.labels) | [ fact.label ]).sort }
-        when Coordinator::Write::Events::DevelopmentArtifactLabelRemovedV1
-          { labels: Array(record.labels) - [ fact.label ] }
-        when Coordinator::Write::Events::DevelopmentArtifactSourceChangedV1
-          {
-            source_kind: fact.source_kind,
-            source_locator: fact.locator,
-            source_revision: fact.revision,
-            source_observed_at: fact.observed_at,
-            source_collector: event.metadata["collector"]
-          }
-        when Coordinator::Write::Events::DevelopmentArtifactContentChangedV1
-          {
-            content_encoding: event.metadata.fetch("encoding"),
-            content_media_type: event.metadata.fetch("media_type"),
-            content_text: event.metadata.fetch("encoding") == "utf-8" ? fact.content : nil,
-            content_base64: event.metadata.fetch("encoding") == "binary" ? fact.content : nil,
-            content_sha256: event.metadata.fetch("content_sha256"),
-            content_byte_size: event.metadata.fetch("byte_size")
-          }
-        else
-          raise InvalidProjectionSource, "Unsupported granular Artifact fact #{fact.class.name}"
-        end
-        record.artifact_id = fact.artifact_id
-        record.stream_revision = [ record.stream_revision.to_i, event.stream_revision ].max
-        record.assign_attributes(attributes)
-        save_projection!(record, event)
-        record
-      end
-
-      def store_observation_recorded(event:, recorded:)
-        record = observation_projection(
-          recorded.observation_id, :observed_event, :classified_event, :classification_revision
-        )
-        return record if record.observed_event&.fetch("event_id", nil) == event.id
-
-        attributes = {
-          **observed_evidence_attributes(event, occurred_at: event.created_at),
-          current_global_position: [ record.current_global_position.to_i, event.global_position ].max
-        }
-        if record.classified_event.blank?
-          attributes.merge!(
-            classification_revision: [ record.classification_revision.to_i, 1 ].max,
-            classification_reason: nil,
-            **classified_evidence_attributes(event, occurred_at: event.created_at)
-          )
-        end
-        record.assign_attributes(attributes)
-        save_projection!(record, event)
-        record
-      end
-
-      def store_classification_recorded(event:, correction:)
-        observation_id = correction.observation_id
-        return unless observation_id
-
-        record = observation_projection(
-          observation_id, :classification_revision, :classified_event, :classification_reason
-        )
-        if record.artifact_id && record.artifact_id != correction.artifact_id
-          raise ProjectionStateError, "Artifact classification changed observation identity"
-        end
-        if record.classification_revision > correction.classification_revision
-          return record
-        end
-        if record.classification_revision == correction.classification_revision && record.classified_event
-          return record if record.classification_reason == correction.reason
-
-          raise ProjectionStateError, "Artifact classification revision changed across events"
-        end
-
-        assign_observation_change(
-          record,
-          {
-            artifact_id: correction.artifact_id,
-            classification_revision: correction.classification_revision,
-            classification_reason: correction.reason,
-            **classified_evidence_attributes(event, occurred_at: event.created_at)
-          },
-          global_position: event.global_position,
-          event:
-        )
-      end
-
-      def store_observation_fact_link(event:, link:, observed_fact_event:, observed_fact:)
-        record = observation_projection(link.observation_id, *property_columns(observed_fact))
-        if record.artifact_id && record.artifact_id != link.artifact_id
-          raise ProjectionStateError, "Artifact observation changed identity"
-        end
-
-        link_record = Coordinator::Read::DevelopmentArtifactObservationFactLink
-          .select(:link_event_id).find_or_initialize_by(link_event_id: event.id)
-        return record if link_record.persisted?
-
-        link_record.assign_attributes(
-          observation_id: link.observation_id,
-          artifact_id: link.artifact_id,
-          role: link.role,
-          link_event: event_reference(event).to_h,
-          link_actor: actor(event).to_h,
-          link_markers: event.markers,
-          link_metadata: event.metadata,
-          link_causation_id: event.causation_id,
-          link_correlation_id: event.correlation_id,
-          link_global_position: event.global_position,
-          link_at_domain: event.created_at,
-          link_at_store: event.created_at,
-          observed_fact_event: event_reference(observed_fact_event).to_h,
-          observed_fact_event_id: observed_fact_event.id,
-          observed_fact_data: observed_fact.to_h,
-          observed_fact_metadata: observed_fact_event.metadata,
-          observed_fact_created_at: observed_fact_event.created_at
-        )
-        link_record.updated_at = event.created_at
-        link_record.save!(touch: false)
-
-        record.assign_attributes(artifact_id: link.artifact_id)
-        apply_observed_fact!(record, observed_fact, fact_event: observed_fact_event)
-        record.current_global_position = [ record.current_global_position.to_i, event.global_position ].max
-        save_projection!(record, event)
-        record
-      end
-
-      def store_relation_v2(event:, declaration:)
-        relation = Coordinator::Read::DevelopmentArtifactRelation.find_or_initialize_by(
-          relation_id: declaration.relation_id
-        )
-        relation.assign_attributes(
-          source_artifact_id: declaration.source_artifact_id,
-          relation: declaration.relation,
-          target_kind: declaration.target_kind,
-          target_id: declaration.target_id,
-          target_status: target_status_for(declaration.target_kind),
-          path: declaration.path,
-          fragment: declaration.fragment,
-          normalized_locator: declaration.normalized_locator,
-          declared_event: event_reference(event).to_h,
-          declared_actor: actor(event).to_h,
-          declared_markers: event.markers,
-          declared_metadata: event.metadata,
-          declared_causation_id: event.causation_id,
-          declared_correlation_id: event.correlation_id,
-          declared_global_position: event.global_position,
-          declared_at_domain: event.created_at,
-          declared_at_store: event.created_at
-        )
-        save_projection!(relation, event)
-        relation
-      end
-
-      def store_supersession_v2(event:, supersession:)
-        relation = Coordinator::Read::DevelopmentArtifactRelation.find_by(
-          relation_id: supersession.relation_id
-        )
-        return unless relation
-
-        record = Coordinator::Read::DevelopmentArtifactRelationSupersession.find_or_initialize_by(
-          superseded_relation_id: supersession.relation_id
-        )
-        return record if record.persisted?
-
-        attributes = {
-          source_artifact_id: supersession.source_artifact_id,
-          replacement_relation_id: supersession.replacement_relation_id,
-          reason: supersession.reason,
-          superseded_event: event_reference(event).to_h,
-          superseded_actor: actor(event).to_h,
-          superseded_markers: event.markers,
-          superseded_metadata: event.metadata,
-          superseded_causation_id: event.causation_id,
-          superseded_correlation_id: event.correlation_id,
-          superseded_global_position: event.global_position,
-          superseded_at_domain: event.created_at,
-          superseded_at_store: event.created_at,
-          observed_sequence: next_relation_observed_sequence
-        }
-        record.assign_attributes(attributes)
-        save_projection!(record, event)
-        record
       end
 
       def fetch_content(artifact_id, observation_id: nil)
@@ -568,113 +350,6 @@ module Coordinator::Read
         ).select(:source_artifact_id)
       end
 
-      def observed_evidence_attributes(event, occurred_at:)
-        evidence_attributes(event, prefix: "observed", occurred_at:)
-      end
-
-      # Projection mutations load guards and the property they change, not
-      # unrelated content or provenance. Reading the changed property retains
-      # dirty tracking (especially for an unchanged large content fact).
-      def artifact_projection(artifact_id, *columns)
-        Coordinator::Read::DevelopmentArtifact.select(*ARTIFACT_PROJECTION_COLUMNS, *columns)
-          .find_or_initialize_by(artifact_id:)
-      end
-
-      def observation_projection(observation_id, *columns)
-        Coordinator::Read::DevelopmentArtifactObservation.select(*OBSERVATION_PROJECTION_COLUMNS, *columns)
-          .find_or_initialize_by(observation_id:)
-      end
-
-      def property_columns(fact)
-        case fact
-        when Coordinator::Write::Events::DevelopmentArtifactScopeChangedV1
-          %i[scope]
-        when Coordinator::Write::Events::DevelopmentArtifactTitleChangedV1
-          %i[title]
-        when Coordinator::Write::Events::DevelopmentArtifactKindChangedV1
-          %i[kind]
-        when Coordinator::Write::Events::DevelopmentArtifactLabelAddedV1,
-             Coordinator::Write::Events::DevelopmentArtifactLabelRemovedV1
-          %i[labels]
-        when Coordinator::Write::Events::DevelopmentArtifactSourceChangedV1
-          %i[source_kind source_locator source_revision source_observed_at source_collector]
-        when Coordinator::Write::Events::DevelopmentArtifactContentChangedV1
-          %i[content_encoding content_media_type content_text content_base64 content_sha256 content_byte_size]
-        else
-          []
-        end
-      end
-
-      def classified_evidence_attributes(event, occurred_at:)
-        evidence_attributes(event, prefix: "classified", occurred_at:)
-      end
-
-      def evidence_attributes(event, prefix:, occurred_at:)
-        {
-          "#{prefix}_event": event_reference(event).to_h,
-          "#{prefix}_actor": actor(event).to_h,
-          "#{prefix}_markers": event.markers,
-          "#{prefix}_metadata": event.metadata,
-          "#{prefix}_causation_id": event.causation_id,
-          "#{prefix}_correlation_id": event.correlation_id,
-          "#{prefix}_global_position": event.global_position,
-          "#{prefix}_at_domain": occurred_at,
-          "#{prefix}_at_store": event.created_at
-        }
-      end
-
-      def assign_observation_change(record, attributes, global_position:, event:)
-        attributes[:current_global_position] = [ record.current_global_position.to_i, global_position ].max
-        attributes[:observed_sequence] = next_artifact_observed_sequence if record.persisted?
-        record.assign_attributes(attributes)
-        save_projection!(record, event)
-        record
-      end
-
-      def apply_observed_fact!(record, fact, fact_event:)
-        attributes = case fact
-        when Coordinator::Write::Events::DevelopmentArtifactScopeChangedV1
-          { scope: fact.scope }
-        when Coordinator::Write::Events::DevelopmentArtifactTitleChangedV1
-          { title: fact.title }
-        when Coordinator::Write::Events::DevelopmentArtifactKindChangedV1
-          { kind: fact.kind }
-        when Coordinator::Write::Events::DevelopmentArtifactLabelAddedV1
-          { labels: (Array(record.labels) | [ fact.label ]).sort }
-        when Coordinator::Write::Events::DevelopmentArtifactLabelRemovedV1
-          { labels: Array(record.labels) - [ fact.label ] }
-        when Coordinator::Write::Events::DevelopmentArtifactSourceChangedV1
-          {
-            source_kind: fact.source_kind,
-            source_locator: fact.locator,
-            source_revision: fact.revision,
-            source_observed_at: fact.observed_at,
-            source_collector: fact_event.metadata.fetch("collector")
-          }
-        when Coordinator::Write::Events::DevelopmentArtifactContentChangedV1
-          {
-            content_encoding: fact_event.metadata.fetch("encoding"),
-            content_media_type: fact_event.metadata.fetch("media_type"),
-            content_text: fact_event.metadata.fetch("encoding") == "utf-8" ? fact.content : nil,
-            content_base64: fact_event.metadata.fetch("encoding") == "binary" ? fact.content : nil,
-            content_sha256: fact_event.metadata.fetch("content_sha256"),
-            content_byte_size: fact_event.metadata.fetch("byte_size")
-          }
-        else
-          {}
-        end
-        record.assign_attributes(attributes)
-      end
-
-      def save_projection!(record, event)
-        record.updated_at = @projection_timestamp.call(current: record.updated_at, event:)
-        record.save!(touch: false)
-      end
-
-      def target_status_for(target_kind)
-        target_kind == "external" ? "unverified" : "verified"
-      end
-
       def build_view(record, observation)
         relations = Coordinator::Read::DevelopmentArtifactRelation
           .where(source_artifact_id: record.artifact_id)
@@ -692,8 +367,7 @@ module Coordinator::Read
       end
 
       def build_summary(observation, artifact, relationship_counts: nil)
-        counts = relationship_counts || relationship_capacity_counts([ artifact.artifact_id ])
-          .fetch(artifact.artifact_id)
+        counts = relationship_counts || { active: artifact.active_relations_number, lifetime: artifact.lifetime_relations_number }
         content = observation.content_encoding ? observation : artifact
         DevelopmentArtifactSummaryV1.new(
           artifact_id: artifact.artifact_id,
@@ -808,24 +482,6 @@ module Coordinator::Read
         record[:navigation_superseded] ? record.supersession : nil
       end
 
-      def next_relation_observed_sequence
-        connection = Coordinator::Read::DevelopmentArtifactRelation.connection
-        table = connection.quote(Coordinator::Read::DevelopmentArtifactRelation.table_name)
-        column = connection.quote("observed_sequence")
-        connection.select_value(
-          "SELECT nextval(pg_get_serial_sequence(#{table}, #{column}))"
-        ).to_i
-      end
-
-      def next_artifact_observed_sequence
-        connection = Coordinator::Read::DevelopmentArtifactObservation.connection
-        table = connection.quote(Coordinator::Read::DevelopmentArtifactObservation.table_name)
-        column = connection.quote("observed_sequence")
-        connection.select_value(
-          "SELECT nextval(pg_get_serial_sequence(#{table}, #{column}))"
-        ).to_i
-      end
-
       def summaries_for(artifact_id, relations)
         peer_ids = relations.filter_map do |relation|
           if relation.source_artifact_id == artifact_id
@@ -852,15 +508,9 @@ module Coordinator::Read
       end
 
       def relationship_capacity_counts(artifact_ids)
-        ids = artifact_ids.uniq
-        active = active_relations.where(source_artifact_id: ids).group(:source_artifact_id).count
-        lifetime = Coordinator::Read::DevelopmentArtifactRelation
-          .where(source_artifact_id: ids)
-          .group(:source_artifact_id)
-          .count
-        ids.to_h do |artifact_id|
-          [ artifact_id, { active: active.fetch(artifact_id, 0), lifetime: lifetime.fetch(artifact_id, 0) } ]
-        end
+        Coordinator::Read::DevelopmentArtifact.where(artifact_id: artifact_ids.uniq)
+          .pluck(:artifact_id, :active_relations_number, :lifetime_relations_number)
+          .to_h { |id, active, lifetime| [ id, { active:, lifetime: } ] }
       end
 
       def relationship_capacity(counts)
@@ -937,25 +587,6 @@ module Coordinator::Read
           persisted_at: record.public_send("#{prefix}_at_store").utc.iso8601(6),
           causation_id: record.public_send("#{prefix}_causation_id"),
           correlation_id: record.public_send("#{prefix}_correlation_id")
-        )
-      end
-
-      def actor(event)
-        AttributedActorV1.new(
-          kind: event.metadata.fetch("actor_kind"),
-          id: event.metadata.fetch("actor_id"),
-          authenticated: false
-        )
-      end
-
-      def event_reference(event)
-        Coordinator::Write::EventReference.new(
-          event_id: event.id,
-          type: event.type,
-          stream_context: event.stream.context,
-          stream_name: event.stream.stream_name,
-          stream_id: event.stream.stream_id,
-          stream_revision: event.stream_revision
         )
       end
 

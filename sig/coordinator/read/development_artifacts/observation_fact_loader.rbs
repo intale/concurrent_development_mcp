@@ -1,0 +1,10 @@
+module Coordinator
+  module Read
+    module DevelopmentArtifacts
+      class ObservationFactLoader
+        def initialize: (event_store: Write::EventStore) -> void
+        def call: (CommandResults::document reference) -> PgEventstore::Event?
+      end
+    end
+  end
+end

@@ -18,7 +18,7 @@ RSpec.describe Coordinator::Read::Projectors::DevelopmentArtifactsV1, :read_mode
       position: 9
     )
 
-    projector.call(event)
+    projector.call([ event ])
 
     expect(Coordinator::Read::DevelopmentArtifactObservation.find(observation_id)).to have_attributes(
       observed_actor: {
@@ -58,22 +58,22 @@ RSpec.describe Coordinator::Read::Projectors::DevelopmentArtifactsV1, :read_mode
     )
 
     projector.call(
-      ProjectionEventFactory.build(
+      [ ProjectionEventFactory.build(
         payload: artifact_relation,
         stream: stream_factory.development_artifact_relation(artifact_relation_id),
         stream_revision: 0,
         global_position: 10,
         policy_version: "development-artifact-repository/v2"
-      )
+      ) ]
     )
     projector.call(
-      ProjectionEventFactory.build(
+      [ ProjectionEventFactory.build(
         payload: external_relation,
         stream: stream_factory.development_artifact_relation(external_relation_id),
         stream_revision: 0,
         global_position: 11,
         policy_version: "development-artifact-repository/v2"
-      )
+      ) ]
     )
 
     expect(Coordinator::Read::DevelopmentArtifactRelation.find(artifact_relation_id)).to have_attributes(
@@ -95,8 +95,8 @@ RSpec.describe Coordinator::Read::Projectors::DevelopmentArtifactsV1, :read_mode
     declaration = relation_payload(source: source.artifact_id, target: target.artifact_id)
     relation = relation_event(declaration, revision: 0, position: 300)
 
-    projector.call(relation)
-    projector.call(relation)
+    projector.call([ relation ])
+    projector.call([ relation ])
     expect(repository.fetch(source.artifact_id)).to be_nil
     expect(Coordinator::Read::DevelopmentArtifactRelation.count).to eq(1)
     lagging = relation_query.call(artifact_id: source.artifact_id, direction: "outgoing", limit: 10).value!
@@ -104,7 +104,9 @@ RSpec.describe Coordinator::Read::Projectors::DevelopmentArtifactsV1, :read_mode
     expect(lagging.data.page.items.sole).to have_attributes(peer_artifact: nil)
     expect(lagging.warnings.sole).to include("not yet observed")
 
-    (facts + observations).each { |event| 2.times { projector.call(event) } }
+    (facts + observations).each { |event| 2.times { projector.call([ event ]) } }
+    counts = relation_numbers(source.artifact_id, active: 1, lifetime: 1)
+    projector.call([ counts ])
     view = repository.fetch(source.artifact_id)
     created = facts.first
     expect(view.artifact).to have_attributes(
@@ -130,7 +132,7 @@ RSpec.describe Coordinator::Read::Projectors::DevelopmentArtifactsV1, :read_mode
         arguments: have_attributes(artifact_id: target.artifact_id)
       )
     )
-    expect(processed_events.count).to eq(facts.length + observations.length + 1)
+    expect(processed_events.count).to eq(0)
     expect(view.to_h.keys & %i[fresh pending projection_status]).to be_empty
     expect(Coordinator::Read::DevelopmentArtifactObservation.find(observation.observation_id).updated_at)
       .to eq(observations.last.created_at)
@@ -141,7 +143,7 @@ RSpec.describe Coordinator::Read::Projectors::DevelopmentArtifactsV1, :read_mode
     binary, binary_observation = build_artifact(locator: "profile.bin", binary: true)
     [ [ text, text_observation ], [ binary, binary_observation ] ].each do |artifact, observation|
       facts, links = observation_facts(artifact, observation)
-      (facts + links).each { projector.call(_1) }
+      (facts + links).each { projector.call([ _1 ]) }
     end
 
     expect(repository.fetch_content(text.artifact_id)).to have_attributes(text: "evidence\n", encoding: "utf-8")
@@ -169,9 +171,9 @@ RSpec.describe Coordinator::Read::Projectors::DevelopmentArtifactsV1, :read_mode
       position: 300
     )
 
-    [ declaration, supersession, supersession ].each { projector.call(_1) }
+    [ declaration, supersession, supersession ].each { projector.call([ _1 ]) }
     expect(Coordinator::Read::DevelopmentArtifactRelationSupersession.count).to eq(1)
-    projector.call(relation_event(replacement, revision: 0, position: 400))
+    projector.call([ relation_event(replacement, revision: 0, position: 400) ])
     page = relation_query.call(artifact_id: source_id, direction: "outgoing", include_superseded: true, limit: 10).value!.data.page
     expect(page.items.map(&:status)).to contain_exactly("active", "superseded")
     expect(page.items.find { _1.status == "superseded" }).to have_attributes(
@@ -191,7 +193,7 @@ RSpec.describe Coordinator::Read::Projectors::DevelopmentArtifactsV1, :read_mode
     )
     [ [ first, first_observation ], [ second, second_observation ] ].each do |artifact, observation|
       facts, links = observation_facts(artifact, observation)
-      (facts + links).each { projector.call(_1) }
+      (facts + links).each { projector.call([ _1 ]) }
     end
     events = Coordinator::Write::Events
     artifact_id = second.artifact_id
@@ -207,7 +209,7 @@ RSpec.describe Coordinator::Read::Projectors::DevelopmentArtifactsV1, :read_mode
       )
     ]).sole
     links = link_facts(properties, second_observation.observation_id, artifact_id)
-    (properties + [ correction ] + links).each { |event| 2.times { projector.call(event) } }
+    (properties + [ correction ] + links).each { |event| 2.times { projector.call([ event ]) } }
 
     first_view = repository.fetch(first.artifact_id, observation_id: first_observation.observation_id)
     corrected_view = repository.fetch(second.artifact_id, observation_id: second_observation.observation_id)
@@ -231,7 +233,7 @@ RSpec.describe Coordinator::Read::Projectors::DevelopmentArtifactsV1, :read_mode
     expect(classified.retrieval_actions.first.arguments.observation_id).to eq(second_observation.observation_id)
   end
 
-  it "loads only the changed property and guards while preserving large bodies and provenance" do
+  it "patches only changed properties without loading large bodies or provenance" do
     body = "large passive evidence\n" * 50_000
     timestamp = Time.utc(2026, 1, 1)
     artifact = create(:coordinator_read_development_artifact,
@@ -249,12 +251,12 @@ RSpec.describe Coordinator::Read::Projectors::DevelopmentArtifactsV1, :read_mode
     capture = ->(_name, _start, _finish, _id, payload) { queries << payload.fetch(:sql) }
 
     ActiveSupport::Notifications.subscribed(capture, "sql.active_record") do
-      projector.call(fact)
-      projector.call(link)
+      projector.call([ fact ])
+      projector.call([ link ])
     end
 
     projections = queries.grep(/\ASELECT.*FROM "development_artifact(?:s|_observations|_observation_fact_links)"/)
-    expect(projections.length).to eq(3)
+    expect(projections).to be_empty
     expect(projections.join("\n")).not_to include('.*', '"content_text"', '"content_base64"', '"observed_fact_data"')
     expect(artifact.reload.attributes.slice(*original_artifact.keys)).to eq(original_artifact)
     expect(observation.reload.attributes.slice(*original_observation.keys)).to eq(original_observation)
@@ -262,7 +264,7 @@ RSpec.describe Coordinator::Read::Projectors::DevelopmentArtifactsV1, :read_mode
     expect(observation).to have_attributes(title: "Changed title only", updated_at: link.created_at)
   end
 
-  it "resolves an immutable linked fact before opening the projection transaction and skips its redelivery" do
+  it "resolves trusted immutable facts before the transaction on every delivery, with stable link identity" do
     artifact = create(:coordinator_read_development_artifact)
     observation = create(:coordinator_read_development_artifact_observation, artifact:)
     fact = append_facts(streams.development_artifact(artifact.artifact_id), [
@@ -278,92 +280,98 @@ RSpec.describe Coordinator::Read::Projectors::DevelopmentArtifactsV1, :read_mode
       end
     end
 
-    trace.enable { 2.times { projector.call(link) } }
+    trace.enable { 2.times { projector.call([ link ]) } }
 
-    expect(reads).to eq([ transaction_depth ])
-    expect(processed_events.where(event_id: link.id).count).to eq(1)
+    expect(reads).to eq([ transaction_depth, transaction_depth ])
+    expect(processed_events.where(event_id: link.id).count).to eq(0)
     expect(Coordinator::Read::DevelopmentArtifactObservationFactLink.where(link_event_id: link.id).count).to eq(1)
     expect(observation.reload.title).to eq("Linked title")
   end
 
-  it "rejects an invalid immutable reference before claiming or changing projections" do
+  it "keeps classification corrections and unrelated content when creation is replayed" do
     artifact = create(:coordinator_read_development_artifact)
     observation = create(:coordinator_read_development_artifact_observation, artifact:)
-    reference = Coordinator::Write::EventReference.new(
-      event_id: SecureRandom.uuid_v7, type: "DevelopmentArtifactTitleChanged",
-      stream_context: "DevelopmentMemory", stream_name: "DevelopmentArtifact",
-      stream_id: artifact.artifact_id, stream_revision: 0
-    )
-    link = observation_stream_event(
-      Coordinator::Write::Events::DevelopmentArtifactObservationFactLinkedV1.new(
-        observation_id: observation.observation_id, artifact_id: artifact.artifact_id, role: "title", observed_fact: reference
-      ), observation_id: observation.observation_id, revision: 1, position: 1
-    )
-    original = observation.attributes
-
-    expect { projector.call(link) }.to raise_error(Coordinator::Read::InvalidProjectionSource, /could not be resolved/)
-    expect(processed_events.where(event_id: link.id)).not_to exist
-    expect(Coordinator::Read::DevelopmentArtifactObservationFactLink.where(link_event_id: link.id)).not_to exist
-    expect(observation.reload.attributes).to eq(original)
-  end
-
-  it "rolls back the claim and all link mutations if the observation identity is inconsistent" do
-    artifact = create(:coordinator_read_development_artifact)
-    observation = create(:coordinator_read_development_artifact_observation)
-    fact = append_facts(streams.development_artifact(artifact.artifact_id), [
-      Coordinator::Write::Events::DevelopmentArtifactTitleChangedV1.new(artifact_id: artifact.artifact_id, title: "Wrong identity")
-    ]).sole
-    link = link_facts([ fact ], observation.observation_id, artifact.artifact_id).sole
-    original = observation.attributes
-
-    expect { projector.call(link) }.to raise_error(Coordinator::Read::ProjectionStateError, /changed identity/)
-    expect(processed_events.where(event_id: link.id)).not_to exist
-    expect(Coordinator::Read::DevelopmentArtifactObservationFactLink.where(link_event_id: link.id)).not_to exist
-    expect(observation.reload.attributes).to eq(original)
-  end
-
-  it "atomically folds one link when two first deliveries race after resolving the fact" do
-    artifact = create(:coordinator_read_development_artifact)
-    observation = create(:coordinator_read_development_artifact_observation, artifact:)
-    fact = append_facts(streams.development_artifact(artifact.artifact_id), [
-      Coordinator::Write::Events::DevelopmentArtifactLabelAddedV1.new(artifact_id: artifact.artifact_id, label: "concurrent")
-    ]).sole
-    link = link_facts([ fact ], observation.observation_id, artifact.artifact_id).sole
-    shared_projector = projector
-    entered = Queue.new
-    release = Queue.new
-    trace = TracePoint.new(:call) do |point|
-      if point.defined_class == Coordinator::Read::Repositories::ProcessedProjectionEvents && point.method_id == :claim
-        entered << true
-        release.pop
-      end
-    end
-    workers = []
-    trace.enable
-    workers = 2.times.map do
-      Thread.new { ApplicationRecord.connection_pool.with_connection { shared_projector.call(link) } }
-    end
-    Timeout.timeout(5) { 2.times { entered.pop } }
-    2.times { release << true }
-    workers.each(&:value)
-    trace.disable
-
-    expect(processed_events.where(event_id: link.id).count).to eq(1)
-    expect(Coordinator::Read::DevelopmentArtifactObservationFactLink.where(link_event_id: link.id).count).to eq(1)
-    expect(observation.reload.labels.count("concurrent")).to eq(1)
-  ensure
-    trace&.disable
-    2.times { release << true } if release
-    workers&.each { _1.join(5) }
-  end
-
-  it "rejects superseded relation schema before claiming or writing a projection" do
-    payload = relation_payload(source: SecureRandom.uuid_v7, target: SecureRandom.uuid_v7)
-    event = relation_event(payload, revision: 0, position: 1)
-    event.metadata = event.metadata.merge("schema_version" => 1)
-    expect { projector.call(event) }.to raise_error(Coordinator::Read::InvalidProjectionSource)
+    recorded = observation_stream_event(
+      Coordinator::Write::Events::DevelopmentArtifactObservationRecordedV1.new(observation_id: observation.observation_id),
+      observation_id: observation.observation_id, revision: 0, position: 1)
+    corrected = observation_stream_event(
+      Coordinator::Write::Events::DevelopmentArtifactClassificationCorrectionRecordedV1.new(
+        observation_id: observation.observation_id, artifact_id: artifact.artifact_id, classification_revision: 2, reason: "Correction"),
+      observation_id: observation.observation_id, revision: 7, position: 8)
+    original_content = observation.content_text
+    projector.call([ corrected, recorded ])
+    expect(observation.reload).to have_attributes(classification_revision: 2, classification_reason: "Correction", content_text: original_content)
+    expect(observation.classified_event.fetch("event_id")).to eq(corrected.id)
+    expect(observation.observed_event.fetch("event_id")).to eq(recorded.id)
     expect(processed_events.count).to eq(0)
-    expect(Coordinator::Read::DevelopmentArtifactRelation.count).to eq(0)
+  end
+
+  it "folds mixed label facts in delivered order and keeps stable children on whole-batch redelivery" do
+    artifact = create(:coordinator_read_development_artifact, labels: [ "base" ])
+    observation = create(:coordinator_read_development_artifact_observation, artifact:, labels: [ "base" ])
+    events = append_facts(streams.development_artifact(artifact.artifact_id), [
+      Coordinator::Write::Events::DevelopmentArtifactLabelAddedV1.new(artifact_id: artifact.artifact_id, label: "temporary"),
+      Coordinator::Write::Events::DevelopmentArtifactLabelRemovedV1.new(artifact_id: artifact.artifact_id, label: "temporary"),
+      Coordinator::Write::Events::DevelopmentArtifactLabelAddedV1.new(artifact_id: artifact.artifact_id, label: "final")
+    ])
+    links = link_facts(events, observation.observation_id, artifact.artifact_id)
+    2.times { projector.call([ *events, *links ]) }
+    expect(artifact.reload.labels).to eq(%w[base final])
+    expect(observation.reload.labels).to eq(%w[base final])
+    expect(Coordinator::Read::DevelopmentArtifactObservationFactLink.where(link_event_id: links.map(&:id)).count).to eq(3)
+    expect(processed_events.count).to eq(0)
+  end
+
+  it "replays relation and supersession facts with deterministic cursor identity" do
+    source = SecureRandom.uuid_v7
+    declaration = relation_payload(source:, target: SecureRandom.uuid_v7)
+    declared = relation_event(declaration, revision: 0, position: 5)
+    superseded = relation_event(Coordinator::Write::Events::DevelopmentArtifactRelationSupersededV2.new(
+      relation_id: declaration.relation_id, source_artifact_id: source, replacement_relation_id: nil, reason: "No longer required"),
+      revision: 1, position: 7)
+    2.times { projector.call([ declared, superseded ]) }
+    relation = Coordinator::Read::DevelopmentArtifactRelation.find(declaration.relation_id)
+    supersession = Coordinator::Read::DevelopmentArtifactRelationSupersession.sole
+    expect(relation.observed_sequence).to eq(5)
+    expect(supersession.observed_sequence).to eq(7)
+    expect(Coordinator::Read::DevelopmentArtifactRelation.count).to eq(1)
+    expect(Coordinator::Read::DevelopmentArtifactRelationSupersession.count).to eq(1)
+  end
+
+  it "applies absolute relation numbers without counting sibling relation rows" do
+    artifact = create(:coordinator_read_development_artifact, active_relations_number: 2, lifetime_relations_number: 3)
+    create(:coordinator_read_development_artifact_relation, source_artifact_id: artifact.artifact_id)
+    numbers = relation_numbers(artifact.artifact_id, active: 8, lifetime: 9)
+    2.times { projector.call([ numbers ]) }
+    expect(artifact.reload).to have_attributes(active_relations_number: 8, lifetime_relations_number: 9)
+    expect(Coordinator::Read::DevelopmentArtifactRelation.count).to eq(1)
+  end
+
+  it "bulk patches a thousand titles without loading content or source columns" do
+    rows = Array.new(1000) { attributes_for(:coordinator_read_development_artifact) }
+    Coordinator::Read::DevelopmentArtifact.insert_all!(rows)
+    events = rows.map.with_index do |row, index|
+      ProjectionEventFactory.build(
+        payload: Coordinator::Write::Events::DevelopmentArtifactTitleChangedV1.new(artifact_id: row.fetch(:artifact_id), title: "Batch title"),
+        stream: streams.development_artifact(row.fetch(:artifact_id)), stream_revision: 2, global_position: index + 2000,
+        policy_version: "development-artifact-repository/v2")
+    end
+    statements = []
+    ActiveSupport::Notifications.subscribed(->(*args) { statements << args.last.fetch(:sql) }, "sql.active_record") { projector.call(events) }
+    expect(statements.count { _1.start_with?("UPDATE") }).to eq(1)
+    expect(statements.grep(/SELECT.*development_artifact/)).to be_empty
+    expect(Coordinator::Read::DevelopmentArtifact.where(title: "Batch title").count).to eq(1000)
+    projector.call(events)
+    expect(Coordinator::Read::DevelopmentArtifact.first.content_text).to eq(rows.first.fetch(:content_text))
+  end
+
+  def relation_numbers(artifact_id, active:, lifetime:)
+    id = SecureRandom.uuid_v7
+    ProjectionEventFactory.build(
+      payload: Coordinator::Write::Events::ProjectionNumbers::DevelopmentArtifactRelationsNumberChangedV1.new(
+        artifact_id:, active_relations_number: active, lifetime_relations_number: lifetime),
+      stream: streams.development_artifact_relation_statistics(id), stream_revision: 1, global_position: 1000,
+      policy_version: "projection-numbers/v1")
   end
 
   def build_artifact(

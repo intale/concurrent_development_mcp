@@ -362,7 +362,9 @@ CREATE TABLE public.development_artifacts (
     source_revision text,
     title text,
     updated_at timestamp(6) without time zone NOT NULL,
-    stream_revision bigint DEFAULT 0 NOT NULL
+    stream_revision bigint DEFAULT 0 NOT NULL,
+    active_relations_number integer DEFAULT 0 NOT NULL,
+    lifetime_relations_number integer DEFAULT 0 NOT NULL
 );
 
 
@@ -3438,6 +3440,7 @@ ALTER TABLE ONLY public.operation_batch_outcomes
 SET search_path TO "$user", public;
 
 INSERT INTO "schema_migrations" (version) VALUES
+('20261014125000'),
 ('20261012111000'),
 ('20261011053000'),
 ('20261010105000'),

@@ -90,11 +90,11 @@ RSpec.describe "Observability overhead" do
         global_position: 300 + sample, policy_version: "development-artifact-repository/v2",
         created_at: Time.utc(2026, 8, 30, 12, 1)
       )
-      elapsed, result = measure(enabled) { handler.call(event) }
+      elapsed, result = measure(enabled) { handler.call([ event ]) }
       expect(result).to be_nil
       artifact.reload
       expect(artifact).to have_attributes(title: "Measured title", content_text: body, updated_at: event.created_at)
-      handler.call(event)
+      handler.call([ event ])
       expect(artifact.reload).to have_attributes(title: "Measured title", updated_at: event.created_at)
       elapsed
     end

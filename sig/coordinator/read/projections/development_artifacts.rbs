@@ -1,0 +1,20 @@
+module Coordinator
+  module Read
+    module Projections
+      class DevelopmentArtifacts
+        def initialize: (artifacts: Batches::ColumnPatches, observations: Batches::ColumnPatches, links: Batches::ColumnPatches,
+          relations: Batches::ColumnPatches, supersessions: Batches::ColumnPatches,
+          ?artifact_labels: Hash[String, Array[String]], ?observation_labels: Hash[String, Array[String]]) -> void
+        def apply: (PgEventstore::Event event, ?observed_fact: PgEventstore::Event?) -> nil
+        private
+        def observation: (PgEventstore::Event event, CommandResults::document data) -> nil
+        def classification: (PgEventstore::Event event, CommandResults::document data) -> nil
+        def link: (PgEventstore::Event event, CommandResults::document data, PgEventstore::Event fact) -> nil
+        def seed_observation: (String id, event: PgEventstore::Event, ?defaults: Batches::column_attributes) -> nil
+        def properties: (PgEventstore::Event event, id: String, labels: Hash[String, Array[String]]) -> CommandResults::document
+        def relation: (PgEventstore::Event event, CommandResults::document data) -> nil
+        def supersession: (PgEventstore::Event event, CommandResults::document data) -> nil
+      end
+    end
+  end
+end

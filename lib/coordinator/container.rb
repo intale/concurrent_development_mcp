@@ -969,10 +969,7 @@ module Coordinator
 
     register("projectors.development_artifacts_v1", memoize: true) do
       Read::Projectors::DevelopmentArtifactsV1.new(
-        schema_registry: self["event_schema_registry"],
-        event_store: self["event_store"],
-        artifacts: self["repositories.development_artifacts"],
-        processed_events: self["repositories.processed_projection_events"]
+        event_store: self["event_store"]
       )
     end
 

@@ -34,6 +34,8 @@ FactoryBot.define do
     captured_metadata { { "schema_version" => 1 } }
     sequence(:captured_global_position, 800)
     stream_revision { 0 }
+    active_relations_number { 0 }
+    lifetime_relations_number { 0 }
     captured_at_domain { Time.utc(2026, 8, 30, 12) }
     captured_at_store { Time.utc(2026, 8, 30, 12, 0, 1) }
 

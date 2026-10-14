@@ -2,7 +2,7 @@
 
 module Coordinator::Read
   module Subscriptions
-    class DevelopmentArtifacts < Coordinator::Shared::Subscriptions::Registration
+    class DevelopmentArtifacts < BatchRegistration
       DEFINITION = ReadModelDefinition.new(
         set_name: ReadModelSet::SET_NAME,
         subscription_name: "development-artifacts-v3",
@@ -18,6 +18,10 @@ module Coordinator::Read
           Coordinator::Shared::Subscriptions::StreamFilter.new(
             context: "DevelopmentMemory",
             stream_name: "DevelopmentArtifactRelation"
+          ),
+          Coordinator::Shared::Subscriptions::StreamFilter.new(
+            context: "DevelopmentMemory",
+            stream_name: "DevelopmentArtifactRelationStatistics"
           )
         ],
         event_types: %w[
@@ -34,6 +38,7 @@ module Coordinator::Read
           DevelopmentArtifactClassificationCorrectionRecorded
           DevelopmentArtifactRelationDeclared
           DevelopmentArtifactRelationSuperseded
+          DevelopmentArtifactRelationsNumberChanged
         ]
       )
 
