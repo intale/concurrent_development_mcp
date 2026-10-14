@@ -1,0 +1,11 @@
+module Coordinator
+  module Read
+    module VerificationObligations
+      class DefinitionSource < Data
+        def self.new: (document: CommandResults::document, event: PgEventstore::Event) -> instance
+        attr_reader document: CommandResults::document
+        attr_reader event: PgEventstore::Event
+      end
+    end
+  end
+end

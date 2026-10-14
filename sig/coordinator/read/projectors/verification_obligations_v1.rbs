@@ -2,17 +2,7 @@ module Coordinator
   module Read
     module Projectors
       class VerificationObligationsV1
-        PROJECTION: ProjectionDefinition
-
-        def initialize: (
-          definition_loader: Write::VerificationObligations::DefinitionLoader,
-          outcome_state_loader: Write::VerificationObligations::OutcomeStateLoader,
-          ?contract: Contracts::VerificationObligationSourceEvent,
-          ?schema_registry: Write::EventSchemaRegistry,
-          ?obligations: Repositories::VerificationObligations,
-          ?processed_events: Repositories::ProcessedProjectionEvents
-        ) -> void
-        def call: (PgEventstore::Event event) -> void
+        def call: (Array[PgEventstore::Event] events) -> nil
       end
     end
   end

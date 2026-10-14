@@ -2,7 +2,7 @@
 
 module Coordinator::Read
   module Subscriptions
-    class VerificationObligations < Coordinator::Shared::Subscriptions::Registration
+    class VerificationObligations < BatchRegistration
       DEFINITION = ReadModelDefinition.new(
         set_name: ReadModelSet::SET_NAME,
         subscription_name: "verification-obligations-v1",
@@ -12,7 +12,11 @@ module Coordinator::Read
             stream_name: "VerificationObligation"
           )
         ],
-        event_types: Contracts::VerificationObligationSourceEvent::EVENT_TYPES
+        event_types: %w[VerificationObligationCreated VerificationObligationAddedToChangeSet
+          VerificationObligationSourceCandidateAssigned VerificationObligationTargetCandidateAssigned
+          VerificationObligationClaimed VerificationEvidenceSubmitted VerificationObligationEvidenceSelected
+          VerificationObligationSatisfied VerificationObligationFailed VerificationObligationWaived VerificationObligationInvalidated
+          VerificationObligationEvidenceNumberChanged VerificationObligationEvidenceCoverageChanged]
       )
 
       def initialize(handler:, pull_interval: 1.0)

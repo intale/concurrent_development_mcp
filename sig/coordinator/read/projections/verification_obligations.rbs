@@ -1,0 +1,15 @@
+module Coordinator
+  module Read
+    module Projections
+      class VerificationObligations
+        def initialize: (obligations: Batches::ColumnPatches, evidence_items: Batches::ColumnPatches) -> void
+        def apply: (PgEventstore::Event event, ?definition: Read::VerificationObligations::DefinitionSource?, ?outcome: CommandResults::document?) -> nil
+        private
+        def create: (Read::VerificationObligations::DefinitionSource source) -> nil
+        def claim: (PgEventstore::Event event, CommandResults::document data) -> nil
+        def evidence: (PgEventstore::Event event, CommandResults::document data) -> nil
+        def envelope: (PgEventstore::Event event, prefix: Symbol) -> Hash[Symbol, CommandResults::json | Time]
+      end
+    end
+  end
+end

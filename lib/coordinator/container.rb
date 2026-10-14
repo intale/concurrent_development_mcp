@@ -982,15 +982,9 @@ module Coordinator
 
     register("projectors.verification_obligations_v1", memoize: true) do
       Read::Projectors::VerificationObligationsV1.new(
-        definition_loader: Write::VerificationObligations::DefinitionLoader.new(
+        source_loader: Read::VerificationObligations::SourceLoader.new(
           event_store: self["event_store"]
-        ),
-        outcome_state_loader: Write::VerificationObligations::OutcomeStateLoader.new(
-          event_store: self["event_store"]
-        ),
-        schema_registry: self["event_schema_registry"],
-        obligations: self["repositories.verification_obligations"],
-        processed_events: self["repositories.processed_projection_events"]
+        )
       )
     end
 

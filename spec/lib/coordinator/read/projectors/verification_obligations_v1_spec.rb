@@ -3,8 +3,7 @@
 RSpec.describe Coordinator::Read::Projectors::VerificationObligationsV1, :read_model, :event_store do
   subject(:projector) do
     described_class.new(
-      definition_loader: Coordinator::Write::VerificationObligations::DefinitionLoader.new(event_store:),
-      outcome_state_loader: Coordinator::Write::VerificationObligations::OutcomeStateLoader.new(event_store:)
+      source_loader:
     )
   end
 
@@ -20,17 +19,17 @@ RSpec.describe Coordinator::Read::Projectors::VerificationObligationsV1, :read_m
   it "reconstructs native definition facts idempotently and rebuilds without write-side effects" do
     events = definition_events
     created = events.first
-    loaded = definition_loader.call(obligation_id)
-    events.each { projector.call(_1) }
-    events.each { projector.call(_1) }
+    loaded = source_loader.definition(obligation_id)
+    projector.call(events)
+    projector.call(events)
 
     first = page.items.sole
     expect(first).to have_attributes(
-      obligation_id:, status: "open", claim_state: "unclaimed",
-      source_candidate: loaded.definition.source_candidate,
-      target_candidate: loaded.definition.target_candidate,
-      reasons: loaded.definition.reasons
+      obligation_id:, status: "open", claim_state: "unclaimed"
     )
+    expect(first.source_candidate.to_h).to eq(loaded.document.fetch(:source_candidate))
+    expect(first.target_candidate.to_h).to eq(loaded.document.fetch(:target_candidate))
+    expect(first.reasons.map(&:to_h)).to eq(loaded.document.fetch(:reasons))
     expect(first.evidence).to have_attributes(
       event: event_reference(created), metadata: created.metadata,
       causation_id: created.causation_id, correlation_id: created.correlation_id,
@@ -44,16 +43,16 @@ RSpec.describe Coordinator::Read::Projectors::VerificationObligationsV1, :read_m
 
     original = first.to_h
     ReadModelTestSafety.clean!
-    events.each { projector.call(_1) }
+    projector.call(events)
     expect(page.items.sole.to_h).to eq(original)
   end
 
   it "projects native fenced claims, expiry and reclaim without changing the creation cursor" do
     created = definition_events.first
-    projector.call(created)
+    projector.call([ created ])
     first = claim_event(agent_id: "agent-blue", fencing_token: 1)
-    projector.call(first)
-    projector.call(first)
+    projector.call([ first ])
+    projector.call([ first ])
     expiry = event_payload(first).expires_at
     active = page(observed_at: timestamp(first)).items.sole
     expect(active).to have_attributes(status: "open", claim_state: "active")
@@ -64,22 +63,22 @@ RSpec.describe Coordinator::Read::Projectors::VerificationObligationsV1, :read_m
     expect(page(observed_at: expiry).items.sole.claim_state).to eq("expired")
 
     second = claim_event(agent_id: "agent-green", fencing_token: 2, expires_at: Time.iso8601(expiry) + 300)
-    projector.call(second)
-    projector.call(first)
+    projector.call([ second ])
     reclaimed = page(observed_at: expiry).items.sole
     expect(reclaimed.claim).to have_attributes(claimant_id: "agent-green", fencing_token: 2)
     expect(reclaimed.claim_state).to eq("active")
     expect(reclaimed.claim.evidence.event).to eq(event_reference(second))
   end
 
-  it "rolls back an out-of-order claim and accepts redelivery after definition projection" do
-    created = definition_events.first
-    claim = claim_event
-    expect { projector.call(claim) }.to raise_error(Coordinator::Read::InvalidProjectionSource, /cannot precede/)
-    expect(Coordinator::Read::ProcessedProjectionEvent.where(event_id: claim.id)).not_to exist
-    projector.call(created)
-    projector.call(claim)
-    expect(page.items.sole.claim.claim_id).to eq(event_payload(claim).claim_id)
+  it "patches claims in delivered order without a revision skip or independent-column replacement" do
+    record = create(:coordinator_read_verification_obligation, obligation_id:, change_set_id:)
+    first = claim_event(agent_id: "agent-blue", fencing_token: 1)
+    second = claim_event(agent_id: "agent-green", fencing_token: 2)
+    original = record.obligation
+    projector.call([ second, first ])
+    expect(record.reload.claimant_id).to eq("agent-blue")
+    expect(record.obligation).to eq(original)
+    expect(Coordinator::Read::ProcessedProjectionEvent.count).to eq(0)
   end
 
   it "keeps partial evidence available and reconstructs selected native satisfaction on rebuild" do
@@ -90,8 +89,9 @@ RSpec.describe Coordinator::Read::Projectors::VerificationObligationsV1, :read_m
     selections = [ first, second ].map { selection_event(event_payload(_1).evidence_id) }
     satisfied = outcome_event("satisfied")
 
-    [ *events, claim, first ].each { projector.call(_1) }
-    projector.call(first)
+    partial_progress = progress_events(count: 1, passed: [ "combined_tests" ], missing: [ "contract_compatibility_review" ])
+    projector.call([ *events, claim, first, *partial_progress ])
+    projector.call([ first ])
     partial = page.items.sole
     expect(partial).to have_attributes(status: "open", outcome: nil)
     expect(partial.progress).to have_attributes(
@@ -100,10 +100,11 @@ RSpec.describe Coordinator::Read::Projectors::VerificationObligationsV1, :read_m
     )
     expect(partial.submitted_evidence.sole).to have_attributes(
       assessment_input_digest: first.metadata.fetch("assessment_input_digest"),
-      submitted_at: timestamp(first), source_candidate: definition_loader.call(obligation_id).definition.source_candidate
+      submitted_at: timestamp(first), source_candidate: Coordinator::Write::CandidateObligations::CandidateSubjectV1.new(source_loader.definition(obligation_id).document.fetch(:source_candidate))
     )
 
-    [ second, *selections, satisfied ].each { projector.call(_1) }
+    complete_progress = progress_events(count: 2, passed: %w[combined_tests contract_compatibility_review], missing: [])
+    projector.call([ second, *complete_progress, *selections, satisfied ])
     observed = page(status: "satisfied").items.sole
     expect(observed.outcome).to have_attributes(
       satisfied_at: timestamp(satisfied), outcome_digest: satisfied.metadata.fetch("outcome_digest")
@@ -116,7 +117,7 @@ RSpec.describe Coordinator::Read::Projectors::VerificationObligationsV1, :read_m
 
     original = observed.to_h
     ReadModelTestSafety.clean!
-    [ *events, claim, first, second, *selections, satisfied ].each { projector.call(_1) }
+    projector.call([ *events, claim, first, *partial_progress, second, *complete_progress, *selections, satisfied ])
     expect(page(status: "satisfied").items.sole.to_h).to eq(original)
   end
 
@@ -126,7 +127,7 @@ RSpec.describe Coordinator::Read::Projectors::VerificationObligationsV1, :read_m
     failed = evidence_event(claim:, evidence_kind: "combined_tests", conclusion: "failed")
     selected = selection_event(event_payload(failed).evidence_id)
     terminal = outcome_event("failed")
-    [ created, claim, failed, selected, terminal ].each { projector.call(_1) }
+    projector.call([ created, claim, failed, selected, terminal ])
     view = page(status: "failed").items.sole
     expect(view.outcome).to be_a(Coordinator::Read::VerificationObligationFailedViewV1)
     expect(view.outcome.triggering_evidence.event).to eq(event_reference(failed))
@@ -134,14 +135,21 @@ RSpec.describe Coordinator::Read::Projectors::VerificationObligationsV1, :read_m
     expect(view.progress.missing_evidence_kinds).to include("combined_tests")
   end
 
-  it "rolls back the idempotency claim when outcome source evidence is missing" do
-    created = definition_events.first
-    projector.call(created)
-    selection_event(SecureRandom.uuid_v7)
-    terminal = outcome_event("satisfied")
-    expect { projector.call(terminal) }.to raise_error(Coordinator::Read::InvalidProjectionSource, /missing evidence/)
-    expect(Coordinator::Read::ProcessedProjectionEvent.where(event_id: terminal.id)).not_to exist
-    expect(page.items.sole.status).to eq("open")
+  it "does not derive progress from evidence rows and preserves explicit absolute facts on redelivery" do
+    record = create(:coordinator_read_verification_obligation, obligation_id:, change_set_id:, evidence_count: 7)
+    claim = claim_event
+    submitted = evidence_event(claim:, evidence_kind: "combined_tests", conclusion: "passed")
+    projector.call([ submitted, submitted ])
+    expect(record.reload.evidence_count).to eq(7)
+    expect(Coordinator::Read::VerificationObligationEvidenceItem.count).to eq(1)
+    created_at = Coordinator::Read::VerificationObligationEvidenceItem.sole.created_at
+    progress = progress_events(count: 1, passed: [ "combined_tests" ], missing: [])
+    2.times { projector.call(progress) }
+    expect(record.reload.evidence_count).to eq(1)
+    expect(record.passed_evidence_kinds).to eq([ "combined_tests" ])
+    projector.call([ submitted ])
+    expect(record.reload.evidence_count).to eq(1)
+    expect(Coordinator::Read::VerificationObligationEvidenceItem.sole.created_at).to eq(created_at)
   end
 
   it "serves a projected waiver while invalidation lags and then rebuilds its native lifecycle" do
@@ -154,7 +162,7 @@ RSpec.describe Coordinator::Read::Projectors::VerificationObligationsV1, :read_m
         policy: impact_policy(required_evidence: event_payload(events.first).required_evidence).to_h, waiver_input_digest: digest("a")
       ), caused_by: events.first
     )
-    policy = definition_loader.call(obligation_id).definition.policy
+    policy = impact_policy(required_evidence: %w[combined_tests contract_compatibility_review])
     invalidated = append_obligation(
       Coordinator::Write::Events::VerificationObligationInvalidatedV2.new(
         obligation_id:, superseding_partition_event: policy.partition_event.new(
@@ -166,11 +174,11 @@ RSpec.describe Coordinator::Read::Projectors::VerificationObligationsV1, :read_m
           invalidated_policy: policy.to_h, invalidation_digest: digest("b"), rule_version: "verification-obligation-validity/v1"
         ), caused_by: waived
     )
-    [ *events, waived ].each { projector.call(_1) }
+    projector.call([ *events, waived ])
     expect(page(status: "waived").items.sole.outcome).to have_attributes(
       previous_status: "open", waived_at: timestamp(waived)
     )
-    projector.call(invalidated)
+    projector.call([ invalidated ])
     observed = page(status: "invalidated").items.sole
     expect(observed.outcome).to have_attributes(
       previous_status: "waived", previous_terminal_event: event_reference(waived),
@@ -178,18 +186,50 @@ RSpec.describe Coordinator::Read::Projectors::VerificationObligationsV1, :read_m
     )
     original = observed.to_h
     ReadModelTestSafety.clean!
-    [ *events, waived, invalidated ].each { projector.call(_1) }
+    projector.call([ *events, waived, invalidated ])
     expect(page(status: "invalidated").items.sole.to_h).to eq(original)
   end
 
-  it "does not record processing when a native definition is incomplete" do
-    created = definition_events(complete: false).first
-    expect { projector.call(created) }.to raise_error(Coordinator::Write::VerificationObligations::InvalidHistory, /incomplete/)
-    expect(Coordinator::Read::ProcessedProjectionEvent.where(event_id: created.id)).not_to exist
-    expect(Coordinator::Read::VerificationObligation).not_to exist
-    append_definition_assignments.each { projector.call(_1) }
-    projector.call(created)
-    expect(page.items.sole.obligation_id).to eq(obligation_id)
+  it "replays creation and terminal facts without resetting independent progress or claims" do
+    events = definition_events
+    claim = claim_event
+    waiver = append_obligation(
+      Coordinator::Write::Events::VerificationObligationWaivedV2.new(
+        obligation_id:, reason: { code: "accepted_risk", summary: "Accepted compatibility risk." }),
+      metadata: metadata("verification-obligation-waiver/v2", actor_kind: "user", actor_id: "project-owner").merge(
+        policy: impact_policy(required_evidence: %w[combined_tests contract_compatibility_review]).to_h, waiver_input_digest: digest("a")))
+    projector.call([ *events, claim, *progress_events(count: 3, passed: [ "combined_tests" ], missing: [ "contract_compatibility_review" ]), waiver ])
+    2.times { projector.call([ events.first, waiver ]) }
+    record = Coordinator::Read::VerificationObligation.find(obligation_id)
+    expect(record).to have_attributes(status: "waived", evidence_count: 3, claim_id: event_payload(claim).claim_id)
+    expect(record.terminal_outcome.fetch("previous_status")).to eq("open")
+    expect(Coordinator::Read::ProcessedProjectionEvent.count).to eq(0)
+  end
+
+  it "bulk patches a thousand absolute progress facts without counting evidence or loading unrelated state" do
+    rows = Array.new(1000) { |index| attributes_for(:coordinator_read_verification_obligation, obligation_id: SecureRandom.uuid_v7, change_set_id: "CS-batch-#{index}") }
+    Coordinator::Read::VerificationObligation.insert_all!(rows)
+    events = rows.map.with_index do |row, index|
+      ProjectionEventFactory.build(
+        payload: Coordinator::Write::Events::ProjectionNumbers::VerificationObligationEvidenceNumberChangedV1.new(obligation_id: row.fetch(:obligation_id), evidence_number: 2),
+        stream: streams.verification_obligation(row.fetch(:obligation_id)), stream_revision: 10, global_position: index + 2000,
+        policy_version: "projection-numbers/v1")
+    end
+    statements = []
+    ActiveSupport::Notifications.subscribed(->(*args) { statements << args.last.fetch(:sql) }, "sql.active_record") { projector.call(events) }
+    expect(statements.count { _1.start_with?("UPDATE") }).to eq(1)
+    expect(statements.grep(/SELECT.*verification_obligation/)).to be_empty
+    expect(Coordinator::Read::VerificationObligation.where(evidence_count: 2).count).to eq(1000)
+    projector.call(events)
+    expect(Coordinator::Read::VerificationObligation.first.obligation).to eq(rows.first.fetch(:obligation))
+    expect(Coordinator::Read::ProcessedProjectionEvent.count).to eq(0)
+  end
+
+  def progress_events(count:, passed:, missing:)
+    [
+      Coordinator::Write::Events::ProjectionNumbers::VerificationObligationEvidenceNumberChangedV1.new(obligation_id:, evidence_number: count),
+      Coordinator::Write::Events::ProjectionNumbers::VerificationObligationEvidenceCoverageChangedV1.new(obligation_id:, passed_evidence_kinds: passed, missing_evidence_kinds: missing)
+    ].map { append_obligation(_1, metadata: metadata("projection-numbers/v1")) }
   end
 
   def definition_events(complete: true)
@@ -291,7 +331,7 @@ RSpec.describe Coordinator::Read::Projectors::VerificationObligationsV1, :read_m
       claim: { claim_id: claim_payload.claim_id, claimant_id: claim_payload.claimant_id,
         fencing_token: claim_payload.fencing_token, claim_event: event_reference(claim) }
     ), metadata: metadata("compatibility-assessment/v2").merge(
-      policy: definition_loader.call(obligation_id).definition.policy.to_h,
+      policy: impact_policy(required_evidence: %w[combined_tests contract_compatibility_review]).to_h,
       obligation_validity_input_digest: digest("1"), assessment_input_digest: input_digest
     ), caused_by: claim)
   end
@@ -311,7 +351,7 @@ RSpec.describe Coordinator::Read::Projectors::VerificationObligationsV1, :read_m
     end
     append_obligation(fact, metadata: metadata("verification-obligation-outcome/v2",
       actor_kind: "system", actor_id: "verification-evidence-outcome").merge(
-        outcome_digest: digest("8"), policy: definition_loader.call(obligation_id).definition.policy.to_h
+        outcome_digest: digest("8"), policy: impact_policy(required_evidence: %w[combined_tests contract_compatibility_review]).to_h
       ))
   end
 
@@ -351,8 +391,8 @@ RSpec.describe Coordinator::Read::Projectors::VerificationObligationsV1, :read_m
     ]).sole
   end
 
-  def definition_loader
-    Coordinator::Write::VerificationObligations::DefinitionLoader.new(event_store:)
+  def source_loader
+    Coordinator::Read::VerificationObligations::SourceLoader.new(event_store:)
   end
 
   def timestamp(event)

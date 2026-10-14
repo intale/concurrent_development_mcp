@@ -1,0 +1,25 @@
+module Coordinator
+  module Read
+    module VerificationObligations
+      class SourceLoader
+        DEFINITION_TYPES: Array[String]
+        CANDIDATE_TYPES: Array[String]
+        TERMINAL_TYPES: Array[String]
+        OUTCOME_TYPES: Array[String]
+        def initialize: (event_store: Write::EventStore, ?stream_factory: Write::StreamFactory) -> void
+        def definition: (String obligation_id) -> DefinitionSource
+        def outcome: (PgEventstore::Event event, definition: DefinitionSource) -> CommandResults::document
+        private
+        def candidate: (String id) -> CommandResults::document
+        def reason: (String kind, source: CommandResults::document, target: CommandResults::document) -> CommandResults::document?
+        def changed_paths: (CommandResults::document candidate) -> Array[String]
+        def impact_keys: (CommandResults::document surface, Array[Symbol] directions) -> Array[String]
+        def decision_reference: (PgEventstore::Event event) -> CommandResults::document
+        def document: (CommandResults::json value) -> CommandResults::json
+        def reference: (PgEventstore::Event event) -> CommandResults::document
+        def timestamp: (PgEventstore::Event event) -> String
+        def status: (PgEventstore::Event event) -> String
+      end
+    end
+  end
+end
