@@ -1,0 +1,1 @@
+# Rails SQL adapter: mirror its source path, deliberately omit framework signatures.

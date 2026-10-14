@@ -1,0 +1,5 @@
+module Coordinator::Read::Subscriptions
+  class BatchRegistration < Coordinator::Shared::Subscriptions::Registration
+    def initialize: (definition: ReadModelDefinition, handler: Coordinator::Shared::_BatchSubscriptionHandler, ?pull_interval: Integer | Float) -> void
+  end
+end

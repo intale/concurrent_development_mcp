@@ -2,7 +2,7 @@
 
 module Coordinator::Read
   module Subscriptions
-    class WorkIntentionRenewals < Coordinator::Shared::Subscriptions::Registration
+    class WorkIntentionRenewals < BatchRegistration
       DEFINITION = ReadModelDefinition.new(set_name: ReadModelSet::SET_NAME,
         subscription_name: "work-intention-renewals-v1",
         streams: [ Coordinator::Shared::Subscriptions::StreamFilter.new(context: "DevelopmentCoordination", stream_name: "WorkIntentionSetRenewal") ],

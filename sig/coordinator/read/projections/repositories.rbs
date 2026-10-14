@@ -1,0 +1,9 @@
+module Coordinator::Read::Projections
+  class Repositories
+    def initialize: (patches: Batches::ColumnPatches, ?paths: Hash[String, Array[String]], ?remotes: Hash[String, Array[String]]) -> void
+    def apply: (PgEventstore::Event event) -> nil
+
+    private
+    def change_membership: (Hash[String, Array[String]] collections, Batches::column_attributes identity, Symbol column, String value, added: bool) -> nil
+  end
+end

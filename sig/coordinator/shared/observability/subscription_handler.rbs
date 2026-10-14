@@ -10,10 +10,6 @@ module Coordinator
 
         def initialize: (definition: _SubscriptionDescriptor, handler: _EventHandler[Result]) -> void
         def call: (PgEventstore::Event event) -> Result
-
-        private
-        def observe: (Session session, Hash[String, String] attributes, PgEventstore::Event event) -> void
-        def outcome: [T] (T result) -> String
       end
     end
   end

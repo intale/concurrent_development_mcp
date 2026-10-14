@@ -19,14 +19,39 @@ RSpec.describe Coordinator::Read::Projectors::WorkIntentionRenewalsV1, :read_mod
         reason_code: "concurrency_conflict", reason: "Three races exhausted; retry with a new request", retryable: true, attempts: 3), revision: 2),
       event(schemas::WorkIntentionSetRenewalFailedV1.new(renewal_id:), revision: 3)
     ]
-    events.each { projector.call(_1) }
+    projector.call(events)
     view = repository.fetch(renewal_id:)
     expect(view).to have_attributes(status: "failed", task_id: fixture.task_id, updated_at: events.last.created_at.utc.iso8601(6))
     expect(view.members.sole.status).to eq("failed")
     expect(view.members.sole.failure).to have_attributes(reason_code: "concurrency_conflict", attempts: 3, retryable: true)
-    events.reverse_each { projector.call(_1) }
+    projector.call(events)
     expect(repository.fetch(renewal_id:)).to eq(view)
     expect(Coordinator::Read::WorkIntentionRenewal.count).to eq(1)
+  end
+
+  it "preserves header fields while completing one stable member in a later batch" do
+    row = create(:coordinator_read_work_intention_renewal, renewal_id:, members: [ member ], status: "requested")
+    header = row.attributes.slice("request_event", "actor_id", "actor_kind", "expires_at", "intention_set_id", "task_id")
+    completed = event(schemas::WorkIntentionRenewalCompletedV1.new(renewal_id:,
+      intention_id: member.fetch("intention_id"), renewal_event: nil), revision: 10)
+
+    2.times { projector.call([ completed ]) }
+
+    expect(row.reload.members.sole).to include("status" => "completed", "failure" => nil, "renewal_event" => nil)
+    expect(row.attributes.slice(*header.keys)).to eq(header)
+    expect(row.status).to eq("running")
+  end
+
+  it "does not erase a member outcome when its assignment is replayed" do
+    row = create(:coordinator_read_work_intention_renewal, renewal_id:, members: [ member.merge("status" => "completed") ], status: "completed")
+    assigned = event(schemas::WorkIntentionRenewalAssignedV1.new(renewal_id:, position: 0,
+      intention_id: member.fetch("intention_id"), resource_id: member.fetch("resource_id"), fencing_token: 1,
+      renew_command_id: SecureRandom.uuid_v7, outcome_command_id: SecureRandom.uuid_v7), revision: 1)
+
+    projector.call([ assigned ])
+
+    expect(row.reload.members.sole.fetch("status")).to eq("completed")
+    expect(row.status).to eq("completed")
   end
 
   it "serves a stale requested projection by public Task ID without querying the write side" do

@@ -1,0 +1,11 @@
+module Coordinator::Shared::Observability
+  interface _BatchEventHandler[Result]
+    def call: (Array[PgEventstore::Event] events) -> Result
+  end
+
+  class BatchSubscriptionHandler[Result]
+    attr_reader definition: _SubscriptionDescriptor
+    def initialize: (definition: _SubscriptionDescriptor, handler: _BatchEventHandler[Result]) -> void
+    def call: (Array[PgEventstore::Event] events) -> Result
+  end
+end

@@ -91,4 +91,13 @@ RSpec.describe Coordinator::Read::Projections::Batches::ColumnPatches do
     expect(patches.update_groups).to be_empty
     expect(patches).to be_empty
   end
+
+  it "retains the latest native timestamp without gating delivered content assignments" do
+    latest = Time.utc(2026, 10, 14, 12)
+    patches.touch({ entity_id: "entity" }, time: latest)
+    patches.assign(entity_id: "entity", foo: "replayed")
+    patches.touch({ entity_id: "entity" }, time: latest - 60)
+
+    expect(patches.update_groups.sole.rows).to eq([ { entity_id: "entity", foo: "replayed", updated_at: latest } ])
+  end
 end

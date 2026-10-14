@@ -1,31 +1,19 @@
 # frozen_string_literal: true
 
-module Coordinator::Read
-  module Projectors
-    class WorkIntentionRenewalsV1
-      PROJECTION = ProjectionDefinition.new(name: "work_intention_renewals", version: 1)
+module Coordinator::Read::Projectors
+  class WorkIntentionRenewalsV1
+    MEMBER_EVENTS = %w[WorkIntentionRenewalAssigned WorkIntentionRenewalCompleted WorkIntentionRenewalFailed].freeze
 
-      def initialize(schema_registry: Coordinator::Write::EventSchemaRegistry.new,
-        renewals: Repositories::WorkIntentionRenewals.new, processed_events: Repositories::ProcessedProjectionEvents.new,
-        contract: Contracts::WorkIntentionRenewalSourceEvent.new)
-        @schema_registry, @renewals, @processed_events = schema_registry, renewals, processed_events
-        @contract = contract
+    def call(events)
+      ApplicationRecord.transaction do
+        patches = Coordinator::Read::Projections::Batches::ColumnPatches.new(identity_columns: [ :renewal_id ])
+        ids = events.select { MEMBER_EVENTS.include?(_1.type) }.map { _1.data.fetch("renewal_id") }.uniq
+        members = ids.empty? ? {} : Coordinator::Read::WorkIntentionRenewal.where(renewal_id: ids).pluck(:renewal_id, :members).to_h
+        fold = Coordinator::Read::Projections::WorkIntentionRenewals.new(patches:, members:)
+        events.each { fold.apply(_1) }
+        Coordinator::Read::Repositories::BatchWriter.new(model: Coordinator::Read::WorkIntentionRenewal, patches:).call
       end
-
-      def call(event)
-        validation = @contract.call(event_type: event.type, schema_version: event.metadata["schema_version"],
-          stream_context: event.stream.context, stream_name: event.stream.stream_name, stream_id: event.stream.stream_id,
-          stream_revision: event.stream_revision, global_position: event.global_position, correlation_id: event.correlation_id)
-        raise InvalidProjectionSource, validation.errors.to_h.inspect if validation.failure?
-        payload = @schema_registry.load(type: event.type, schema_version: 1, data: event.data)
-        raise InvalidProjectionSource, "Renewal identity does not match the source stream" unless payload.renewal_id == event.stream.stream_id
-        identity = ProjectionEventIdentity.from_event(event)
-        ApplicationRecord.transaction do
-          next unless @processed_events.claim(definition: PROJECTION, identity:, processed_at: event.created_at)
-          @renewals.store(event:, payload:)
-        end
-        nil
-      end
+      nil
     end
   end
 end

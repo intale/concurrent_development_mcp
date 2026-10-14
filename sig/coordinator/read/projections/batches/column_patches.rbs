@@ -9,6 +9,7 @@ module Coordinator::Read::Projections
       def initialize: (identity_columns: Array[Symbol]) -> void
       def insert: (column_attributes attributes) -> nil
       def assign: (column_attributes attributes) -> nil
+      def touch: (column_attributes attributes, time: Time) -> nil
       def inserts: () -> Array[column_attributes]
       def update_groups: () -> Array[UpdateGroup]
       def empty?: () -> bool

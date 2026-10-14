@@ -1,0 +1,13 @@
+module Coordinator::Read::Projections
+  class WorkIntentionRenewals
+    type member = Hash[String, Batches::column_value]
+
+    def initialize: (patches: Batches::ColumnPatches, ?members: Hash[String, Array[member]]) -> void
+    def apply: (PgEventstore::Event event) -> nil
+
+    private
+    def owner_members: (Batches::column_attributes identity) -> Hash[String, member]
+    def member_outcome: (Batches::column_attributes identity, String intention_id, member changes) -> nil
+    def assign_members: (Batches::column_attributes identity) -> nil
+  end
+end

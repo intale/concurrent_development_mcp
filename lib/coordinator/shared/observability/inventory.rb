@@ -26,7 +26,7 @@ module Coordinator::Shared
         {
           "subscription.set" => registered.set_name,
           "subscription.name" => registered.subscription_name,
-          "event.type" => registered.event_types.include?(event_type) ? event_type : "unknown"
+          "event.type" => event_type == "batch" || registered.event_types.include?(event_type) ? event_type : "unknown"
         }.freeze
       end
 

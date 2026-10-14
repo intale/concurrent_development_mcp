@@ -1,71 +1,31 @@
 # frozen_string_literal: true
 
-module Coordinator::Read
-  module Projectors
-    class RepositoriesV1
-      PROJECTION = ProjectionDefinition.new(name: "repositories", version: 1)
-
-      def initialize(
-        contract: Contracts::RepositorySourceEvent.new,
-        schema_registry: Coordinator::Write::EventSchemaRegistry.new,
-        catalog: Repositories::RepositoryCatalog.new,
-        processed_events: Repositories::ProcessedProjectionEvents.new
-      )
-        @contract = contract
-        @schema_registry = schema_registry
-        @catalog = catalog
-        @processed_events = processed_events
+module Coordinator::Read::Projectors
+  class RepositoriesV1
+    def call(events)
+      ApplicationRecord.transaction do
+        patches = Coordinator::Read::Projections::Batches::ColumnPatches.new(identity_columns: [ :repository_id ])
+        collections = collection_state(events)
+        fold = Coordinator::Read::Projections::Repositories.new(patches:, **collections)
+        events.each { fold.apply(_1) }
+        Coordinator::Read::Repositories::BatchWriter.new(model: Coordinator::Read::Repository, patches:).call
       end
+      nil
+    end
 
-      def call(event)
-        registration = load_registration(event)
-        verify_stream_identity!(event, registration)
-        identity = ProjectionEventIdentity.from_event(event)
+    private
 
-        ApplicationRecord.transaction do
-          next unless @processed_events.claim(
-            definition: PROJECTION,
-            identity:,
-            processed_at: event.created_at
-          )
+    def collection_state(events)
+      columns = []
+      columns << :paths if events.any? { %w[RepositoryPathAdded RepositoryPathRemoved].include?(_1.type) }
+      columns << :remotes if events.any? { %w[RepositoryRemoteAdded RepositoryRemoteRemoved].include?(_1.type) }
+      return {} if columns.empty?
 
-          @catalog.store(event:, registration:)
-        end
-
-        nil
-      end
-
-      private
-
-      def load_registration(event)
-        result = @contract.call(
-          event_type: event.type,
-          schema_version: event.metadata["schema_version"],
-          stream_context: event.stream.context,
-          stream_name: event.stream.stream_name,
-          stream_id: event.stream.stream_id,
-          stream_revision: event.stream_revision,
-          global_position: event.global_position,
-          command_id: event.metadata["command_id"],
-          actor_kind: event.metadata["actor_kind"],
-          actor_id: event.metadata["actor_id"],
-          recorded_by: event.metadata["recorded_by"],
-          policy_version: event.metadata["policy_version"]
-        )
-        raise InvalidProjectionSource, result.errors.to_h.inspect if result.failure?
-
-        @schema_registry.load(
-          type: event.type,
-          schema_version: event.metadata.fetch("schema_version"),
-          data: event.data
-        )
-      end
-
-      def verify_stream_identity!(event, registration)
-        return if event.stream.stream_id == registration.repository_id
-
-        raise InvalidProjectionSource, "Repository identity does not match its source stream"
-      end
+      ids = events.map { _1.data.fetch("repository_id") }.uniq
+      rows = Coordinator::Read::Repository.where(repository_id: ids).pluck(:repository_id, *columns)
+      columns.map.with_index do |column, index|
+        [ column, rows.to_h { [ _1.first, _1.fetch(index + 1) ] } ]
+      end.to_h
     end
   end
 end

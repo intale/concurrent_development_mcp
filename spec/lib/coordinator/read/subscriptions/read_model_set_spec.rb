@@ -186,6 +186,15 @@ RSpec.describe Coordinator::Read::Subscriptions::ReadModelSet do
     )
   end
 
+  it "opts converted builders into native batches without changing process-manager delivery" do
+    registrations = [ repository_registration, resource_registration, utterance_registration ]
+    registrations << Coordinator::Container["subscriptions.work_intention_renewals"]
+
+    expect(registrations.map(&:in_batches)).to all(be(true))
+    expect(registrations.map(&:handler)).to all(be_a(Coordinator::Shared::Observability::BatchSubscriptionHandler))
+    expect(Coordinator::Container["subscription_registrations.process_managers"].map(&:in_batches)).to all(be(false))
+  end
+
   def build_set
     manager = PgEventstore.subscriptions_manager(
       subscription_set: described_class::SET_NAME

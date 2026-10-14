@@ -24,6 +24,11 @@ module Coordinator::Read::Projections
         nil
       end
 
+      def touch(attributes, time:)
+        current = @updates[identity(attributes)]&.fetch(:updated_at, nil)
+        assign(attributes.merge(updated_at: current && current > time ? current : time))
+      end
+
       def inserts
         @inserts.values
       end

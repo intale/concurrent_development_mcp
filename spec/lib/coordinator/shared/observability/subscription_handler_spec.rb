@@ -23,7 +23,9 @@ RSpec.describe Coordinator::Shared::Observability::SubscriptionHandler, :event_s
     %w[process_managers task_results read_models].each do |set|
       registrations = Coordinator::Container["subscription_registrations.#{set}"]
       registrations.each do |registration|
-        expect(registration.handler).to be_a(described_class)
+        expected = registration.is_a?(Coordinator::Read::Subscriptions::BatchRegistration) ?
+          Coordinator::Shared::Observability::BatchSubscriptionHandler : described_class
+        expect(registration.handler).to be_a(expected)
         expect(registration.handler.definition).to equal(registration.definition)
       end
     end

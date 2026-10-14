@@ -1,0 +1,10 @@
+module Coordinator::Read::Projections
+  class UserUtterances
+    def initialize: (patches: Batches::ColumnPatches, ?anchors: Hash[String, Hash[String, Batches::column_value]]) -> void
+    def apply: (PgEventstore::Event event) -> nil
+
+    private
+    def change_anchor: (Batches::column_attributes identity, String kind, String id) -> nil
+    def empty_anchors: () -> Hash[String, Batches::column_value]
+  end
+end

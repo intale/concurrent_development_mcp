@@ -1,0 +1,12 @@
+module Coordinator::Shared::Observability
+  class SubscriptionDelivery
+    def initialize: (definition: _SubscriptionDescriptor, ?in_batches: bool) -> void
+    def call: [T] (Array[PgEventstore::Event] events) { () -> T } -> T
+
+    private
+    def observe: (Session session, Hash[String, String] attributes, Array[PgEventstore::Event] events) -> void
+    def span_attributes: (Hash[String, String] attributes, Array[PgEventstore::Event] events) -> Hash[String, String]
+    def inventory: () -> Inventory
+    def outcome: [T] (T result) -> String
+  end
+end

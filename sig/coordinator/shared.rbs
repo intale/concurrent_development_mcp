@@ -14,6 +14,10 @@ module Coordinator
       def call: (PgEventstore::Event event) -> untyped
     end
 
+    interface _BatchSubscriptionHandler
+      def call: (Array[PgEventstore::Event] events) -> untyped
+    end
+
     interface _SubscriptionDefinition
       def subscription_name: () -> String
 

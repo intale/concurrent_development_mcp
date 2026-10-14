@@ -907,11 +907,7 @@ module Coordinator
     end
 
     register("projectors.user_utterances_v1", memoize: true) do
-      Read::Projectors::UserUtterancesV1.new(
-        schema_registry: self["event_schema_registry"],
-        utterances: self["repositories.user_utterances"],
-        processed_events: self["repositories.processed_projection_events"]
-      )
+      Read::Projectors::UserUtterancesV1.new
     end
 
     register("projectors.decision_interpretations_v1", memoize: true) do
@@ -976,19 +972,11 @@ module Coordinator
     end
 
     register("projectors.repositories_v1", memoize: true) do
-      Read::Projectors::RepositoriesV1.new(
-        schema_registry: self["event_schema_registry"],
-        catalog: self["repositories.repository_catalog"],
-        processed_events: self["repositories.processed_projection_events"]
-      )
+      Read::Projectors::RepositoriesV1.new
     end
 
     register("projectors.resources_v1", memoize: true) do
-      Read::Projectors::ResourcesV1.new(
-        schema_registry: self["event_schema_registry"],
-        resources: self["repositories.resources"],
-        processed_events: self["repositories.processed_projection_events"]
-      )
+      Read::Projectors::ResourcesV1.new
     end
 
     register("projectors.skills_v1", memoize: true) do

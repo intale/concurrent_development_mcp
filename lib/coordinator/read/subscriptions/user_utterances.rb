@@ -2,7 +2,7 @@
 
 module Coordinator::Read
   module Subscriptions
-    class UserUtterances < Coordinator::Shared::Subscriptions::Registration
+    class UserUtterances < BatchRegistration
       DEFINITION = ReadModelDefinition.new(
         set_name: ReadModelSet::SET_NAME,
         subscription_name: "user-utterances-v1",
@@ -12,7 +12,7 @@ module Coordinator::Read
             stream_name: "Conversation"
           )
         ],
-        event_types: Contracts::GuidanceSourceEvent::EVENT_TYPES
+        event_types: %w[UserUtteranceRecorded UserUtteranceForwardedByAgent GuidanceMessageAnchored]
       )
 
       def initialize(handler:, pull_interval: 1.0)

@@ -1,0 +1,7 @@
+module Coordinator::Read::Projections
+  module Source
+    def self.reference: (PgEventstore::Event event) -> Batches::column_attributes
+    def self.actor: (PgEventstore::Event event) -> Batches::column_attributes
+    def self.evidence: (PgEventstore::Event event, prefix: Symbol) -> Batches::column_attributes
+  end
+end

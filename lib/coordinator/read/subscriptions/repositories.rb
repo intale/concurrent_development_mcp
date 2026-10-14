@@ -2,7 +2,7 @@
 
 module Coordinator::Read
   module Subscriptions
-    class Repositories < Coordinator::Shared::Subscriptions::Registration
+    class Repositories < BatchRegistration
       DEFINITION = ReadModelDefinition.new(
         set_name: ReadModelSet::SET_NAME,
         subscription_name: "repositories-v1",

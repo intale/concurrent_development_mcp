@@ -3,12 +3,17 @@
 module Coordinator::Shared
   module Subscriptions
     class Registration
-      attr_reader :definition, :handler
+      attr_reader :definition, :handler, :in_batches
 
-      def initialize(definition:, handler:, pull_interval: 1.0)
+      def initialize(definition:, handler:, pull_interval: 1.0, in_batches: false)
         @definition = definition
-        @handler = Observability::SubscriptionHandler.new(definition:, handler:)
+        @handler = if in_batches
+                     Observability::BatchSubscriptionHandler.new(definition:, handler:)
+        else
+                     Observability::SubscriptionHandler.new(definition:, handler:)
+        end
         @pull_interval = pull_interval
+        @in_batches = in_batches
       end
 
       def register(manager)
@@ -16,7 +21,8 @@ module Coordinator::Shared
           definition.subscription_name,
           handler: @handler,
           options: definition.options,
-          pull_interval: @pull_interval
+          pull_interval: @pull_interval,
+          in_batches: @in_batches
         )
       end
     end

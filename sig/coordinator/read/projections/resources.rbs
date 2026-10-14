@@ -1,0 +1,6 @@
+module Coordinator::Read::Projections
+  class Resources
+    def initialize: (patches: Batches::ColumnPatches) -> void
+    def apply: (PgEventstore::Event event) -> nil
+  end
+end

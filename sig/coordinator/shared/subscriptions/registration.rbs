@@ -3,9 +3,10 @@ module Coordinator
     module Subscriptions
       class Registration
         attr_reader definition: _SubscriptionDefinition
-        attr_reader handler: _SubscriptionHandler
+        attr_reader handler: _SubscriptionHandler | _BatchSubscriptionHandler
+        attr_reader in_batches: bool
 
-        def initialize: (definition: _SubscriptionDefinition, handler: _SubscriptionHandler, ?pull_interval: Integer | Float) -> void
+        def initialize: (definition: _SubscriptionDefinition, handler: _SubscriptionHandler | _BatchSubscriptionHandler, ?pull_interval: Integer | Float, ?in_batches: bool) -> void
         def register: (PgEventstore::SubscriptionsManager manager) -> bool
       end
     end

@@ -7,7 +7,7 @@ RSpec.describe Coordinator::Shared::Observability::Contract do
     expect(metrics.keys).to contain_exactly(
       :mcp_started, :mcp_completed, :mcp_duration, :mcp_in_flight,
       :subscription_started, :subscription_completed, :subscription_duration,
-      :subscription_in_flight, :subscription_oldest_in_flight, :subscription_delivery_age,
+      :subscription_in_flight, :subscription_oldest_in_flight, :subscription_delivery_age, :subscription_delivered,
       :sql_completed, :sql_duration
     )
     expect(metrics[:subscription_oldest_in_flight].kind).to eq(:observable_gauge)
