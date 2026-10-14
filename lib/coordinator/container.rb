@@ -941,11 +941,7 @@ module Coordinator
     register("projectors.candidates_v1", memoize: true) do
       Read::Projectors::CandidatesV1.new(
         submission_loader: self["read.candidates.submission_loader"],
-        impact_surface_loader: Read::Candidates::ImpactSurfaceLoader.new(event_store: self["event_store"]),
-        schema_registry: self["event_schema_registry"],
-        candidates: self["repositories.candidates"],
-        candidate_impacts: self["repositories.candidate_impacts"],
-        processed_events: self["repositories.processed_projection_events"]
+        impact_surface_loader: Read::Candidates::ImpactSurfaceLoader.new(event_store: self["event_store"])
       )
     end
 

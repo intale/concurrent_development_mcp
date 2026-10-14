@@ -3,7 +3,6 @@ module Coordinator
     module Repositories
       class Candidates
         def fetch: (String candidate_id) -> CandidateViewV1?
-        def store_submission: (event: PgEventstore::Event, candidate: CandidateSubmissionViewV2) -> Candidate
         def page: (CandidateListQueryV1 query) -> CandidatePageV1
         def summaries: (Array[String] candidate_ids) -> Hash[String, CandidateSummaryV1]
       end

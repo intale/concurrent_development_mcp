@@ -1,0 +1,16 @@
+module Coordinator
+  module Read
+    module Projections
+      class Candidates
+        PROPERTY_COLUMNS: Hash[String, Array[Symbol]]
+        def initialize: (headers: Batches::ColumnPatches, changed: Batches::ColumnPatches, observed: Batches::ColumnPatches, keys: Batches::ColumnPatches) -> void
+        def apply: (PgEventstore::Event event, ?submission: CandidateSubmissionViewV2?, ?surface: CandidateImpactSurfaceSourceV2?) -> nil
+        private
+        def submission_attributes: (CandidateSubmissionViewV2 source) -> Batches::column_attributes
+        def manifest_members: (CandidateSubmissionViewV2 source, time: Time) -> void
+        def observed_members: (CandidateSubmissionViewV2 source, time: Time) -> void
+        def member: (Batches::ColumnPatches patches, Batches::column_attributes identity, Batches::column_attributes attributes, time: Time) -> nil
+      end
+    end
+  end
+end

@@ -1,20 +1,5 @@
-module Coordinator
-  module Read
-    module Projectors
-      class CandidatesV1
-        PROJECTION: ProjectionDefinition
-
-        def initialize: (
-          submission_loader: Coordinator::Read::Candidates::_SubmissionLoader,
-          impact_surface_loader: Coordinator::Read::Candidates::_ImpactSurfaceLoader,
-          ?contract: Contracts::CandidateSourceEvent,
-          ?schema_registry: Write::EventSchemaRegistry,
-          ?candidates: Repositories::Candidates,
-          ?candidate_impacts: Repositories::CandidateImpacts,
-          ?processed_events: Repositories::ProcessedProjectionEvents
-        ) -> void
-        def call: (PgEventstore::Event event) -> void
-      end
-    end
+module Coordinator::Read::Projectors
+  class CandidatesV1
+    def call: (Array[PgEventstore::Event] events) -> nil
   end
 end

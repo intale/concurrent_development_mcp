@@ -3,8 +3,6 @@
 module Coordinator::Read
   module Repositories
     class CandidateImpacts
-      include EventTimestamped
-
       OUTGOING_MATCH_SQL = <<~SQL.squish.freeze
         EXISTS (
           SELECT 1
@@ -76,47 +74,6 @@ module Coordinator::Read
         @policies = policies
       end
 
-      def store_manifest(event:, manifest:)
-        record = candidate!(manifest.candidate_id, "manifest resources")
-        replace_partition(
-          Coordinator::Read::CandidateChangedResource,
-          record:,
-          values: changed_paths(manifest.files),
-          value_key: :path,
-          event:
-        )
-      end
-
-      def store_build_context(event:, build_context:)
-        record = candidate!(build_context.candidate_id, "build-context inputs")
-        replace_partition(
-          Coordinator::Read::CandidateObservedInput,
-          record:,
-          values: build_context.inputs.map(&:path).uniq.sort,
-          value_key: :path,
-          event:
-        )
-      end
-
-      def store_surface(event:, projection_event: event, surface:)
-        record = candidate!(surface.candidate_id, "impact surface")
-        verify_surface!(record, surface, event:)
-        save_from_event(record, event: projection_event, attributes: {
-          impact_surface: surface_document(surface, event:),
-          impact_event: event_reference(event).to_h,
-          impact_actor: actor(event).to_h,
-          impact_markers: event.markers,
-          impact_metadata: event.metadata,
-          impact_causation_id: event.causation_id,
-          impact_correlation_id: event.correlation_id,
-          impact_global_position: event.global_position,
-          impact_at_domain: event.created_at,
-          impact_at_store: event.created_at
-        })
-        replace_impact_keys(record:, surface:, event: projection_event)
-        record
-      end
-
       def page(query)
         subject = Coordinator::Read::Candidate.find_by(candidate_id: query.candidate_id)
         return unless subject
@@ -153,86 +110,6 @@ module Coordinator::Read
       end
 
       private
-
-      def candidate!(candidate_id, component)
-        Coordinator::Read::Candidate.find_by(candidate_id:) ||
-          raise(ProjectionStateError, "CandidateSubmitted must be projected before its #{component}")
-      end
-
-      def replace_partition(model, record:, values:, value_key:, event:)
-        model.where(candidate_id: record.candidate_id).delete_all
-        return if values.empty?
-
-        model.insert_all!(values.map do |value|
-          {
-            candidate_id: record.candidate_id,
-            change_set_id: record.change_set_id,
-            repository_id: record.repository_id,
-            value_key => value,
-            created_at: event.created_at,
-            updated_at: event.created_at
-          }
-        end)
-      end
-
-      def replace_impact_keys(record:, surface:, event:)
-        Coordinator::Read::CandidateImpactKey.where(candidate_id: record.candidate_id).delete_all
-        rows = {
-          "produces" => surface.produces,
-          "consumes" => surface.consumes,
-          "may_affect" => surface.may_affect,
-          "assumes" => surface.assumes
-        }.flat_map do |direction, entries|
-          entries.map do |entry|
-            {
-              candidate_id: record.candidate_id,
-              change_set_id: record.change_set_id,
-              direction:,
-              impact_key: entry.impact_key
-            }
-          end
-        end
-        return if rows.empty?
-
-        Coordinator::Read::CandidateImpactKey.insert_all!(rows.map do |row|
-          row.merge(created_at: event.created_at, updated_at: event.created_at)
-        end)
-      end
-
-      def changed_paths(files)
-        files.flat_map do |file|
-          case file.status
-          when "added", "copied" then [ file.new_path ]
-          when "renamed" then [ file.old_path, file.new_path ]
-          else [ file.old_path ]
-          end
-        end.compact.uniq.sort
-      end
-
-      def verify_surface!(record, surface, event:)
-        matches = record.candidate_id == surface.candidate_id &&
-                  record.manifest_digest == event.metadata.fetch("manifest_digest") &&
-                  record.build_context_digest == event.metadata["build_context_digest"]
-        return if matches
-
-        raise ProjectionStateError, "Candidate impact-surface identity changed"
-      end
-
-      def surface_document(surface, event:)
-        {
-          policy_version: event.metadata.fetch("policy_version"),
-          surface_digest: event.metadata.fetch("surface_digest"),
-          evidence_revision: surface.evidence_revision,
-          manifest_digest: event.metadata.fetch("manifest_digest"),
-          build_context_digest: event.metadata["build_context_digest"],
-          produces: surface.produces.map(&:to_h),
-          consumes: surface.consumes.map(&:to_h),
-          may_affect: surface.may_affect.map(&:to_h),
-          assumes: surface.assumes.map(&:to_h),
-          analyzer: event.metadata.fetch("analyzer"),
-          evidence_status: "attributed_unverified"
-        }
-      end
 
       def matched_candidates(subject:, direction:)
         Coordinator::Read::Candidate
@@ -362,25 +239,6 @@ module Coordinator::Read
           persisted_at: record.public_send("#{prefix}_at_store").utc.iso8601(6),
           causation_id: record.public_send("#{prefix}_causation_id"),
           correlation_id: record.public_send("#{prefix}_correlation_id")
-        )
-      end
-
-      def actor(event)
-        AttributedActorV1.new(
-          kind: event.metadata.fetch("actor_kind"),
-          id: event.metadata.fetch("actor_id"),
-          authenticated: false
-        )
-      end
-
-      def event_reference(event)
-        Coordinator::Write::EventReference.new(
-          event_id: event.id,
-          type: event.type,
-          stream_context: event.stream.context,
-          stream_name: event.stream.stream_name,
-          stream_id: event.stream.stream_id,
-          stream_revision: event.stream_revision
         )
       end
 

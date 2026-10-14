@@ -4,6 +4,7 @@ module Coordinator
       class FactReader
         def initialize: (event_store: Write::_EventStore, ?stream_factory: Write::StreamFactory) -> void
         def call: (PgEventstore::Event terminal) -> Source?
+        def instruction: (String command_id) -> Hash[String, json]?
         def history: (Symbol stream, String id, Array[String] types, maximum_count: Integer, ?to_revision: Integer?) -> Array[PgEventstore::Event]
         def first: (Symbol stream, String id, String type) -> PgEventstore::Event?
         def at: (Symbol stream, String id, Integer revision) -> PgEventstore::Event?

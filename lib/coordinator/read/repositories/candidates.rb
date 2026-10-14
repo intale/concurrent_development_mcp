@@ -3,46 +3,9 @@
 module Coordinator::Read
   module Repositories
     class Candidates
-      include EventTimestamped
-
       def fetch(candidate_id)
         record = Coordinator::Read::Candidate.find_by(candidate_id:)
         record && build_view(record)
-      end
-
-      def store_submission(event:, candidate:)
-        submitted_event = candidate.submitted_event
-        manifest_event = candidate.manifest_event
-        build_context_event = candidate.build_context_event
-        create_from_event(Coordinator::Read::Candidate, event:, attributes: {
-          candidate_id: candidate.candidate_id,
-          change_set_id: candidate.change_set_id,
-          work_item_id: candidate.work_item_id,
-          attempt_id: candidate.attempt_id,
-          agent_id: candidate.agent_id,
-          repository_id: candidate.repository_id,
-          target_branch: candidate.target_branch,
-          object_format: candidate.object_format,
-          base_commit_oid: candidate.base_commit_oid,
-          head_commit_oid: candidate.head_commit_oid,
-          checkpoint_kind: candidate.checkpoint_kind,
-          intention_set_id: candidate.intention_set_id,
-          intention_policy_version: Coordinator::Write::WorkIntentionPolicyV1::VERSION,
-          intentions: candidate.intentions.map(&:to_h),
-          manifest_digest: candidate.manifest_digest,
-          build_context_digest: candidate.build_context_digest,
-          evidence_status: candidate.evidence_status,
-          **source_columns(:submitted, submitted_event),
-          manifest: {
-            policy_version: manifest_event.metadata.fetch("policy_version"),
-            digest: manifest_event.metadata.fetch("manifest_digest"),
-            files: candidate.manifest.files.map(&:to_h),
-            collector: manifest_event.metadata.fetch("collector")
-          },
-          **source_columns(:manifest, manifest_event),
-          build_context: build_context_document(candidate),
-          **optional_source_columns(:build_context, build_context_event)
-        })
       end
 
       def page(query)
@@ -69,42 +32,6 @@ module Coordinator::Read
       end
 
       private
-
-      def build_context_document(candidate)
-        context = candidate.build_context
-        event = candidate.build_context_event
-        return unless context && event
-
-        {
-          policy_version: event.metadata.fetch("policy_version"),
-          digest: event.metadata.fetch("build_context_digest"),
-          inputs: context.inputs.map(&:to_h),
-          environment: context.environment.map(&:to_h),
-          dependency_graph_digest: event.metadata["dependency_graph_digest"],
-          test_environment_digest: event.metadata["test_environment_digest"],
-          collector: event.metadata.fetch("collector")
-        }
-      end
-
-      def source_columns(prefix, event)
-        {
-          "#{prefix}_event": event_reference(event).to_h,
-          "#{prefix}_actor": actor(event).to_h,
-          "#{prefix}_markers": event.markers,
-          "#{prefix}_metadata": event.metadata,
-          "#{prefix}_causation_id": event.causation_id,
-          "#{prefix}_correlation_id": event.correlation_id,
-          "#{prefix}_global_position": event.global_position,
-          "#{prefix}_at_domain": event.created_at,
-          "#{prefix}_at_store": event.created_at
-        }
-      end
-
-      def optional_source_columns(prefix, event)
-        return {} unless event
-
-        source_columns(prefix, event)
-      end
 
       def build_view(record)
         CandidateViewV1.new(
@@ -204,25 +131,6 @@ module Coordinator::Read
           persisted_at: record.public_send("#{prefix}_at_store").utc.iso8601(6),
           causation_id: record.public_send("#{prefix}_causation_id"),
           correlation_id: record.public_send("#{prefix}_correlation_id")
-        )
-      end
-
-      def actor(event)
-        AttributedActorV1.new(
-          kind: event.metadata.fetch("actor_kind"),
-          id: event.metadata.fetch("actor_id"),
-          authenticated: false
-        )
-      end
-
-      def event_reference(event)
-        Coordinator::Write::EventReference.new(
-          event_id: event.id,
-          type: event.type,
-          stream_context: event.stream.context,
-          stream_name: event.stream.stream_name,
-          stream_id: event.stream.stream_id,
-          stream_revision: event.stream_revision
         )
       end
 

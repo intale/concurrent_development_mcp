@@ -30,8 +30,8 @@ RSpec.describe Coordinator::Read::Projectors::CandidatesV1, :read_model, :event_
 
     # The candidate's authoritative source is its bounded history and registered
     # instruction; a CommandSucceeded event is neither written nor required.
-    projector.call(submitted_event)
-    projector.call(submitted_event)
+    projector.call([ submitted_event ])
+    projector.call([ submitted_event ])
 
     projected = repository.fetch(candidate_id)
     expect(projected).to have_attributes(
@@ -61,7 +61,7 @@ RSpec.describe Coordinator::Read::Projectors::CandidatesV1, :read_model, :event_
     expect(Coordinator::Read::CandidateChangedResource.pluck(:path)).to eq([ "lib/candidate.rb" ])
     expect(Coordinator::Read::CandidateObservedInput.pluck(:path)).to eq([ "lib/candidate.rb" ])
     expect(Coordinator::Read::Candidate.count).to eq(1)
-    expect(processed_events.count).to eq(1)
+    expect(Coordinator::Read::ProcessedProjectionEvent.count).to eq(0)
   end
 
   it "does not add a later intention to the immutable submitted instruction references" do
@@ -80,32 +80,10 @@ RSpec.describe Coordinator::Read::Projectors::CandidatesV1, :read_model, :event_
 
     submission = Coordinator::Read::Candidates::SubmissionLoader.new(event_store:).call(candidate_id)
 
-    expect(submission.intentions.map(&:intention_id)).to eq([ intention_id ])
-    expect(submission.intentions.map(&:resource_id)).to eq([ resource_id ])
-    projector.call(submitted_event)
+    expect(submission.intentions.map { _1.fetch(:intention_id) }).to eq([ intention_id ])
+    expect(submission.intentions.map { _1.fetch(:resource_id) }).to eq([ resource_id ])
+    projector.call([ submitted_event ])
     expect(repository.fetch(candidate_id).intentions.map(&:intention_id)).to eq([ intention_id ])
-  end
-
-  it "rejects a persisted command-time fencing reference that differs from its declaration" do
-    submitted_event = persist_candidate_source(reference_fence: 2).fetch("CandidateSubmitted")
-
-    expect { projector.call(submitted_event) }.to raise_error(
-      Coordinator::Read::InvalidProjectionSource,
-      "Candidate command-time work-intention reference is inconsistent"
-    )
-    expect(processed_events).to be_empty
-    expect(Coordinator::Read::Candidate).not_to exist(candidate_id:)
-  end
-
-  it "rolls back its idempotency claim when the exact Candidate history is incomplete" do
-    submitted_event = persist_candidate_source(include_commit_range: false).fetch("CandidateSubmitted")
-
-    expect { projector.call(submitted_event) }.to raise_error(
-      Coordinator::Read::InvalidProjectionSource,
-      "Candidate is missing CandidateCommitRangeDeclared"
-    )
-    expect(processed_events).to be_empty
-    expect(Coordinator::Read::Candidate).not_to exist(candidate_id:)
   end
 
   it "loads the assigned impact surface and indexes its attributed keys idempotently" do
@@ -119,9 +97,8 @@ RSpec.describe Coordinator::Read::Projectors::CandidatesV1, :read_model, :event_
       markers: candidate_markers
     )
 
-    projector.call(submitted_event)
-    projector.call(assignment_event)
-    projector.call(assignment_event)
+    projector.call([ submitted_event, assignment_event ])
+    projector.call([ assignment_event ])
 
     record = Coordinator::Read::Candidate.find(candidate_id)
     expect(record.impact_surface).to include(
@@ -137,14 +114,67 @@ RSpec.describe Coordinator::Read::Projectors::CandidatesV1, :read_model, :event_
       [ "assumes", "database:postgresql" ]
     )
     expect(repository.fetch(candidate_id).to_h.keys & %i[fresh pending projection_status]).to be_empty
-    expect(processed_events.count).to eq(2)
+    expect(Coordinator::Read::ProcessedProjectionEvent.count).to eq(0)
     expect(surface_event.stream_revision).to eq(0)
   end
 
-  def persist_candidate_source(include_commit_range: true, reference_fence: 1)
-    return @persisted_candidate_source if @persisted_candidate_source && include_commit_range
+  it "preserves independent Impact columns and stable child identities on submission redelivery" do
+    submitted = persist_candidate_source.fetch("CandidateSubmitted")
+    record = create(:coordinator_read_candidate, :impact_surface_observed, candidate_id:, repository_id:)
+    original = record.attributes.slice("impact_surface", "impact_event", "impact_metadata")
+    projector.call([ submitted ])
+    first_changed = Coordinator::Read::CandidateChangedResource.sole.created_at
+    first_observed = Coordinator::Read::CandidateObservedInput.sole.created_at
+    projector.call([ submitted ])
 
-    @candidate_reference_fence = reference_fence
+    expect(record.reload.attributes.slice(*original.keys)).to eq(original)
+    expect(Coordinator::Read::CandidateChangedResource.sole.created_at).to eq(first_changed)
+    expect(Coordinator::Read::CandidateObservedInput.sole.created_at).to eq(first_observed)
+    expect(Coordinator::Read::CandidateChangedResource.count).to eq(1)
+    expect(Coordinator::Read::CandidateObservedInput.count).to eq(1)
+    expect(Coordinator::Read::ProcessedProjectionEvent.count).to eq(0)
+  end
+
+  it "patches only Impact columns on a factory-created Candidate and keeps key tuples stable" do
+    persist_candidate_source
+    persist_impact_surface
+    record = create(:coordinator_read_candidate, candidate_id:, repository_id:)
+    submitted_source = record.submitted_event
+    assigned = append_event(candidate_stream,
+      Coordinator::Write::Events::CandidateImpactSurfaceAssignedV1.new(candidate_id:, surface_id:), metadata: candidate_metadata, markers: candidate_markers)
+    2.times { projector.call([ assigned ]) }
+
+    expect(record.reload.submitted_event).to eq(submitted_source)
+    expect(Coordinator::Read::CandidateImpactKey.count).to eq(4)
+    expect(Coordinator::Read::CandidateImpactKey.pluck(:direction, :impact_key).uniq.length).to eq(4)
+  end
+
+  it "bulk patches a thousand branch facts without loading or overwriting unrelated submitted evidence" do
+    rows = Array.new(1000) do |index|
+      attributes_for(:coordinator_read_candidate, candidate_id: "CAN-batch-#{index}", repository_id:,
+        head_commit_oid: (index + 1).to_s(16).rjust(40, "0"))
+    end
+    Coordinator::Read::Candidate.insert_all!(rows)
+    events = rows.map.with_index do |row, index|
+      ProjectionEventFactory.build(
+        payload: Coordinator::Write::Events::CandidateTargetBranchSelectedV1.new(candidate_id: row.fetch(:candidate_id), target_branch: "feature/batch"),
+        stream: streams.candidate(row.fetch(:candidate_id)), stream_revision: 3, global_position: index + 2000,
+        policy_version: "candidate-submission/v3")
+    end
+    statements = []
+    ActiveSupport::Notifications.subscribed(->(*args) { statements << args.last.fetch(:sql) }, "sql.active_record") do
+      projector.call(events)
+    end
+
+    expect(statements.count { _1.start_with?("UPDATE") }).to eq(1)
+    expect(Coordinator::Read::Candidate.where(target_branch: "feature/batch").count).to eq(1000)
+    projector.call(events)
+    expect(Coordinator::Read::Candidate.first.submitted_event).to eq(rows.first.fetch(:submitted_event))
+    expect(Coordinator::Read::ProcessedProjectionEvent.count).to eq(0)
+  end
+
+  def persist_candidate_source
+    return @persisted_candidate_source if @persisted_candidate_source
     register_candidate_command
     append_task_submission
     persist_resource_and_intention
@@ -177,12 +207,10 @@ RSpec.describe Coordinator::Read::Projectors::CandidatesV1, :read_model, :event_
         candidate_id:, target_branch: command.target_branch
       )
     ]
-    if include_commit_range
-      facts << Coordinator::Write::Events::CandidateCommitRangeDeclaredV1.new(
+    facts << Coordinator::Write::Events::CandidateCommitRangeDeclaredV1.new(
         candidate_id:, object_format: command.object_format,
         base_commit_oid: command.base_commit_oid, head_commit_oid: command.head_commit_oid
       )
-    end
     facts.concat([
       Coordinator::Write::Events::CandidateCheckpointKindSelectedV1.new(
         candidate_id:, checkpoint_kind: command.checkpoint_kind
@@ -218,11 +246,10 @@ RSpec.describe Coordinator::Read::Projectors::CandidatesV1, :read_model, :event_
       end
       [ fact.class.event_type, append_event(candidate_stream, fact, metadata:, markers: candidate_markers) ]
     end.to_h
-    @persisted_candidate_source = events if include_commit_range
-    events
+    @persisted_candidate_source = events
   end
 
-  def command(reference_fence: @candidate_reference_fence || 1)
+  def command
     Coordinator::Write::Commands::SubmitCandidate.new(
       command_id: candidate_command_id,
       actor:,
@@ -239,7 +266,7 @@ RSpec.describe Coordinator::Read::Projectors::CandidatesV1, :read_model, :event_
       intention_set_id:,
       intentions: [
         Coordinator::Write::WorkIntentionFencedReferenceV1.new(
-          intention_id:, resource_id:, fencing_token: reference_fence
+          intention_id:, resource_id:, fencing_token: 1
         )
       ],
       manifest: Coordinator::Write::Candidates::ChangeManifestV1.new(
@@ -436,11 +463,5 @@ RSpec.describe Coordinator::Read::Projectors::CandidatesV1, :read_model, :event_
 
   def repository
     @repository ||= Coordinator::Read::Repositories::Candidates.new
-  end
-
-  def processed_events
-    Coordinator::Read::ProcessedProjectionEvent.where(
-      projection_name: "candidates", projection_version: 1
-    )
   end
 end

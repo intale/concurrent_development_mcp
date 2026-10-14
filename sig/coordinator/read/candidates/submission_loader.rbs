@@ -1,26 +1,16 @@
-module Coordinator::Read
-  module Candidates
-    interface _SubmissionLoader
-      def call: (String candidate_id) -> Coordinator::Read::CandidateSubmissionViewV2
-    end
-
-    class SubmissionLoader
-      FACT_TYPES: Array[String]
-
-      def initialize: (
-        event_store: Coordinator::Write::_EventStore,
-        ?stream_factory: Coordinator::Write::StreamFactory,
-        ?schema_registry: Coordinator::Write::EventSchemaRegistry,
-        ?instruction_loader: Coordinator::Write::CommandResults::InstructionLoader,
-        ?target_command_builder: Coordinator::Write::Tasks::TargetCommandBuilder
-      ) -> void
-      def call: (String candidate_id) -> Coordinator::Read::CandidateSubmissionViewV2
-      private
-      def fetch_fact: (Hash[String, [Coordinator::Write::Events::Base, PgEventstore::Event]] facts, String type) -> [Coordinator::Write::Events::Base, PgEventstore::Event]
-      def load_command: (PgEventstore::Event created_event) -> Coordinator::Write::Commands::SubmitCandidate
-      def load_intention_references: (Coordinator::Write::Commands::SubmitCandidate command) -> Array[Coordinator::Read::WorkIntentionViewV1]
-      def load_first: (Coordinator::Write::StreamReference stream, String event_type) -> Coordinator::Write::Events::Base
-      def load_event: (PgEventstore::Event event) -> Coordinator::Write::Events::Base
+module Coordinator
+  module Read
+    module Candidates
+      interface _SubmissionLoader
+        def call: (String candidate_id) -> CandidateSubmissionViewV2
+      end
+      class SubmissionLoader
+        FACT_TYPES: Array[String]
+        def initialize: (event_store: Write::_EventStore, ?stream_factory: Write::StreamFactory, ?fact_reader: CommandResults::FactReader) -> void
+        def call: (String candidate_id) -> CandidateSubmissionViewV2
+        private
+        def intention_references: (Array[Hash[String, CommandResults::json]] references) -> Array[CommandResults::document]
+      end
     end
   end
 end

@@ -23,6 +23,10 @@ module Coordinator::Read
         Source.new(terminal_event: terminal, registration:, input: instruction.fetch("input"), persisted_events: effects)
       end
 
+      def instruction(command_id)
+        instruction_for(command_id, first(:command, command_id, "CommandRegistered"))
+      end
+
       def history(stream, id, types, maximum_count:, to_revision: nil)
         @event_store.read(@stream_factory.public_send(stream, id), Coordinator::Write::EventReadCriteria.new(
           event_types: types, maximum_count:, direction: :asc, to_revision:

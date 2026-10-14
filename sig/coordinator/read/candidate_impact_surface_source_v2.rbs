@@ -1,4 +1,9 @@
-module Coordinator::Read
-  class CandidateImpactSurfaceSourceV2 < Coordinator::Shared::Value
+module Coordinator
+  module Read
+    class CandidateImpactSurfaceSourceV2 < ::Data
+      attr_reader surface: CommandResults::document
+      attr_reader event: PgEventstore::Event
+      def self.new: (surface: CommandResults::document, event: PgEventstore::Event) -> instance
+    end
   end
 end
