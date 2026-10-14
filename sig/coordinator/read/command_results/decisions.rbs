@@ -1,0 +1,21 @@
+module Coordinator
+  module Read
+    module CommandResults
+      class Decisions
+        TOOLS: Array[String]
+        def initialize: (facts: FactReader) -> void
+        def call: (Source source) -> document
+        private
+        def adjudication: (Source source) -> document
+        def activation: (Source source) -> document
+        def correction: (Source source) -> document
+        def choice: (Source source) -> document
+        def partitions: (Source source, Array[document] definitions) -> Array[document]
+        def partition_descriptors: (document definition) -> Array[document]
+        def slot_document: (document definition) -> document
+        def slot: (String id, document document) -> document
+        def digest: (document document) -> String
+      end
+    end
+  end
+end

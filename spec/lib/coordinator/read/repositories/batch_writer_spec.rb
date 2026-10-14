@@ -128,4 +128,60 @@ RSpec.describe Coordinator::Read::Repositories::BatchWriter, :read_model do
 
     expect(writes { persist }).to be_empty
   end
+
+  it "returns a fresh handler thread's connection to the Rails pool after a batch" do
+    row = create(:coordinator_read_repository)
+    patches.assign(repository_id: row.repository_id, display_name: "scoped connection")
+    writer = described_class.new(model:, patches:)
+    pool = model.connection_pool
+    retained = Thread.new do
+      writer.call
+      pool.active_connection?
+    ensure
+      pool.release_connection
+    end.value
+
+    expect(retained).to be_nil
+    expect(row.reload.display_name).to eq("scoped connection")
+  end
+
+  it "returns the scoped connection after a failed statement and preserves the rollback" do
+    row = create(:coordinator_read_repository)
+    patches.assign(repository_id: row.repository_id, scope: nil)
+    writer = described_class.new(model:, patches:)
+    pool = model.connection_pool
+    error, retained = Thread.new do
+      begin
+        writer.call
+      rescue ActiveRecord::NotNullViolation => error
+        [ error, pool.active_connection? ]
+      end
+    ensure
+      pool.release_connection
+    end.value
+
+    expect(error).to be_a(ActiveRecord::NotNullViolation)
+    expect(retained).to be_nil
+    expect(row.reload.scope).not_to be_nil
+  end
+
+  it "uses but does not release the caller's existing scoped connection" do
+    row = create(:coordinator_read_repository)
+    patches.assign(repository_id: row.repository_id, display_name: "nested scope")
+    writer = described_class.new(model:, patches:)
+    pool = model.connection_pool
+    still_owned, retained = Thread.new do
+      owned = pool.with_connection do |connection|
+        writer.call
+        pool.active_connection?.equal?(connection)
+      end
+      [ owned, pool.active_connection? ]
+    ensure
+      pool.release_connection
+    end.value
+
+    expect(still_owned).to be(true)
+    expect(retained).to be_nil
+    expect(row.reload.display_name).to eq("nested scope")
+  end
 end

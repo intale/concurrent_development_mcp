@@ -6,7 +6,6 @@ module Coordinator
         def fetch_by_request_id: (String request_id) -> Coordinator::Write::CommandResults::ResultV1?
         def fetch_many: (Array[String] command_ids) -> Array[Coordinator::Write::CommandResults::ResultV1]
         def fetch_index: (Array[String] command_ids) -> Hash[String, Coordinator::Write::CommandResults::ResultV1]
-        def store: (event: PgEventstore::Event, result: Coordinator::Write::CommandResults::ResultV1) -> CommandReceipt
 
         private
 

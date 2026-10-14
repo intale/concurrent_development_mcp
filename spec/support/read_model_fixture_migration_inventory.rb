@@ -29,6 +29,7 @@ module ReadModelFixtureMigrationInventory
     spec/lib/coordinator/read/projectors/agent_choice_impacts_v1_spec.rb
     spec/lib/coordinator/read/projectors/agent_choices_v1_spec.rb
     spec/lib/coordinator/read/projectors/candidates_v1_spec.rb
+    spec/lib/coordinator/read/projectors/command_receipts_v2_spec.rb
     spec/lib/coordinator/read/projectors/coord_context_v1_spec.rb
     spec/lib/coordinator/read/projectors/decision_governance_v1_spec.rb
     spec/lib/coordinator/read/projectors/decision_interpretations_v1_spec.rb
@@ -77,6 +78,7 @@ module ReadModelFixtureMigrationInventory
   PERSISTED_SOURCE_PROJECTOR_SPECS = %w[
     spec/lib/coordinator/read/projectors/agent_choice_impacts_v1_spec.rb
     spec/lib/coordinator/read/projectors/candidates_v1_spec.rb
+    spec/lib/coordinator/read/projectors/command_receipts_v2_spec.rb
     spec/lib/coordinator/read/projectors/coord_context_v1_spec.rb
     spec/lib/coordinator/read/projectors/decision_governance_v1_spec.rb
     spec/lib/coordinator/read/projectors/decision_interpretations_v1_spec.rb

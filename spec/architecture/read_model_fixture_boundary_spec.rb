@@ -87,7 +87,7 @@ RSpec.describe "Read-model test fixture boundaries", :read_model do
 
     expect(inventory::BY_TARGET_BOUNDARY.transform_values(&:length)).to eq(
       factory_bot_read: 21,
-      direct_event_projector: 15,
+      direct_event_projector: 16,
       split_transport: 13,
       subscription_contract_with_cucumber_delivery: 1
     )

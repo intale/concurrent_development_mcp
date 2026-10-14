@@ -1,0 +1,14 @@
+module Coordinator
+  module Read
+    module CommandResults
+      class Coordination
+        TOOLS: Array[String]
+        def call: (Source source) -> document
+        private
+        def work_item_completion: (Source source) -> document
+        def candidate: (Source source) -> document
+        def impact_surface: (Source source) -> document
+      end
+    end
+  end
+end

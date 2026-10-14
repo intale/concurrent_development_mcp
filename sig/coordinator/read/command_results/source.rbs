@@ -1,0 +1,31 @@
+module Coordinator
+  module Read
+    module CommandResults
+      type json = nil | bool | Integer | Float | String | Array[json] | Hash[String | Symbol, json]
+      type document = Hash[Symbol, json]
+
+      class Source
+        attr_reader terminal_event: PgEventstore::Event
+        attr_reader registration: PgEventstore::Event
+        attr_reader input: document
+        attr_reader persisted_events: Array[PgEventstore::Event]
+        def initialize: (terminal_event: PgEventstore::Event, registration: PgEventstore::Event, input: Hash[String, json], persisted_events: Array[PgEventstore::Event]) -> void
+        def self.document: (json value) -> json
+        def command_id: () -> String
+        def request_id: () -> String
+        def tool_name: () -> String
+        def canonical_input_digest: () -> String
+        def completed_at: () -> String
+        def event: (String type) -> PgEventstore::Event?
+        def events: (*String types) -> Array[PgEventstore::Event]
+        def data: (PgEventstore::Event event) -> document
+        def fact: (String type) -> document
+        def timestamp: (PgEventstore::Event event) -> String
+        def reference: (PgEventstore::Event event) -> document
+        def values: (*Symbol keys) -> document
+        def action: (String tool, **json) -> document
+        def presentation: (String summary, document data, ?next_actions: Array[document], ?warnings: Array[String]) -> document
+      end
+    end
+  end
+end

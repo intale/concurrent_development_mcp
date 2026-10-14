@@ -1,0 +1,15 @@
+module Coordinator
+  module Read
+    module CommandResults
+      class Assembler
+        PRESENTERS: Array[singleton(Coordination) | singleton(Catalog) | singleton(WorkIntentions) | singleton(Decisions) | singleton(Verification) | singleton(Integration) | singleton(OperationBatches)]
+        def initialize: (facts: FactReader) -> void
+        def call: (Source source) -> document
+        private
+        def rejection: (Source source, document error, ?next_actions: Array[document]?) -> document
+        def rejection_actions: (document error) -> Array[document]
+        def failure: (Source source) -> document
+      end
+    end
+  end
+end

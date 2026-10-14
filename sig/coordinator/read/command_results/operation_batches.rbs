@@ -1,0 +1,14 @@
+module Coordinator
+  module Read
+    module CommandResults
+      class OperationBatches
+        TOOLS: Array[String]
+        def initialize: (facts: FactReader) -> void
+        def call: (Source source) -> document
+        private
+        def actions: (Source source) -> Array[document]
+        def effects: (Source source, total: Integer, succeeded: Integer, failures: Array[PgEventstore::Event]) -> String
+      end
+    end
+  end
+end

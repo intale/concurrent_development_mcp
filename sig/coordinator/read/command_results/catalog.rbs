@@ -1,0 +1,23 @@
+module Coordinator
+  module Read
+    module CommandResults
+      class Catalog
+        TOOLS: Array[String]
+        ARTIFACT_PROPERTIES: Hash[String, String]
+        def initialize: (facts: FactReader) -> void
+        def call: (Source source) -> document
+        private
+        def repository: (Source source) -> document
+        def resolve_resource: (Source source) -> document
+        def remove_resource: (Source source) -> document
+        def skill: (Source source) -> document
+        def capture: (Source source) -> document
+        def update: (Source source) -> document
+        def classification: (Source source) -> document
+        def relation: (Source source) -> document
+        def relation_registration: (Source source) -> PgEventstore::Event
+        def compound: (String purpose, **String) -> String
+      end
+    end
+  end
+end

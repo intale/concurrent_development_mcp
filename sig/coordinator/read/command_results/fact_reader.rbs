@@ -1,0 +1,20 @@
+module Coordinator
+  module Read
+    module CommandResults
+      class FactReader
+        def initialize: (event_store: Write::_EventStore, ?stream_factory: Write::StreamFactory) -> void
+        def call: (PgEventstore::Event terminal) -> Source?
+        def history: (Symbol stream, String id, Array[String] types, maximum_count: Integer, ?to_revision: Integer?) -> Array[PgEventstore::Event]
+        def first: (Symbol stream, String id, String type) -> PgEventstore::Event?
+        def at: (Symbol stream, String id, Integer revision) -> PgEventstore::Event?
+        def previous: (Symbol stream, String id, Array[String] types, Integer revision) -> PgEventstore::Event?
+        def indexed: (context: String, stream: String, types: Array[String], marker: String, through_position: Integer?) -> PgEventstore::Event?
+        def latest: (context: String, stream: String, types: Array[String], marker: String, through_position: Integer) -> PgEventstore::Event?
+        def marked: (Symbol stream, String id, String type, String marker) -> PgEventstore::Event?
+        private
+        def instruction_for: (String command_id, PgEventstore::Event registration) -> Hash[String, json]?
+        def renewal_effects: (String id, Integer through_position) -> Array[PgEventstore::Event]
+      end
+    end
+  end
+end

@@ -1,0 +1,10 @@
+module Coordinator
+  module Read
+    module CommandResults
+      class Verification
+        TOOLS: Array[String]
+        def call: (Source source) -> document
+      end
+    end
+  end
+end

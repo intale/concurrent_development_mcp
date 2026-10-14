@@ -899,11 +899,12 @@ module Coordinator
 
     register("projectors.command_receipts_v2", memoize: true) do
       Read::Projectors::CommandReceiptsV2.new(
-        source_loader: self["command_results.source_loader"],
-        assembler: self["command_results.assembler"],
-        receipts: self["repositories.command_receipts"],
-        processed_events: self["repositories.processed_projection_events"]
+        facts: self["read.command_results.facts"]
       )
+    end
+
+    register("read.command_results.facts", memoize: true) do
+      Read::CommandResults::FactReader.new(event_store: self["event_store"], stream_factory: self["stream_factory"])
     end
 
     register("projectors.user_utterances_v1", memoize: true) do

@@ -1,0 +1,21 @@
+module Coordinator
+  module Read
+    module CommandResults
+      class WorkIntentions
+        TOOLS: Array[String]
+        SET_TYPES: Array[String]
+        DEADLINE_TYPES: Array[String]
+        def initialize: (facts: FactReader) -> void
+        def call: (Source source) -> document
+        def reference: (Source source, PgEventstore::Event declaration) -> document
+        private
+        def evidence: (Source source, String id) -> document
+        def set_history: (Source source, String id) -> Array[PgEventstore::Event]
+        def memberships: (Source source, Array[PgEventstore::Event] events) -> Array[PgEventstore::Event]
+        def deadline: (String id, Integer position) -> PgEventstore::Event?
+        def timestamp: (Source source, String type, ?String? fallback) -> String
+        def abandonment: (Source source) -> document
+      end
+    end
+  end
+end

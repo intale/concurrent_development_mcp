@@ -2,7 +2,7 @@
 
 module Coordinator::Read
   module Subscriptions
-    class CommandReceipts < Coordinator::Shared::Subscriptions::Registration
+    class CommandReceipts < BatchRegistration
       DEFINITION = ReadModelDefinition.new(
         set_name: TaskResultSet::SET_NAME,
         subscription_name: "command-receipts-v2",

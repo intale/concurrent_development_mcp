@@ -1,0 +1,22 @@
+module Coordinator
+  module Read
+    module CommandResults
+      class Integration
+        TOOLS: Array[String]
+        def initialize: (facts: FactReader) -> void
+        def call: (Source source) -> document
+        private
+        def snapshot: (Source source) -> document
+        def verification: (Source source) -> document
+        def authorization: (Source source) -> document
+        def observation: (Source source) -> document
+        def preparation: (Source source) -> document
+        def repository_integration: (Source source) -> document
+        def release_verification: (Source source) -> document
+        def activation: (Source source) -> document
+        def compensation: (Source source) -> document
+        def result: (Source source, String summary, document data, String tool, Symbol key) -> document
+      end
+    end
+  end
+end

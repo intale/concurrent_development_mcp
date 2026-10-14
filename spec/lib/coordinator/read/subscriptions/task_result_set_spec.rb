@@ -22,5 +22,6 @@ RSpec.describe Coordinator::Read::Subscriptions::TaskResultSet do
       set_name: "coordinator-task-results-v1",
       subscription_name: "command-receipts-v2"
     )
+    expect(receipt_registration.in_batches).to be(true)
   end
 end
