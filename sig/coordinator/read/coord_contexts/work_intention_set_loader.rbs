@@ -1,31 +1,10 @@
-module Coordinator::Read
-  module CoordContexts
-    class WorkIntentionSetLoader
-      class Member < Data
-        def self.new: (
-          state: WorkIntentionStateV1,
-          history: Array[[PgEventstore::Event, Coordinator::Write::Events::Base]],
-          declaration_event: PgEventstore::Event,
-          resource: Coordinator::Write::Events::ResourceIdentityV2::Registered
-        ) -> instance
-
-        def state: () -> WorkIntentionStateV1
-        def history: () -> Array[[PgEventstore::Event, Coordinator::Write::Events::Base]]
-        def declaration_event: () -> PgEventstore::Event
-        def resource: () -> Coordinator::Write::Events::ResourceIdentityV2::Registered
+module Coordinator
+  module Read
+    module CoordContexts
+      class WorkIntentionSetLoader
+        def initialize: (event_store: Write::EventStore, ?stream_factory: Write::StreamFactory) -> void
+        def call: (PgEventstore::Event event) -> CommandResults::document
       end
-
-      def initialize: (
-        event_store: Coordinator::Write::EventStore,
-        ?stream_factory: Coordinator::Write::StreamFactory,
-        ?schema_registry: Coordinator::Write::EventSchemaRegistry
-      ) -> void
-
-      def call: (PgEventstore::Event, Coordinator::Write::Events::Base) -> Coordinator::Read::WorkIntentionSetViewV1
-
-      private
-
-      def previous_expiration: (Member) -> String?
     end
   end
 end

@@ -5,12 +5,10 @@ module Coordinator::Read
     class CoordContexts
       def initialize(
         state_loader: Projections::CoordContextStateLoader.new,
-        source_positions: Projections::CoordContextSourcePositions.new,
-        projection_timestamp: ProjectionTimestamp.new
+        source_positions: Projections::CoordContextSourcePositions.new
       )
         @state_loader = state_loader
         @source_positions = source_positions
-        @projection_timestamp = projection_timestamp
       end
 
       def fetch(change_set_id)
@@ -23,21 +21,6 @@ module Coordinator::Read
         return unless scope
 
         fetch(scope.change_set_id)
-      end
-
-      def store_attempt_event(event:, payload:, projection_version:)
-        case payload
-        when Coordinator::Read::AttemptDefinitionViewV1
-          store_attempt_definition(event:, payload:, projection_version:)
-        when Coordinator::Read::WorkIntentionSetViewV1
-          update_work_intention_set(event:, payload:)
-        when Coordinator::Read::AttemptAbandonmentViewV1
-          update_attempt_abandoned(event:, payload:)
-        when Coordinator::Read::AttemptCompletionViewV1
-          update_attempt_completed(event:, payload:)
-        end
-
-        nil
       end
 
       def attempt_page(work_item_id:, after_authorized_global_position:, limit:)
@@ -58,135 +41,6 @@ module Coordinator::Read
       end
 
       private
-
-      def store_attempt_definition(event:, payload:, projection_version:)
-        record = Coordinator::Read::AttemptHistory.find_or_initialize_by(attempt_id: payload.attempt_id)
-        record = reset_for_projection(record, projection_version:)
-        if record.persisted?
-          verify_attempt_definition!(record, payload:)
-          return
-        end
-
-        authorization = payload.authorization_event
-        record.assign_attributes(
-          change_set_id: payload.change_set_id,
-          work_item_id: payload.work_item_id,
-          agent_id: payload.agent_id,
-          base_snapshots: payload.base_snapshots.map(&:to_h),
-          status: "started",
-          authorization_event: event_reference(authorization).to_h,
-          authorized_global_position: authorization.global_position,
-          authorized_at_domain: payload.authorized_at,
-          started_at_domain: payload.started_at,
-          projection_version:,
-          updated_at: projection_time(record, event)
-        )
-        record.save!(touch: false)
-      end
-
-      def update_work_intention_set(event:, payload:)
-        record = attempt_history!(payload)
-        update_record(record, event,
-          work_intention_set_id: payload.set_id,
-          work_intention_set_repository_id: payload.repository_id,
-          work_intention_set_policy_version: payload.policy_version,
-          work_intention_set_intentions: sorted_resources(payload.intentions),
-          work_intention_set_declared_event: event_reference(payload.created_event).to_h,
-          work_intention_set_declared_at_domain: payload.declared_at,
-          work_intention_set_last_expanded_event: payload.last_expanded_event &&
-            event_reference(payload.last_expanded_event).to_h,
-          work_intention_set_last_expanded_at_domain: payload.last_expanded_at,
-          work_intention_set_last_renewed_event: payload.last_renewed_event &&
-            event_reference(payload.last_renewed_event).to_h,
-          work_intention_set_last_renewed_at_domain: payload.last_renewed_at,
-          work_intention_set_previous_expires_at_domain: payload.previous_expires_at,
-          work_intention_set_expires_at_domain: payload.expires_at,
-          work_intention_set_withdrawal_event: payload.withdrawal_event && event_reference(payload.withdrawal_event).to_h,
-          work_intention_set_withdrawn_at_domain: payload.withdrawn_at
-        )
-      end
-
-      def update_attempt_abandoned(event:, payload:)
-        record = attempt_history!(payload)
-        if record.status == "completed"
-          raise ProjectionStateError, "Completed Attempt #{payload.attempt_id} cannot be abandoned"
-        end
-
-        update_record(record, event,
-          status: "abandoned",
-          abandonment_reason: payload.reason,
-          terminal_event: event_reference(event).to_h,
-          terminal_at_domain: payload.abandoned_at
-        )
-      end
-
-      def update_attempt_completed(event:, payload:)
-        record = attempt_history!(payload)
-        if record.status == "abandoned"
-          raise ProjectionStateError, "Abandoned Attempt #{payload.attempt_id} cannot be completed"
-        end
-
-        update_record(record, event,
-          status: "completed",
-          selected_candidate_id: payload.candidate_id,
-          selected_candidate_event: payload.candidate_event.to_h,
-          terminal_event: event_reference(event).to_h,
-          terminal_at_domain: payload.completed_at
-        )
-      end
-
-      def verify_attempt_definition!(record, payload:)
-        authorization = payload.authorization_event
-        expected = {
-          change_set_id: payload.change_set_id,
-          work_item_id: payload.work_item_id,
-          agent_id: payload.agent_id,
-          base_snapshots: payload.base_snapshots.map(&:to_h),
-          authorization_event: event_reference(authorization).to_h,
-          authorized_global_position: authorization.global_position,
-          authorized_at_domain: Time.iso8601(payload.authorized_at),
-          started_at_domain: Time.iso8601(payload.started_at)
-        }
-        actual = expected.keys.to_h do |attribute|
-          value = record.public_send(attribute)
-          value = deep_symbolize(value) if value.is_a?(Hash) || value.is_a?(Array)
-          [ attribute, value ]
-        end
-        return if actual == expected
-
-        raise ProjectionStateError, "Attempt #{payload.attempt_id} definition evidence changed"
-      end
-
-      def attempt_history!(payload)
-        record = Coordinator::Read::AttemptHistory.find_by(attempt_id: payload.attempt_id)
-        raise ProjectionStateError, "Attempt #{payload.attempt_id} authorization is not projected" unless record
-        unless record.change_set_id == payload.change_set_id && record.work_item_id == payload.work_item_id
-          raise ProjectionStateError, "Attempt #{payload.attempt_id} history scope changed"
-        end
-
-        record
-      end
-
-      def reset_for_projection(record, projection_version:)
-        return record if record.new_record? || record.projection_version == projection_version
-
-        attempt_id = record.attempt_id
-        record.destroy!
-        Coordinator::Read::AttemptHistory.new(attempt_id:)
-      end
-
-      def terminal_status?(status)
-        %w[abandoned completed].include?(status)
-      end
-
-      def sorted_resources(resources)
-        resources.map { _1.respond_to?(:to_h) ? deep_symbolize(_1.to_h) : deep_symbolize(_1) }
-                 .sort_by { _1.fetch(:resource_id).b }
-      end
-
-      def timestamp(value)
-        value&.utc&.iso8601(6)
-      end
 
       def build_attempt_history(record)
         QueryResultV1::AttemptHistoryView.new(
@@ -210,28 +64,6 @@ module Coordinator::Read
             Coordinator::Write::EventReference.new(deep_symbolize(record.terminal_event)),
           terminal_at: record.terminal_at_domain&.utc&.iso8601(6)
         )
-      end
-
-      def event_reference(event)
-        Coordinator::Write::EventReference.new(
-          event_id: event.id,
-          type: event.type,
-          stream_context: event.stream.context,
-          stream_name: event.stream.stream_name,
-          stream_id: event.stream.stream_id,
-          stream_revision: event.stream_revision
-        )
-      end
-
-      def update_record(record, event, **attributes)
-        record.assign_attributes(
-          attributes.merge(updated_at: projection_time(record, event))
-        )
-        record.save!(touch: false)
-      end
-
-      def projection_time(record, event)
-        @projection_timestamp.call(current: record.updated_at, event:)
       end
 
       def build_snapshot(record)

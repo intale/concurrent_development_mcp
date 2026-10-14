@@ -35,25 +35,16 @@ RSpec.describe Coordinator::Read::CoordContexts::WorkIntentionSetLoader, :event_
     append(streams.resource_work_intention(intention_id), declaration)
   end
 
-  it "accepts replay of an earlier renewal after another renewal and withdrawal exist" do
+  it "returns the delivered renewal delta without fetching a later renewal or withdrawal" do
     first = append(streams.resource_work_intention(intention_id), renewal("01")).sole
-    last = append(streams.resource_work_intention(intention_id), renewal("02")).sole
-    withdrawn = append(streams.resource_work_intention(intention_id),
+    append(streams.resource_work_intention(intention_id), renewal("02"))
+    append(streams.resource_work_intention(intention_id),
       Coordinator::Write::Events::ResourceWorkIntentionWithdrawnV1.new(intention_id:, resource_id:, fencing_token: 1, reason: nil)).sole
 
     2.times do
-      view = loader.call(first, renewal("01"))
-      expect(view).to have_attributes(set_id:, last_renewed_event: last, withdrawal_event: withdrawn,
-        previous_expires_at: "2026-12-01T01:00:00.000000Z",
-        expires_at: "2026-12-01T02:00:00.000000Z")
+      view = loader.call(first)
+      expect(view).to include(set_id:, previous_expires_at: "2026-12-01T00:00:00.000000Z", expires_at: "2026-12-01T01:00:00.000000Z")
     end
-  end
-
-  it "rejects a trigger that belongs to another persisted intention stream" do
-    other = append(streams.resource_work_intention(SecureRandom.uuid_v7), renewal("01")).sole
-
-    expect { loader.call(other, renewal("01")) }
-      .to raise_error(Coordinator::Read::InvalidProjectionSource, "Work-intention trigger is absent from its source stream")
   end
 
   private

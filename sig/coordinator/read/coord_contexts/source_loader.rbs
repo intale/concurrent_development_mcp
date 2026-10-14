@@ -1,32 +1,19 @@
-module Coordinator::Read
-  module CoordContexts
-    interface _SourceLoader
-      def call: (PgEventstore::Event event, Coordinator::Write::Events::Base payload) -> (
-        Coordinator::Write::Events::Base |
-        Coordinator::Read::ChangeSetDefinitionViewV1 |
-        Coordinator::Read::WorkItemDefinitionViewV1 |
-        Coordinator::Read::WorkItemCompletionViewV1 |
-        Coordinator::Read::AttemptDefinitionViewV1 |
-        Coordinator::Read::AttemptAbandonmentViewV1 |
-        Coordinator::Read::AttemptCompletionViewV1 |
-        Coordinator::Read::WorkIntentionSetViewV1 |
-        Coordinator::Read::CandidateSubmissionViewV2 |
-        nil
-      )
-    end
-
-    class SourceLoader
-      include _SourceLoader
-
-      def initialize: (
-        event_store: Coordinator::Write::EventStore,
-        submission_loader: Coordinator::Read::Candidates::_SubmissionLoader,
-        ?change_set_definition_loader: Coordinator::Read::ChangeSets::DefinitionLoader,
-        ?work_item_definition_loader: Coordinator::Read::WorkItems::DefinitionLoader,
-        ?work_item_completion_loader: Coordinator::Read::WorkItems::CompletionLoader,
-        ?attempt_definition_loader: Coordinator::Read::Attempts::DefinitionLoader,
-        ?work_intention_set_loader: Coordinator::Read::CoordContexts::WorkIntentionSetLoader
-      ) -> void
+module Coordinator
+  module Read
+    module CoordContexts
+      interface _SourceLoader
+        def call: (PgEventstore::Event event) -> CommandResults::document?
+      end
+      class SourceLoader
+        include _SourceLoader
+        COMPONENT_TYPES: Array[String]
+        def initialize: (event_store: Write::EventStore, submission_loader: Candidates::_SubmissionLoader,
+          ?change_set_definition_loader: ChangeSets::DefinitionLoader, ?work_item_definition_loader: WorkItems::DefinitionLoader,
+          ?work_item_completion_loader: WorkItems::CompletionLoader, ?attempt_definition_loader: Attempts::DefinitionLoader,
+          ?work_intention_set_loader: WorkIntentionSetLoader) -> void
+        private
+        def candidate: (String id) -> CommandResults::document
+      end
     end
   end
 end

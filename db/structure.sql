@@ -173,7 +173,8 @@ CREATE TABLE public.coordinator_contexts (
     last_processed_at timestamp(6) without time zone NOT NULL,
     projection_version integer NOT NULL,
     source_positions jsonb DEFAULT '[]'::jsonb NOT NULL,
-    updated_at timestamp(6) without time zone NOT NULL
+    updated_at timestamp(6) without time zone NOT NULL,
+    repository_checkpoint_numbers jsonb DEFAULT '{}'::jsonb NOT NULL
 );
 
 
@@ -564,7 +565,8 @@ CREATE TABLE public.attempt_histories (
     work_intention_set_expires_at_domain timestamp(6) without time zone,
     work_intention_set_withdrawal_event jsonb,
     work_intention_set_withdrawn_at_domain timestamp(6) without time zone,
-    projection_version integer DEFAULT 4 NOT NULL
+    projection_version integer DEFAULT 4 NOT NULL,
+    work_intention_member_states jsonb DEFAULT '{}'::jsonb NOT NULL
 );
 
 
@@ -3440,6 +3442,7 @@ ALTER TABLE ONLY public.operation_batch_outcomes
 SET search_path TO "$user", public;
 
 INSERT INTO "schema_migrations" (version) VALUES
+('20261014131800'),
 ('20261014125000'),
 ('20261012111000'),
 ('20261011053000'),

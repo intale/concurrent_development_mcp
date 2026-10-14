@@ -864,10 +864,7 @@ module Coordinator
 
     register("projectors.coord_context_v1", memoize: true) do
       Read::Projectors::CoordContextV1.new(
-        source_loader: self["read.coord_contexts.source_loader"],
-        schema_registry: self["event_schema_registry"],
-        contexts: self["repositories.coord_contexts"],
-        processed_events: self["repositories.processed_projection_events"]
+        source_loader: self["read.coord_contexts.source_loader"]
       )
     end
 

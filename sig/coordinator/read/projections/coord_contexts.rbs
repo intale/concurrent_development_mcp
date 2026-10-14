@@ -1,0 +1,33 @@
+module Coordinator
+  module Read
+    module Projections
+      class CoordContexts
+        VERSION: Integer
+        WORK_ITEM_LIMIT: Integer
+        DEPENDENCY_LIMIT: Integer
+        ATTEMPT_LIMIT: Integer
+        def self.initial: () -> CommandResults::document
+        def initialize: (contexts: Batches::ColumnPatches, histories: Batches::ColumnPatches, scopes: Batches::ColumnPatches,
+          ?documents: Hash[String, CommandResults::document], ?positions: Hash[String, Array[CommandResults::document]],
+          ?checkpoint_numbers: Hash[String, CommandResults::document], ?history_documents: Hash[String, CommandResults::document]) -> void
+        def apply: (PgEventstore::Event event, source: CommandResults::document) -> nil
+        private
+        def work_item_defaults: () -> CommandResults::document
+        def work_item: (CommandResults::document state, CommandResults::document source, **CommandResults::json changes) -> nil
+        def member: (CommandResults::document state, Symbol collection, Symbol key, CommandResults::document changes, ?defaults: CommandResults::document) -> nil
+        def existing: (CommandResults::document state, Symbol collection, Symbol key, String id, **CommandResults::json changes) -> nil
+        def attempt_started: (CommandResults::document state, CommandResults::document source, PgEventstore::Event event) -> nil
+        def attempt_terminal: (CommandResults::document state, CommandResults::document source, PgEventstore::Event event) -> nil
+        def intention: (CommandResults::document state, CommandResults::document source, PgEventstore::Event event) -> nil
+        def upsert_intention: (Array[CommandResults::document] references, CommandResults::document member) -> Array[CommandResults::document]
+        def initial_set: (CommandResults::document source) -> CommandResults::document
+        def set_from_history: (CommandResults::document history) -> CommandResults::document
+        def history_attributes: (CommandResults::document source, CommandResults::document set, CommandResults::document history, CommandResults::document tracking) -> CommandResults::document
+        def retain: (CommandResults::document state) -> Array[CommandResults::document]
+        def persist_context: (String id, CommandResults::document state, PgEventstore::Event event) -> nil
+        def retained_streams: (CommandResults::document state) -> Array[Array[String]]
+        def roots: (CommandResults::document source, PgEventstore::Event event) -> nil
+      end
+    end
+  end
+end

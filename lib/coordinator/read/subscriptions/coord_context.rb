@@ -2,7 +2,7 @@
 
 module Coordinator::Read
   module Subscriptions
-    class CoordContext < Coordinator::Shared::Subscriptions::Registration
+    class CoordContext < BatchRegistration
       DEFINITION = ReadModelDefinition.new(
         set_name: ReadModelSet::SET_NAME,
         subscription_name: "coord-context-v7",
@@ -11,12 +11,17 @@ module Coordinator::Read
           Coordinator::Shared::Subscriptions::StreamFilter.new(context: "DevelopmentExecution", stream_name: "WorkItem"),
           Coordinator::Shared::Subscriptions::StreamFilter.new(context: "DevelopmentExecution", stream_name: "Attempt"),
           Coordinator::Shared::Subscriptions::StreamFilter.new(context: "DevelopmentIntegration", stream_name: "Candidate"),
+          Coordinator::Shared::Subscriptions::StreamFilter.new(context: "DevelopmentIntegration", stream_name: "CheckpointStatistics"),
           Coordinator::Shared::Subscriptions::StreamFilter.new(
             context: "DevelopmentCoordination",
             stream_name: "ResourceWorkIntention"
           )
         ],
-        event_types: Contracts::CoordContextSourceEvent::EVENT_TYPES
+        event_types: %w[ChangeSetAcceptanceCriteriaDefined WorkItemCompetitiveModeSelected WorkItemDependencyDeclared
+          ChangeSetActivated WorkItemDependencySatisfied ChangeSetCompleted WorkItemMadeReady WorkItemAcquired WorkItemCandidateSelected
+          WorkItemCompleted WorkItemRequeued AttemptStarted AttemptAbandoned AttemptCompleted CandidateSubmitted
+          ResourceWorkIntentionDeclared ResourceWorkIntentionRenewed ResourceWorkIntentionWithdrawn ResourceWorkIntentionExpired
+          ChangeSetRepositoryCheckpointNumberChanged]
       )
 
       def initialize(handler:, pull_interval: 1.0)

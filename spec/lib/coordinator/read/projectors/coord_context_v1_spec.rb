@@ -25,8 +25,8 @@ RSpec.describe Coordinator::Read::Projectors::CoordContextV1, :read_model, :even
 
   it "atomically projects current definition facts with exact source identities and duplicate protection" do
     planning = planning_events
-    planning.each { projector.call(_1) }
-    2.times { projector.call(planning.last) }
+    planning.each { projector.call([ _1 ]) }
+    2.times { projector.call([ planning.last ]) }
 
     snapshot = repository.resolve(scope_kind: "work_item", scope_id: work_item_id)
     expect(snapshot.state.change_set).to have_attributes(
@@ -35,18 +35,11 @@ RSpec.describe Coordinator::Read::Projectors::CoordContextV1, :read_model, :even
     expect(snapshot.state.work_item_ids).to eq([ work_item_id ])
     expect(snapshot.state.work_items.sole).to have_attributes(work_item_id:, repository_id:, status: "planned")
     expect(snapshot.source_positions.length).to eq(2)
-    expect(processed_events.count).to eq(2)
+    expect(processed_events.count).to eq(0)
     expect(Coordinator::Read::CoordContextScope.find_by!(scope_kind: "work_item", scope_id: work_item_id).updated_at)
       .to eq(planning.last.created_at)
     expect(snapshot.state.change_set.created_at).to eq(timestamp(planning.first))
     expect(snapshot.state.work_items.sole.created_at).to eq(timestamp(planning.fetch(3)))
-  end
-
-  it "keeps the projection available when a broad type filter encounters a superseded schema" do
-    event = planning_events.first
-    event.metadata["schema_version"] = 1
-
-    expect { projector.call(event) }.not_to change(Coordinator::Read::ProcessedProjectionEvent, :count)
   end
 
   it "converges when definition-component deliveries surround the complete WorkItem definition" do
@@ -54,11 +47,11 @@ RSpec.describe Coordinator::Read::Projectors::CoordContextV1, :read_model, :even
     change_definition = planning.fetch(2)
     work_definition = planning.last
     components = [ planning.first, planning.fetch(3), planning.fetch(4) ]
-    [ change_definition, *components, work_definition ].each { projector.call(_1) }
+    [ change_definition, *components, work_definition ].each { projector.call([ _1 ]) }
     first_document = Coordinator::Read::CoordContext.find(change_set_id).document
 
     ReadModelTestSafety.clean!
-    [ change_definition, work_definition, *components.reverse ].each { projector.call(_1) }
+    [ change_definition, work_definition, *components.reverse ].each { projector.call([ _1 ]) }
 
     expect(Coordinator::Read::CoordContext.find(change_set_id).document).to eq(first_document)
   end
@@ -73,23 +66,23 @@ RSpec.describe Coordinator::Read::Projectors::CoordContextV1, :read_model, :even
         change_set_id:, work_item_id:, attempt_id:, agent_id:, reason:
       )).sole
 
-    events.each { projector.call(_1) }
-    [ abandoned, requeued, abandoned, requeued ].each { projector.call(_1) }
+    events.each { projector.call([ _1 ]) }
+    [ abandoned, requeued, abandoned, requeued ].each { projector.call([ _1 ]) }
     first_document = Coordinator::Read::CoordContext.find(change_set_id).document
     assert_abandoned_context(abandoned, reason:)
 
     ReadModelTestSafety.clean!
-    events.each { projector.call(_1) }
-    [ requeued, abandoned ].each { projector.call(_1) }
+    events.each { projector.call([ _1 ]) }
+    [ requeued, abandoned ].each { projector.call([ _1 ]) }
 
     expect(Coordinator::Read::CoordContext.find(change_set_id).document).to eq(first_document)
     assert_abandoned_context(abandoned, reason:)
   end
 
   it "projects exact ownership, Attempt bases and current work-intention lifecycle evidence" do
-    active_attempt_events.each { projector.call(_1) }
+    active_attempt_events.each { projector.call([ _1 ]) }
     declared = intention_events
-    declared.each { projector.call(_1) }
+    declared.each { projector.call([ _1 ]) }
 
     context = repository.resolve(scope_kind: "attempt", scope_id: attempt_id).state
     expect(context.change_set.status).to eq("active")
@@ -113,12 +106,12 @@ RSpec.describe Coordinator::Read::Projectors::CoordContextV1, :read_model, :even
       Coordinator::Write::Events::ResourceWorkIntentionRenewedV1.new(
         intention_id:, resource_id:, fencing_token: 1, expires_at: "2026-12-01T01:00:00.000000Z"
       )).sole
-    projector.call(renewed)
+    projector.call([ renewed ])
     withdrawn = append(streams.resource_work_intention(intention_id),
       Coordinator::Write::Events::ResourceWorkIntentionWithdrawnV1.new(
         intention_id:, resource_id:, fencing_token: 1, reason: "Checkpoint published"
       )).sole
-    2.times { projector.call(withdrawn) }
+    2.times { projector.call([ withdrawn ]) }
 
     set = repository.resolve(scope_kind: "attempt", scope_id: attempt_id).state.attempts.sole.work_intention_set
     expect(set).to have_attributes(
@@ -137,26 +130,62 @@ RSpec.describe Coordinator::Read::Projectors::CoordContextV1, :read_model, :even
     expect(history.updated_at).to eq(withdrawn.created_at)
   end
 
-  it "rebuilds projection-owned Attempt history when its projection version advances" do
-    create(:coordinator_read_attempt_history, :with_work_intention_set,
-      attempt_id:, change_set_id:, work_item_id:,
-      projection_version: described_class::PROJECTION.version - 1)
+  it "does not reset independently projected intention fields when a version number differs" do
+    record = create(:coordinator_read_attempt_history, :with_work_intention_set,
+      attempt_id:, change_set_id:, work_item_id:, projection_version: 1)
+    original_set = record.work_intention_set_id
+    projector.call(active_attempt_events)
+    expect(record.reload).to have_attributes(
+      projection_version: Coordinator::Read::Projections::CoordContexts::VERSION, agent_id:, status: "started",
+      work_intention_set_id: original_set)
+  end
 
-    active_attempt_events.each { projector.call(_1) }
+  it "replays definitions without overwriting completed WorkItem lifecycle or dependency satisfaction" do
+    events = active_attempt_events
+    projector.call(events)
+    finished = ProjectionEventFactory.build(
+      payload: Coordinator::Write::Events::ChangeSetCompletedV2.new(change_set_id:), stream: streams.change_set(change_set_id),
+      stream_revision: 4, global_position: 1000, policy_version: "changeset-completion/v2")
+    projector.call([ finished ])
+    projector.call(events.first(9))
+    expect(repository.fetch(change_set_id).state.change_set.status).to eq("completed")
+    expect(processed_events.count).to eq(0)
+  end
 
-    history = Coordinator::Read::AttemptHistory.find(attempt_id)
-    expect(history).to have_attributes(
-      projection_version: described_class::PROJECTION.version, agent_id:, status: "started",
-      work_intention_set_id: nil, work_intention_set_intentions: []
-    )
+  it "bulk folds a thousand activations while preserving unrelated document fields" do
+    rows = Array.new(1000) { attributes_for(:coordinator_read_coord_context, change_set_status: "planning") }
+    Coordinator::Read::CoordContext.insert_all!(rows)
+    events = rows.map.with_index do |row, index|
+      ProjectionEventFactory.build(payload: Coordinator::Write::Events::ChangeSetActivatedV2.new(change_set_id: row.fetch(:change_set_id)),
+        stream: streams.change_set(row.fetch(:change_set_id)), stream_revision: 3, global_position: index + 2000,
+        policy_version: "changeset-activation/v2")
+    end
+    statements = []
+    ActiveSupport::Notifications.subscribed(->(*args) { statements << args.last.fetch(:sql) }, "sql.active_record") { projector.call(events) }
+    context_updates = statements.select { _1.start_with?('UPDATE "coordinator_contexts"') }
+    expect(context_updates.length).to be_between(1, 20)
+    expect(Coordinator::Read::CoordContext.first.document.fetch("work_items")).to eq(rows.first.fetch(:document).fetch("work_items"))
+    expect(Coordinator::Read::CoordContext.pluck(:document).map { _1.fetch("change_set").fetch("status") }.uniq).to eq([ "active" ])
+    expect(processed_events.count).to eq(0)
+  end
+
+  it "projects absolute repository checkpoint numbers independently of the clipped checkpoint list" do
+    record = create(:coordinator_read_coord_context, change_set_id:, repository_id:, candidate_checkpoint_count: 1)
+    number = ProjectionEventFactory.build(
+      payload: Coordinator::Write::Events::ProjectionNumbers::ChangeSetRepositoryCheckpointNumberChangedV1.new(
+        change_set_id:, repository_id:, checkpoints_number: 153),
+      stream: streams.checkpoint_statistics(SecureRandom.uuid_v7), stream_revision: 1, global_position: 2000, policy_version: "projection-numbers/v1")
+    2.times { projector.call([ number ]) }
+    expect(record.reload.repository_checkpoint_numbers).to eq(repository_id => 153)
+    expect(record.document.fetch("candidate_checkpoints").length).to eq(1)
   end
 
   it "retains the latest observed Candidate checkpoint while Candidate history remains separate" do
-    active_attempt_events.each { projector.call(_1) }
+    active_attempt_events.each { projector.call([ _1 ]) }
     intention_events
     first = candidate_events(checkpoint_kind: "intermediate", head_character: "b")
     second = candidate_events(checkpoint_kind: "handoff", head_character: "e")
-    [ first.last, second.last ].each { projector.call(_1) }
+    [ first.last, second.last ].each { projector.call([ _1 ]) }
 
     checkpoint = repository.resolve(scope_kind: "attempt", scope_id: attempt_id).state.candidate_checkpoints.sole
     expect(checkpoint).to have_attributes(
@@ -167,10 +196,10 @@ RSpec.describe Coordinator::Read::Projectors::CoordContextV1, :read_model, :even
   end
 
   it "serves observed final-Candidate context before completion, then converges lean terminal facts" do
-    active_attempt_events.each { projector.call(_1) }
+    active_attempt_events.each { projector.call([ _1 ]) }
     intention_events
     candidate = candidate_events(checkpoint_kind: "final", head_character: "e").last
-    projector.call(candidate)
+    projector.call([ candidate ])
     before_completion = Coordinator::Read::Queries::CoordContext.new.call(attempt_id:).value!
     expect(before_completion.data.context.work_items.sole.status).to eq("acquired")
 
@@ -187,7 +216,7 @@ RSpec.describe Coordinator::Read::Projectors::CoordContextV1, :read_model, :even
       Coordinator::Write::Events::AttemptCompletedV2.new(attempt_id:)).sole
     change_completed = append(streams.change_set(change_set_id),
       Coordinator::Write::Events::ChangeSetCompletedV2.new(change_set_id:)).sole
-    [ selected, output, completed, attempt_completed, change_completed ].each { projector.call(_1) }
+    [ selected, output, completed, attempt_completed, change_completed ].each { projector.call([ _1 ]) }
 
     converged = Coordinator::Read::Queries::CoordContext.new.call(change_set_id:).value!
     expect(converged.status).to eq("ok")
@@ -208,8 +237,8 @@ RSpec.describe Coordinator::Read::Projectors::CoordContextV1, :read_model, :even
     producer_id = work_item_id
     consumer_id = SecureRandom.uuid_v7
     dependency_id = SecureRandom.uuid_v7
-    planning_events.each { projector.call(_1) }
-    work_item_definition_events(consumer_id).each { projector.call(_1) }
+    planning_events.each { projector.call([ _1 ]) }
+    work_item_definition_events(consumer_id).each { projector.call([ _1 ]) }
     dependency = {
       change_set_id:, dependency_id:, producer_work_item_id: producer_id,
       consumer_work_item_id: consumer_id, dependency_kind: "requires_completion", required_output: nil
@@ -218,7 +247,7 @@ RSpec.describe Coordinator::Read::Projectors::CoordContextV1, :read_model, :even
       Coordinator::Write::Events::WorkItemDependencyDeclaredV2.new(dependency)).sole
     activated = append(streams.change_set(change_set_id),
       Coordinator::Write::Events::ChangeSetActivatedV2.new(change_set_id:)).sole
-    [ declared, activated ].each { projector.call(_1) }
+    [ declared, activated ].each { projector.call([ _1 ]) }
     blocked = Coordinator::Read::Queries::CoordContext.new.call(work_item_id: consumer_id).value!
     expect(blocked.data.blockers.sole.dependency_id).to eq(dependency_id)
 
@@ -229,7 +258,7 @@ RSpec.describe Coordinator::Read::Projectors::CoordContextV1, :read_model, :even
     )
     satisfied = append(streams.work_item(consumer_id),
       Coordinator::Write::Events::WorkItemDependencySatisfiedV2.new(dependency.merge(source: completed_source))).sole
-    projector.call(satisfied)
+    projector.call([ satisfied ])
 
     observed = Coordinator::Read::Queries::CoordContext.new.call(work_item_id: consumer_id).value!
     expect(observed.data.blockers).to be_empty
@@ -243,7 +272,7 @@ RSpec.describe Coordinator::Read::Projectors::CoordContextV1, :read_model, :even
         change_set_id:, work_item_id: consumer_id, readiness_decision_id: SecureRandom.uuid_v7,
         reason: "dependencies_satisfied"
       )).sole
-    projector.call(ready)
+    projector.call([ ready ])
     converged = Coordinator::Read::Queries::CoordContext.new.call(work_item_id: consumer_id).value!
     expect(converged.data.blockers).to be_empty
     expect(converged.next_actions).to be_empty

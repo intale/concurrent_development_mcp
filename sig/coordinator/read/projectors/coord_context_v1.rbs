@@ -2,21 +2,7 @@ module Coordinator
   module Read
     module Projectors
       class CoordContextV1
-        PROJECTION: ProjectionDefinition
-
-        def initialize: (
-          source_loader: CoordContexts::_SourceLoader,
-          ?contract: Contracts::CoordContextSourceEvent,
-          ?schema_registry: Write::EventSchemaRegistry,
-          ?reducer: Projections::CoordContextReducer,
-          ?state_loader: Projections::CoordContextStateLoader,
-          ?source_positions: Projections::CoordContextSourcePositions,
-          ?scope_roots_builder: ProjectionScopeRootsBuilder,
-          ?contexts: Repositories::CoordContexts,
-          ?processed_events: Repositories::ProcessedProjectionEvents,
-          ?projection_timestamp: ProjectionTimestamp
-        ) -> void
-        def call: (PgEventstore::Event event) -> void
+        def call: (Array[PgEventstore::Event] events) -> nil
       end
     end
   end

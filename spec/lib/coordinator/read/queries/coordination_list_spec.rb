@@ -91,6 +91,16 @@ RSpec.describe Coordinator::Read::Queries::CoordinationList, :read_model do
     expect(invalid.data).to have_attributes(code: "invalid_input")
   end
 
+  it "uses modeled repository numbers even when recent checkpoint detail is clipped" do
+    repository_id = COORDINATION_REPOSITORY_IDS.first
+    create(:coordinator_read_repository, repository_id:, scope: "project:counted")
+    create(:coordinator_read_coord_context, repository_id:, candidate_checkpoint_count: 1,
+      repository_checkpoint_numbers: { repository_id => 153 })
+
+    item = query.call(scope: "project:counted").value!.data.page.items.sole
+    expect(item.candidate_checkpoint_count).to eq(153)
+  end
+
   def create_coordination(
     change_set_id:,
     work_item_id:,

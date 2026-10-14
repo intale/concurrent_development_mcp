@@ -77,9 +77,7 @@ module Coordinator::Read
         scoped_attempts = state.attempts.select { scoped_work_item_ids.include?(_1.work_item_id) }
         active_attempt_ids = scoped_attempts.reject { %w[abandoned completed].include?(_1.status) }
           .map(&:attempt_id).uniq.sort_by(&:b)
-        checkpoint_count = state.candidate_checkpoints.count do |checkpoint|
-          scoped_work_item_ids.include?(checkpoint.work_item_id)
-        end
+        checkpoint_count = repository_ids.sum { record.repository_checkpoint_numbers.fetch(_1, 0) }
         change_set = state.change_set
         raise ProjectionStateError, "Coordination discovery row has no ChangeSet" unless change_set
 

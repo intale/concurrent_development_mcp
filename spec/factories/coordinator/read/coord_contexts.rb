@@ -13,6 +13,7 @@ FactoryBot.define do
     sequence(:change_set_id) { "CS-factory-#{_1}" }
     projection_version { 2 }
     last_processed_at { Time.utc(2026, 8, 30, 12) }
+    repository_checkpoint_numbers { { repository_id => candidate_checkpoint_count } }
     source_positions do
       [
         {

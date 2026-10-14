@@ -3,99 +3,18 @@
 RSpec.describe Coordinator::Read::Repositories::CoordContexts, :read_model do
   subject(:repository) { described_class.new }
 
-  it "replaces earlier work-intention evidence with the latest observed set" do
-    attempt_id = SecureRandom.uuid_v7
-    change_set_id = SecureRandom.uuid_v7
-    work_item_id = SecureRandom.uuid_v7
-    repository_id = SecureRandom.uuid_v7
-    set_id = SecureRandom.uuid_v7
-    intention_id = SecureRandom.uuid_v7
-    resource_id = SecureRandom.uuid_v7
-    create(
-      :coordinator_read_attempt_history,
-      :with_work_intention_set,
-      attempt_id:,
-      change_set_id:,
-      work_item_id:,
-      projection_version: Coordinator::Read::Projectors::CoordContextV1::PROJECTION.version
-    )
-    declaration = Coordinator::Write::Events::ResourceWorkIntentionDeclaredV1.new(
-      intention_id:,
-      set_id:,
-      resource_id:,
-      repository_id:,
-      change_set_id:,
-      work_item_id:,
-      attempt_id:,
-      agent_id: "agent-rebuild",
-      mode: "shared",
-      purpose: "Continue the same Attempt after earlier coordination expired",
-      context: "The latest available projection observes a replacement set.",
-      object_format: "sha1",
-      base_commit_oid: "a" * 40,
-      base_blob_oid: "b" * 40,
-      fencing_token: 2,
-      expires_at: "2026-09-11T13:00:00.000000Z"
-    )
-    event = ProjectionEventFactory.build(
-      payload: declaration,
-      stream: Coordinator::Write::StreamFactory.new.resource_work_intention(intention_id),
-      stream_revision: 0,
-      global_position: 1_000,
-      policy_version: Coordinator::Write::WorkIntentionPolicyV1::VERSION,
-      created_at: Time.utc(2026, 9, 11, 12)
-    )
-    view = Coordinator::Read::WorkIntentionSetViewV1.new(
-      set_id:,
-      change_set_id:,
-      work_item_id:,
-      attempt_id:,
-      repository_id:,
-      agent_id: "agent-rebuild",
-      policy_version: Coordinator::Write::WorkIntentionPolicyV1::VERSION,
-      intentions: [
-        Coordinator::Read::WorkIntentionViewV1.new(
-          intention_id:,
-          resource_id:,
-          resource_kind: "file",
-          resource_path: "app/models/example.rb",
-          base_blob_oid: "b" * 40,
-          mode: "shared",
-          purpose: "Continue the same Attempt after earlier coordination expired",
-          context: "The latest available projection observes a replacement set.",
-          fencing_token: 2
-        )
-      ],
-      created_event: event,
-      last_expanded_event: nil,
-      last_renewed_event: nil,
-      withdrawal_event: nil,
-      declared_at: "2026-09-11T12:00:00.000000Z",
-      last_expanded_at: nil,
-      last_renewed_at: nil,
-      previous_expires_at: nil,
-      expires_at: "2026-09-11T13:00:00.000000Z",
-      withdrawn_at: nil
-    )
-
-    repository.store_attempt_event(
-      event:,
-      payload: view,
-      projection_version: Coordinator::Read::Projectors::CoordContextV1::PROJECTION.version
-    )
-
-    history = Coordinator::Read::AttemptHistory.find(attempt_id)
-    expect(history).to have_attributes(
-      work_intention_set_id: set_id,
-      work_intention_set_repository_id: repository_id,
-      work_intention_set_declared_at_domain: Time.utc(2026, 9, 11, 12),
-      work_intention_set_expires_at_domain: Time.utc(2026, 9, 11, 13)
-    )
-    expect(history.work_intention_set_intentions.sole).to include(
-      "intention_id" => intention_id,
-      "resource_id" => resource_id,
-      "resource_path" => "app/models/example.rb",
-      "fencing_token" => 2
-    )
+  it "serves factory-backed context and paged Attempt history without write-side or subscription state" do
+    context = create(:coordinator_read_coord_context)
+    create(:coordinator_read_coord_context_scope, scope_kind: "change_set", scope_id: context.change_set_id, change_set_id: context.change_set_id)
+    first = create(:coordinator_read_attempt_history, change_set_id: context.change_set_id, work_item_id: "W-page", authorized_global_position: 10)
+    second = create(:coordinator_read_attempt_history, change_set_id: context.change_set_id, work_item_id: "W-page", authorized_global_position: 20)
+    snapshot = repository.resolve(scope_kind: "change_set", scope_id: context.change_set_id)
+    expect(snapshot.state.change_set.change_set_id).to eq(context.change_set_id)
+    first_page = repository.attempt_page(work_item_id: "W-page", after_authorized_global_position: nil, limit: 1)
+    expect(first_page).to have_attributes(has_more: true, next_authorized_global_position: 10)
+    expect(first_page.items.sole.attempt_id).to eq(first.attempt_id)
+    last_page = repository.attempt_page(work_item_id: "W-page", after_authorized_global_position: 10, limit: 1)
+    expect(last_page.items.sole.attempt_id).to eq(second.attempt_id)
+    expect(last_page.has_more).to be(false)
   end
 end

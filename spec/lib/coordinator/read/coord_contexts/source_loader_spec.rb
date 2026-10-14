@@ -102,18 +102,13 @@ RSpec.describe Coordinator::Read::CoordContexts::SourceLoader, :event_store do
       Coordinator::Write::Events::WorkItemCompletedV2.new(work_item_id:)
     )
 
-    change_set = load(change_set_events.last)
-    work_item = load(work_item_events.last)
-    attempt = load(attempt_events.last)
-    completion = load(completion_events.last)
-
-    expect(loader.call(change_set_events.last, change_set)).to have_attributes(
+    expect(loader.call(change_set_events.last)).to include(
       change_set_id:,
       goal: "Rebuild the read side",
       acceptance_criteria: [ "The projection is deterministic" ],
       created_at: timestamp(change_set_events.first)
     )
-    expect(loader.call(work_item_events.last, work_item)).to have_attributes(
+    expect(loader.call(work_item_events.last)).to include(
       work_item_id:,
       change_set_id:,
       repository_id:,
@@ -122,7 +117,7 @@ RSpec.describe Coordinator::Read::CoordContexts::SourceLoader, :event_store do
       competitive_mode: false,
       created_at: timestamp(work_item_events.first)
     )
-    expect(loader.call(attempt_events.last, attempt)).to have_attributes(
+    expect(loader.call(attempt_events.last)).to include(
       attempt_id:,
       change_set_id:,
       work_item_id:,
@@ -130,13 +125,13 @@ RSpec.describe Coordinator::Read::CoordContexts::SourceLoader, :event_store do
       authorized_at: timestamp(attempt_events.first),
       started_at: timestamp(attempt_events.last)
     )
-    expect(loader.call(completion_events.last, completion)).to have_attributes(
+    expect(loader.call(completion_events.last)).to include(
       work_item_id:,
       change_set_id:,
       attempt_id:,
       candidate_id:,
-      candidate_event:,
-      produced_outputs: [ Coordinator::Write::WorkItemOutputV1.new(kind: "artifact", key: output_key) ],
+      candidate_event: candidate_event.to_h,
+      produced_outputs: [ { kind: "artifact", key: output_key } ],
       completed_at: timestamp(completion_events.last)
     )
   end
@@ -154,14 +149,6 @@ RSpec.describe Coordinator::Read::CoordContexts::SourceLoader, :event_store do
       )
     end
     event_store.append(stream, events)
-  end
-
-  def load(event)
-    Coordinator::Write::EventSchemaRegistry.new.load(
-      type: event.type,
-      schema_version: event.metadata.fetch("schema_version"),
-      data: event.data
-    )
   end
 
   def timestamp(event)

@@ -12,6 +12,7 @@ FactoryBot.define do
     end
     status { "authorized" }
     projection_version { 7 }
+    work_intention_member_states { {} }
     authorization_event do
       { "event_id" => SecureRandom.uuid_v7, "type" => "AttemptStarted",
         "stream_context" => "DevelopmentCoordination", "stream_name" => "Attempt",
