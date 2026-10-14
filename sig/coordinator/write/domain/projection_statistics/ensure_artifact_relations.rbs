@@ -1,0 +1,11 @@
+module Coordinator
+  module Write
+    module Domain
+      module ProjectionStatistics
+        class EnsureArtifactRelations
+          def call: (command: Coordinator::Write::Commands::EnsureDevelopmentArtifactRelationStatistics, artifact_exists: bool) -> Dry::Monads::Result
+        end
+      end
+    end
+  end
+end

@@ -1,0 +1,18 @@
+module Coordinator
+  module Write
+    module ProjectionStatistics
+      class ArtifactRelationsLoader
+        def initialize: (event_store: Coordinator::Write::_EventStore, ?stream_factory: Coordinator::Write::StreamFactory, ?registry: Coordinator::Write::EventSchemaRegistry, ?markers: ArtifactRelationMarkers) -> void
+        def selector: (String artifact_id) -> Coordinator::Write::NaturalKeys::Registry::SelectorV1
+        def state: (String statistics_id) -> ArtifactRelationStateV1
+        def source: (Coordinator::Write::EventReference reference, artifact_id: String) -> PgEventstore::Event?
+        def reconciled?: (String statistics_id, String source_event_id) -> bool
+        def failure_recorded?: (String statistics_id, String command_id) -> bool
+        def relation_states: (String artifact_id) -> Array[Coordinator::Write::Domain::DevelopmentArtifacts::RelationStateV2]
+
+        private
+        def marked?: (String statistics_id, String event_type, String marker) -> bool
+      end
+    end
+  end
+end

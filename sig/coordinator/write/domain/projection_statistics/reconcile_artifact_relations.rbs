@@ -1,0 +1,11 @@
+module Coordinator
+  module Write
+    module Domain
+      module ProjectionStatistics
+        class ReconcileArtifactRelations
+          def call: (command: Coordinator::Write::Commands::ReconcileDevelopmentArtifactRelationsNumber, state: Coordinator::Write::ProjectionStatistics::ArtifactRelationStateV1, relation_states: Array[Coordinator::Write::Domain::DevelopmentArtifacts::RelationStateV2], already_reconciled: bool) -> Dry::Monads::Result
+        end
+      end
+    end
+  end
+end

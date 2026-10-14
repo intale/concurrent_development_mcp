@@ -1,0 +1,12 @@
+module Coordinator
+  module Write
+    module Commands
+      class EnsureDevelopmentArtifactRelationStatistics < Coordinator::Shared::Value
+        def command_id: () -> String
+        def actor: () -> Coordinator::Write::Commands::Actor
+        def artifact_id: () -> String
+        def statistics_id: () -> String
+      end
+    end
+  end
+end

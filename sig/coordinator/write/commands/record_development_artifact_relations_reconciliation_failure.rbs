@@ -1,0 +1,13 @@
+module Coordinator
+  module Write
+    module Commands
+      class RecordDevelopmentArtifactRelationsReconciliationFailure < Coordinator::Shared::Value
+        def command_id: () -> String
+        def actor: () -> Coordinator::Write::Commands::Actor
+        def statistics_id: () -> String
+        def source_event: () -> Coordinator::Write::EventReference
+        def failure: () -> Coordinator::Write::Tasks::ExecutionFailureV1
+      end
+    end
+  end
+end

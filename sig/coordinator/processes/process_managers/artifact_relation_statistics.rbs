@@ -1,0 +1,22 @@
+module Coordinator
+  module Processes
+    module ProcessManagers
+      class ArtifactRelationStatistics
+        class Rejected < StandardError
+        end
+        def initialize: (
+          event_store: Coordinator::Write::_EventStore,
+          ?planner: Coordinator::Processes::ProcessStepPlanner,
+          ?ensure_statistics: Coordinator::Write::Operations::ExecuteEnsureDevelopmentArtifactRelationStatistics,
+          ?reconcile: Coordinator::Write::Operations::ExecuteReconcileDevelopmentArtifactRelationsNumber,
+          ?record_failure: Coordinator::Write::Operations::ExecuteRecordDevelopmentArtifactRelationsReconciliationFailure,
+          ?retryability: Coordinator::Write::Tasks::CommandRejectionRetryability
+        ) -> void
+        def call: (PgEventstore::Event event) -> nil
+
+        private
+        def plan: (PgEventstore::Event event, String step_name, String subject_id, ?allocate_target_entity: bool) -> Coordinator::Write::ProcessSteps::PlannedV1
+      end
+    end
+  end
+end

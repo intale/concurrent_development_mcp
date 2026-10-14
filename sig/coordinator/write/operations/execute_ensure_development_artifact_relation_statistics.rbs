@@ -1,0 +1,13 @@
+module Coordinator
+  module Write
+    module Operations
+      class ExecuteEnsureDevelopmentArtifactRelationStatistics
+        def initialize: (event_store: Coordinator::Write::_EventStore, ?registry: Coordinator::Write::NaturalKeys::Registry, ?loader: Coordinator::Write::ProjectionStatistics::ArtifactRelationsLoader, ?artifact_loader: Coordinator::Write::DevelopmentArtifacts::Loader, ?decider: Coordinator::Write::Domain::ProjectionStatistics::EnsureArtifactRelations, ?writer: Coordinator::Write::ProjectionStatistics::ArtifactRelationWriter, ?id_generator: Coordinator::Shared::_IdGenerator, ?stream_factory: Coordinator::Write::StreamFactory) -> void
+        def call_command: (Coordinator::Write::Commands::EnsureDevelopmentArtifactRelationStatistics command, ?caused_by: PgEventstore::Event?) -> Dry::Monads::Result
+
+        private
+        def find: (Coordinator::Write::Commands::EnsureDevelopmentArtifactRelationStatistics command) -> Dry::Monads::Result
+      end
+    end
+  end
+end

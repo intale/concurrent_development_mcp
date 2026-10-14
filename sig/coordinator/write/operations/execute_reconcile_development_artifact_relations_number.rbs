@@ -1,0 +1,13 @@
+module Coordinator
+  module Write
+    module Operations
+      class ExecuteReconcileDevelopmentArtifactRelationsNumber
+        def initialize: (event_store: Coordinator::Write::_EventStore, ?loader: Coordinator::Write::ProjectionStatistics::ArtifactRelationsLoader, ?decider: Coordinator::Write::Domain::ProjectionStatistics::ReconcileArtifactRelations, ?writer: Coordinator::Write::ProjectionStatistics::ArtifactRelationWriter, ?id_generator: Coordinator::Shared::_IdGenerator, ?revision_retry: Coordinator::Write::Operations::OptimisticRevisionRetry) -> void
+        def call_command: (Coordinator::Write::Commands::ReconcileDevelopmentArtifactRelationsNumber command, ?caused_by: PgEventstore::Event?) -> Dry::Monads::Result
+
+        private
+        def failure: (Coordinator::Write::Commands::ReconcileDevelopmentArtifactRelationsNumber command, Symbol code, String message) -> Dry::Monads::Result
+      end
+    end
+  end
+end

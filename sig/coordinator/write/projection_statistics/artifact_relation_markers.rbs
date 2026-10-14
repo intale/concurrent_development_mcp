@@ -1,0 +1,12 @@
+module Coordinator
+  module Write
+    module ProjectionStatistics
+      class ArtifactRelationMarkers
+        def owner: (String artifact_id) -> String
+        def source: (String source_event_id) -> String
+        def failure_command: (String command_id) -> String
+        def call: (command_id: String, artifact_id: String, ?source_event_id: String?) -> Array[String]
+      end
+    end
+  end
+end

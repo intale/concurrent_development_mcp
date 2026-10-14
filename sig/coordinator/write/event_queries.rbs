@@ -22,6 +22,7 @@ module Coordinator
       REPOSITORY_REGISTRATION: EventReadCriteria
       SKILL_LATEST_REVISION: GroupedEventReadCriteria
       DEVELOPMENT_ARTIFACT_HISTORY: EventReadCriteria
+      DEVELOPMENT_ARTIFACT_RELATION_STATISTICS_CONTROL: GroupedEventReadCriteria
       DEVELOPMENT_ARTIFACT_CAPTURE: EventReadCriteria
       DEVELOPMENT_ARTIFACT_OBSERVATION_HISTORY: EventReadCriteria
       OPERATION_BATCH_HISTORY: EventReadCriteria

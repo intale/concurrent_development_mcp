@@ -1,0 +1,13 @@
+module Coordinator
+  module Write
+    module Events
+      module ProjectionNumbers
+        class DevelopmentArtifactRelationsNumberChangedV1 < Coordinator::Write::Events::Base
+          def artifact_id: () -> String
+          def active_relations_number: () -> Integer
+          def lifetime_relations_number: () -> Integer
+        end
+      end
+    end
+  end
+end

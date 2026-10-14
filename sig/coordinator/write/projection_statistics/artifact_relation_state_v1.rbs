@@ -1,0 +1,14 @@
+module Coordinator
+  module Write
+    module ProjectionStatistics
+      class ArtifactRelationStateV1 < Coordinator::Shared::Value
+        def statistics_id: () -> String
+        def artifact_id: () -> String?
+        def active_relations_number: () -> Integer?
+        def lifetime_relations_number: () -> Integer?
+        def latest_revision: () -> Integer
+        def initialized?: () -> bool
+      end
+    end
+  end
+end

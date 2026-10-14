@@ -1,0 +1,11 @@
+module Coordinator
+  module Write
+    module Domain
+      module ProjectionStatistics
+        class RecordArtifactRelationsFailure
+          def call: (command: Coordinator::Write::Commands::RecordDevelopmentArtifactRelationsReconciliationFailure, state: Coordinator::Write::ProjectionStatistics::ArtifactRelationStateV1, already_reconciled: bool, failure_recorded: bool) -> Dry::Monads::Result
+        end
+      end
+    end
+  end
+end

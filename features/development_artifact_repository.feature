@@ -85,6 +85,7 @@ Feature: Development Artifact repository
       And its relation fact reaches the read side after a subscription restart
       Then both responses expose the original Task and one logical relation result
       And one relation fact, command lifecycle, and projected edge exist
+      And the relationship statistics Saga records one successful source observation
 
   Rule: Captures have independent identities while observations remain explicitly correctable
 

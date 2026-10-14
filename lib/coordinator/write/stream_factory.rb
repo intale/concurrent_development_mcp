@@ -70,6 +70,11 @@ module Coordinator::Write
       )
     end
 
+    def development_artifact_relation_statistics(statistics_id)
+      StreamReference.new(context: "DevelopmentMemory",
+        stream_name: "DevelopmentArtifactRelationStatistics", stream_id: statistics_id)
+    end
+
     def repository(repository_id)
       StreamReference.new(
         context: "DevelopmentPlanning",

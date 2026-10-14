@@ -146,6 +146,13 @@ module Coordinator::Write
       direction: :desc
     )
 
+    DEVELOPMENT_ARTIFACT_RELATION_STATISTICS_CONTROL = GroupedEventReadCriteria.new(
+      event_types: %w[
+        DevelopmentArtifactRelationStatisticsAssigned DevelopmentArtifactRelationsNumberChanged
+        DevelopmentArtifactRelationsReconciled DevelopmentArtifactRelationsReconciliationFailed
+      ], direction: :desc
+    )
+
     DEVELOPMENT_ARTIFACT_HISTORY = EventReadCriteria.new(
       event_types: [
         "DevelopmentArtifactCreated", "DevelopmentArtifactScopeChanged",
