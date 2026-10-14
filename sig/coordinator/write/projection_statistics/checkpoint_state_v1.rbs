@@ -1,0 +1,14 @@
+module Coordinator
+  module Write
+    module ProjectionStatistics
+      class CheckpointStateV1 < Coordinator::Shared::Value
+        def statistics_id: () -> String
+        def change_set_id: () -> String?
+        def repository_id: () -> String?
+        def checkpoints_number: () -> Integer?
+        def latest_revision: () -> Integer
+        def initialized?: () -> bool
+      end
+    end
+  end
+end

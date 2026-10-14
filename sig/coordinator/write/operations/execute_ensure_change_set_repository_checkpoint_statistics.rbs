@@ -1,0 +1,20 @@
+module Coordinator
+  module Write
+    module Operations
+      class ExecuteEnsureChangeSetRepositoryCheckpointStatistics
+        def initialize: (
+          event_store: Coordinator::Write::_EventStore,
+          ?registry: Coordinator::Write::NaturalKeys::Registry,
+          ?loader: Coordinator::Write::ProjectionStatistics::CheckpointsLoader,
+          ?decider: Coordinator::Write::Domain::ProjectionStatistics::EnsureCheckpoints,
+          ?writer: Coordinator::Write::ProjectionStatistics::CheckpointWriter,
+          ?id_generator: Coordinator::Shared::_IdGenerator,
+          ?stream_factory: Coordinator::Write::StreamFactory
+        ) -> void
+        def call_command: (Coordinator::Write::Commands::EnsureChangeSetRepositoryCheckpointStatistics command, ?caused_by: PgEventstore::Event?) -> Dry::Monads::Result
+        private
+        def find: (Coordinator::Write::Commands::EnsureChangeSetRepositoryCheckpointStatistics command) -> Dry::Monads::Result
+      end
+    end
+  end
+end

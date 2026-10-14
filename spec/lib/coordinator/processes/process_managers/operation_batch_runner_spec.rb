@@ -27,11 +27,11 @@ RSpec.describe Coordinator::Processes::ProcessManagers::OperationBatchRunner, :e
     expect(first_history.map(&:type)).to eq([
       "OperationBatchCreated",
       "OperationBatchTargetSelected",
-      "OperationBatchItemEnqueued",
-      "OperationBatchItemEnqueued",
       "OperationBatchManifestAccepted",
       "OperationBatchSucceededItemsNumberChanged",
       "OperationBatchUnsuccessfulItemsNumberChanged",
+      "OperationBatchItemEnqueued",
+      "OperationBatchItemEnqueued",
       "OperationBatchItemCommandAssigned",
       "OperationBatchItemExecutionStarted",
       "OperationBatchItemSucceeded",
@@ -42,11 +42,13 @@ RSpec.describe Coordinator::Processes::ProcessManagers::OperationBatchRunner, :e
       "OperationBatchItemRejected",
       "OperationBatchItemCompletionLinked",
       "OperationBatchUnsuccessfulItemsNumberChanged",
+      "OperationBatchOutcomeRecorded",
       "OperationBatchCompleted"
     ])
     expect(batch_events(command.batch_id).map(&:id)).to eq(first_history.map(&:id))
     completed = load(first_history.last)
     expect(completed.to_h).to eq(batch_id: command.batch_id)
+    expect(first_history[-2].data).to eq("batch_id" => command.batch_id, "outcome" => "completed_with_errors")
     first_history.select { %w[OperationBatchItemSucceeded OperationBatchItemRejected].include?(_1.type) }
       .each do |event|
         expect(event.markers).to include("batch-item:#{command.batch_id}:#{event.data.fetch("index")}")
@@ -70,11 +72,12 @@ RSpec.describe Coordinator::Processes::ProcessManagers::OperationBatchRunner, :e
     expect(batch_events(command.batch_id).map(&:type)).to eq([
       "OperationBatchCreated",
       "OperationBatchTargetSelected",
-      "OperationBatchItemEnqueued",
       "OperationBatchManifestAccepted",
       "OperationBatchSucceededItemsNumberChanged",
       "OperationBatchUnsuccessfulItemsNumberChanged",
+      "OperationBatchItemEnqueued",
       "OperationBatchCancellationRequested",
+      "OperationBatchOutcomeRecorded",
       "OperationBatchCancelled"
     ])
     expect(skill_events).to be_empty
@@ -114,15 +117,16 @@ RSpec.describe Coordinator::Processes::ProcessManagers::OperationBatchRunner, :e
     expect(history.map(&:type)).to eq([
       "OperationBatchCreated",
       "OperationBatchTargetSelected",
-      "OperationBatchItemEnqueued",
       "OperationBatchManifestAccepted",
       "OperationBatchSucceededItemsNumberChanged",
       "OperationBatchUnsuccessfulItemsNumberChanged",
+      "OperationBatchItemEnqueued",
       "OperationBatchItemCommandAssigned",
       "OperationBatchItemExecutionStarted",
       "OperationBatchItemSucceeded",
       "OperationBatchItemCompletionLinked",
       "OperationBatchSucceededItemsNumberChanged",
+      "OperationBatchOutcomeRecorded",
       "OperationBatchCompleted"
     ])
     outcome = history.find { _1.type == "OperationBatchItemSucceeded" }

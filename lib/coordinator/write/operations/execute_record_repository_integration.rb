@@ -52,7 +52,7 @@ module Coordinator::Write
       private
 
       def prepare_logical_values(command)
-        event_count = command.outcome == "integrated" ? 2 : 1
+        event_count = command.outcome == "integrated" ? 3 : 1
         ReleaseSetIntegrationPreparationV1.new(
           recorded_at: @clock.now,
           input_digest: @input_digest.release_repository_integration_record(command),

@@ -1,0 +1,12 @@
+module Coordinator
+  module Write
+    module ProjectionStatistics
+      class CheckpointMarkers
+        def initialize: (?codec: Coordinator::Shared::Markers::CodecV2) -> void
+        def owner: (change_set_id: String, repository_id: String) -> String
+        def candidate: (String candidate_id) -> String
+        def call: (command_id: String, change_set_id: String, repository_id: String) -> Array[String]
+      end
+    end
+  end
+end

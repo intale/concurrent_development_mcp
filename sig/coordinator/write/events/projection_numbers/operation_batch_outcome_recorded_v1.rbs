@@ -1,0 +1,12 @@
+module Coordinator
+  module Write
+    module Events
+      module ProjectionNumbers
+        class OperationBatchOutcomeRecordedV1 < Coordinator::Write::Events::Base
+          def batch_id: () -> String
+          def outcome: () -> String
+        end
+      end
+    end
+  end
+end

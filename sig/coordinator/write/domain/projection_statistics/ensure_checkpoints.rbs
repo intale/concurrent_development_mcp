@@ -1,0 +1,11 @@
+module Coordinator
+  module Write
+    module Domain
+      module ProjectionStatistics
+        class EnsureCheckpoints
+          def call: (command: Coordinator::Write::Commands::EnsureChangeSetRepositoryCheckpointStatistics, change_set_exists: bool, repository_exists: bool) -> Dry::Monads::Result
+        end
+      end
+    end
+  end
+end

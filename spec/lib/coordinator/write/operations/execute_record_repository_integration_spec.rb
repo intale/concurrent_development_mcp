@@ -55,6 +55,31 @@ RSpec.describe Coordinator::Write::Operations::ExecuteRecordRepositoryIntegratio
     expect(lifecycle_events(prepared).count { _1.type == "RepositoryIntegrationRecorded" }).to eq(0)
   end
 
+  it "requests verification exactly once after the final authoritative member integration" do
+    prepared = ReleaseSetScenario.prepare(prefix: "integration-request")
+    first_observation = ReleaseSetScenario.observe_member(prepared, index: 0, prefix: "integration-request")
+    first = operation.call(successful_input(prepared, first_observation, index: 0, prefix: "integration-request"))
+    expect(first).to be_success
+    expect(lifecycle_events(prepared).map(&:type)).not_to include("ReleaseSetVerificationRequested")
+
+    last_observation = ReleaseSetScenario.observe_member(prepared, index: 1, prefix: "integration-request")
+    input = successful_input(prepared, last_observation, index: 1, prefix: "integration-request")
+    result = operation.call(input)
+    expect(result).to be_success
+    facts = lifecycle_events(prepared)
+    expect(facts.last(3).map(&:type)).to eq(%w[
+      RepositoryIntegrationRecorded RepositoryIntegrationMergeLinked ReleaseSetVerificationRequested
+    ])
+    requested = facts.last
+    expect(requested.data).to eq("release_set_id" => prepared.dig(:input, :release_set_id))
+    expect(requested.causation_id).to eq(facts[-2].id)
+    expect(requested.correlation_id).to eq(prepared.fetch(:event).correlation_id)
+    expect(Coordinator::Write::ReleaseSets::HistoryLoader.new(event_store:).call(
+      prepared.dig(:input, :release_set_id))).to be_all_integrated
+    expect(operation.call(input).failure.code).to eq(:release_integration_attempt_reused)
+    expect(lifecycle_events(prepared).count { _1.type == "ReleaseSetVerificationRequested" }).to eq(1)
+  end
+
   it "keeps retry possible after a first-member failure and records a later successful attempt" do
     prepared = ReleaseSetScenario.prepare(prefix: "integration-retry")
     failed = ReleaseSetScenario.record_integration(

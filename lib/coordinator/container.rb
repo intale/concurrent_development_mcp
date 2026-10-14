@@ -2823,7 +2823,8 @@ module Coordinator
         self["subscriptions.merge_snapshot_verification"],
         self["subscriptions.release_set_lifecycle"],
         self["subscriptions.build_progress"],
-        self["subscriptions.artifact_relation_statistics"]
+        self["subscriptions.artifact_relation_statistics"],
+        self["subscriptions.checkpoint_statistics"]
       ]
       registrations.freeze
     end
@@ -2831,6 +2832,11 @@ module Coordinator
     register("subscriptions.artifact_relation_statistics", memoize: true) do
       Processes::Subscriptions::ArtifactRelationStatistics.new(handler:
         Processes::ProcessManagers::ArtifactRelationStatistics.new(event_store: self["event_store"]))
+    end
+
+    register("subscriptions.checkpoint_statistics", memoize: true) do
+      Processes::Subscriptions::CheckpointStatistics.new(handler:
+        Processes::ProcessManagers::CheckpointStatistics.new(event_store: self["event_store"]))
     end
 
     register("subscriptions.work_intention_set_renewal", memoize: true) do

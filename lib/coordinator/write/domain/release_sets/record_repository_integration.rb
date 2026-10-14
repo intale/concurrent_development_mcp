@@ -42,6 +42,10 @@ module Coordinator::Write
                 merge_observation: command.merge_observation_event
               )
             )
+            if state.preparation.payload.ordered_members.all? { _1.repository_id == command.repository_id || state.integrated?(_1.repository_id) }
+              writes << EventWrite.new(stream:,
+                event: Events::ProjectionNumbers::ReleaseSetVerificationRequestedV1.new(release_set_id: command.release_set_id))
+            end
           end
           Success(EventPlan.new(writes:))
         end

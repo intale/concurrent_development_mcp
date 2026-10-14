@@ -11,6 +11,7 @@ module Coordinator
       def development_artifact_observation: (String observation_id) -> StreamReference
       def development_artifact_relation: (String relation_id) -> StreamReference
       def development_artifact_relation_statistics: (String statistics_id) -> StreamReference
+      def checkpoint_statistics: (String statistics_id) -> StreamReference
       def operation_batch: (String batch_id) -> StreamReference
       def work_intention_set_renewal: (String renewal_id) -> StreamReference
       def repository: (String repository_id) -> StreamReference

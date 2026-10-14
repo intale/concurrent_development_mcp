@@ -1,0 +1,10 @@
+module Coordinator
+  module Write
+    module ProjectionStatistics
+      class CheckpointWriter
+        def initialize: (event_store: Coordinator::Write::_EventStore, ?event_factory: Coordinator::Write::EventFactory, ?markers: CheckpointMarkers) -> void
+        def call: (plan: Coordinator::Write::Domain::EventPlan, command_id: String, actor: Coordinator::Write::Commands::Actor, change_set_id: String, repository_id: String, event_ids: Array[String], caused_by: PgEventstore::Event?, correlation_id: String?, ?expected_revision: Integer?) -> Array[PgEventstore::Event]
+      end
+    end
+  end
+end

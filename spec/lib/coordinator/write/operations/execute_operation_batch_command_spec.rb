@@ -16,11 +16,11 @@ RSpec.describe Coordinator::Write::Operations::ExecuteOperationBatchCommand, :ev
     expect(first.value!.emitted_events.map(&:type)).to eq([
       "OperationBatchCreated",
       "OperationBatchTargetSelected",
-      "OperationBatchItemEnqueued",
-      "OperationBatchItemEnqueued",
       "OperationBatchManifestAccepted",
       "OperationBatchSucceededItemsNumberChanged",
-      "OperationBatchUnsuccessfulItemsNumberChanged"
+      "OperationBatchUnsuccessfulItemsNumberChanged",
+      "OperationBatchItemEnqueued",
+      "OperationBatchItemEnqueued"
     ])
     expect(first.value!.data).to have_attributes(
       batch_id: command.batch_id,

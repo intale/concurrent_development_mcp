@@ -22,7 +22,8 @@ Feature: Immutable multi-repository ReleaseSet preparation
       When the agent prepares the ordered ReleaseSet through MCP
       And the ReleaseSet preparation reaches the read side after a subscription restart
       And the agent records both repository integrations through MCP in order
-      And the agent records passing composite verification through MCP
+      Then the final integration requests composite verification as its own fact
+      When the agent records passing composite verification through MCP
       Then the integration and verification Tasks preserve one ReleaseSet trace
       And the older ReleaseSet view remains available while lifecycle projection lags
       When the complete ReleaseSet lifecycle reaches the read side after a subscription restart

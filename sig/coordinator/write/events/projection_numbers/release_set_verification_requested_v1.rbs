@@ -1,0 +1,11 @@
+module Coordinator
+  module Write
+    module Events
+      module ProjectionNumbers
+        class ReleaseSetVerificationRequestedV1 < Coordinator::Write::Events::Base
+          def release_set_id: () -> String
+        end
+      end
+    end
+  end
+end

@@ -1,0 +1,21 @@
+module Coordinator
+  module Write
+    module ProjectionStatistics
+      class CheckpointsLoader
+        CANDIDATE_TYPES: Array[String]
+        ATTEMPT_TYPES: Array[String]
+        WORK_ITEM_TYPES: Array[String]
+        def initialize: (event_store: Coordinator::Write::_EventStore, ?stream_factory: Coordinator::Write::StreamFactory, ?markers: CheckpointMarkers) -> void
+        def selector: (change_set_id: String, repository_id: String) -> Coordinator::Write::NaturalKeys::Registry::SelectorV1
+        def state: (String statistics_id) -> CheckpointStateV1
+        def source_scope: (Coordinator::Write::EventReference reference) -> CandidateCheckpointScopeV1?
+        def counted?: (String statistics_id, String candidate_id) -> bool
+        def owner_exists?: (Coordinator::Write::StreamReference stream, String event_type) -> bool
+        private
+        def identities: (Coordinator::Write::StreamReference stream, Array[String] event_types) -> Array[PgEventstore::Event]
+        def attempt_matches?: (CandidateCheckpointScopeV1 scope) -> bool
+        def work_item_matches?: (CandidateCheckpointScopeV1 scope) -> bool
+      end
+    end
+  end
+end

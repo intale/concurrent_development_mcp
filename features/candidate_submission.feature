@@ -23,6 +23,7 @@ Feature: Attributed Candidate checkpoints
       And the exact Candidate command is retried through its original Task
       Then the replayed Candidate Task exposes the same result
       And Candidate "CAN-CUC-REPLAY" has one submission, manifest, head registration, and successful command lifecycle
+      And Candidate "CAN-CUC-REPLAY" is counted once by the registered checkpoint statistics Saga
 
   Rule: Invalid observations never create partial Candidate authority
 

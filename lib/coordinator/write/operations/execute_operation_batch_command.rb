@@ -43,6 +43,7 @@ module Coordinator::Write
         count = case command
         when Commands::CreateOperationBatch then items.length + 5
         when Commands::RecordOperationBatchItemOutcome then 3
+        when Commands::CompleteOperationBatch, Commands::CompleteOperationBatchCancellation then 2
         else 1
         end
         OperationBatches::PreparationV1.new(
@@ -99,10 +100,17 @@ module Coordinator::Write
         verify_outcome!(snapshot.state, command) if command.is_a?(Commands::RecordOperationBatchItemOutcome)
         batch_events = persist_domain(decision.value!, command:, preparation:, caused_by:, expected_revision:)
         Success(build_completion(
-          command:, event: decision.value!.events.first,
+          command:, event: transition_event(command, decision.value!),
           input_digest: preparation.input_digest, persisted_events: batch_events,
           completed_at: batch_events.last.created_at.utc.iso8601(6)
         ))
+      end
+
+      def transition_event(command, plan)
+        case command
+        when Commands::CompleteOperationBatch, Commands::CompleteOperationBatchCancellation then plan.events.last
+        else plan.events.first
+        end
       end
 
       def verify_outcome!(state, command)

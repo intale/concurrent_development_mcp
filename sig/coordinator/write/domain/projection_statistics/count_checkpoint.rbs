@@ -1,0 +1,11 @@
+module Coordinator
+  module Write
+    module Domain
+      module ProjectionStatistics
+        class CountCheckpoint
+          def call: (command: Coordinator::Write::Commands::CountCandidateCheckpoint, state: Coordinator::Write::ProjectionStatistics::CheckpointStateV1, scope: Coordinator::Write::ProjectionStatistics::CandidateCheckpointScopeV1, already_counted: bool) -> Dry::Monads::Result
+        end
+      end
+    end
+  end
+end

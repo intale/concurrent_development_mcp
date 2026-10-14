@@ -1,0 +1,12 @@
+module Coordinator
+  module Write
+    module Commands
+      class CountCandidateCheckpoint < Coordinator::Shared::Value
+        def command_id: () -> String
+        def actor: () -> Coordinator::Write::Commands::Actor
+        def statistics_id: () -> String
+        def source_event: () -> Coordinator::Write::EventReference
+      end
+    end
+  end
+end

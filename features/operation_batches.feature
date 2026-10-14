@@ -15,6 +15,7 @@ Feature: Bounded command batches for checkpointed agent imports
       When the process workers restart after the first durable Batch page
       Then the Batch has 51 successes, no rejection, and one terminal completion
       And Batch number facts record 51 successes and 0 unsuccessful items
+      And the Batch records terminal outcome "completed" independently of read models
       And the complete normalized manifest and outcomes are recoverable in bounded pages using only the Batch ID
       And page-boundary redelivery leaves one marked outcome per item
 
@@ -29,6 +30,7 @@ Feature: Bounded command batches for checkpointed agent imports
       When the Batch decision boundary is released and terminal facts reach the read side
       Then the available Batch completes with one success and one rejection
       And Batch number facts record 1 successes and 1 unsuccessful items
+      And the Batch records terminal outcome "completed_with_errors" independently of read models
       And both child command results are independently available through MCP
 
   Rule: Cooperative cancellation preserves committed item outcomes
@@ -45,6 +47,7 @@ Feature: Bounded command batches for checkpointed agent imports
       When the pending Batch continuation observes cancellation
       Then the Batch history derives 50 successes and one item not run after cancellation
       And Batch number facts record 50 successes and 0 unsuccessful items
+      And the Batch records terminal outcome "cancelled" independently of read models
       When the agent resubmits only the not-run manifest items
       Then the resumed Batch succeeds once without replaying the completed prefix
 

@@ -1,0 +1,13 @@
+module Coordinator
+  module Write
+    module ProjectionStatistics
+      class CandidateCheckpointScopeV1 < Coordinator::Shared::Value
+        def candidate_id: () -> String
+        def change_set_id: () -> String
+        def work_item_id: () -> String
+        def attempt_id: () -> String
+        def repository_id: () -> String
+      end
+    end
+  end
+end

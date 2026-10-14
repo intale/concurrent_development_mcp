@@ -63,6 +63,7 @@ module Coordinator::Write
         when Events::ReleaseSetPreparedV2 then apply_prepared!(facts, payload, event)
         when Events::RepositoryIntegrationRecordedV2 then apply_integration!(facts, payload, event)
         when Events::RepositoryIntegrationMergeLinkedV1 then apply_merge_link!(facts, payload, event)
+        when Events::ProjectionNumbers::ReleaseSetVerificationRequestedV1 then require_preparation!(facts)
         when Events::ReleaseSetVerificationRecordedV2 then apply_verification!(facts, payload, event)
         when Events::ReleaseSetIntegrationLinkedV1 then apply_integration_link!(facts, payload, event)
         when Events::ReleaseSetActivatedV2 then apply_activation!(facts, payload, event)

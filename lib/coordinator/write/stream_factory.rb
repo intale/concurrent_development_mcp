@@ -75,6 +75,11 @@ module Coordinator::Write
         stream_name: "DevelopmentArtifactRelationStatistics", stream_id: statistics_id)
     end
 
+    def checkpoint_statistics(statistics_id)
+      StreamReference.new(context: "DevelopmentIntegration",
+        stream_name: "CheckpointStatistics", stream_id: statistics_id)
+    end
+
     def repository(repository_id)
       StreamReference.new(
         context: "DevelopmentPlanning",

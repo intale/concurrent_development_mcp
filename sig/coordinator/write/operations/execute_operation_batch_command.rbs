@@ -6,6 +6,8 @@ module Coordinator
         def prepare: (Commands::CreateOperationBatch | Commands::CancelOperationBatch | Commands::RecordOperationBatchItemOutcome | Commands::RequestOperationBatchContinuation | Commands::CompleteOperationBatch | Commands::CompleteOperationBatchCancellation command, ?caused_by: PgEventstore::Event?) -> OperationBatches::PreparationV1
         def call_prepared_command: (Commands::CreateOperationBatch | Commands::CancelOperationBatch | Commands::RecordOperationBatchItemOutcome | Commands::RequestOperationBatchContinuation | Commands::CompleteOperationBatch | Commands::CompleteOperationBatchCancellation command, preparation: OperationBatches::PreparationV1, ?caused_by: PgEventstore::Event?) -> Dry::Monads::Result
         def call_command: (Commands::CreateOperationBatch | Commands::CancelOperationBatch | Commands::RecordOperationBatchItemOutcome | Commands::RequestOperationBatchContinuation | Commands::CompleteOperationBatch | Commands::CompleteOperationBatchCancellation command, ?caused_by: PgEventstore::Event?) -> Dry::Monads::Result
+        private
+        def transition_event: (Commands::CreateOperationBatch | Commands::CancelOperationBatch | Commands::RecordOperationBatchItemOutcome | Commands::RequestOperationBatchContinuation | Commands::CompleteOperationBatch | Commands::CompleteOperationBatchCancellation command, Domain::EventPlan plan) -> Events::Base
       end
     end
   end

@@ -153,6 +153,12 @@ module Coordinator::Write
       ], direction: :desc
     )
 
+    CHECKPOINT_STATISTICS_CONTROL = GroupedEventReadCriteria.new(
+      event_types: %w[
+        ChangeSetRepositoryCheckpointStatisticsAssigned ChangeSetRepositoryCheckpointNumberChanged CandidateCheckpointCounted
+      ], direction: :desc
+    )
+
     DEVELOPMENT_ARTIFACT_HISTORY = EventReadCriteria.new(
       event_types: [
         "DevelopmentArtifactCreated", "DevelopmentArtifactScopeChanged",
@@ -197,10 +203,11 @@ module Coordinator::Write
         "OperationBatchItemCompletionLinked",
         "OperationBatchContinuationRequested",
         "OperationBatchCancellationRequested",
+        "OperationBatchOutcomeRecorded",
         "OperationBatchCancelled",
         "OperationBatchCompleted"
       ],
-      maximum_count: Types::OPERATION_BATCH_MAXIMUM_HISTORY_EVENTS + Types::OPERATION_BATCH_MAXIMUM_ITEMS + 3,
+      maximum_count: Types::OPERATION_BATCH_MAXIMUM_HISTORY_EVENTS + Types::OPERATION_BATCH_MAXIMUM_ITEMS + 4,
       direction: :asc
     )
 
@@ -219,6 +226,7 @@ module Coordinator::Write
         OperationBatchCreated OperationBatchTargetSelected OperationBatchContinuationRequested
         OperationBatchCancellationRequested OperationBatchCancelled OperationBatchCompleted
         OperationBatchManifestAccepted OperationBatchSucceededItemsNumberChanged OperationBatchUnsuccessfulItemsNumberChanged
+        OperationBatchOutcomeRecorded
       ],
       direction: :desc
     )
@@ -388,6 +396,7 @@ module Coordinator::Write
         "ReleaseSetCreated",
         "ReleaseSetMemberAdded",
         "ReleaseSetPrepared",
+        "ReleaseSetVerificationRequested",
         "RepositoryIntegrationRecorded",
         "RepositoryIntegrationMergeLinked",
         "ReleaseSetVerificationRecorded",
@@ -399,7 +408,7 @@ module Coordinator::Write
         "ReleaseSetOutcomeRecorded",
         "ReleaseSetCompleted"
       ],
-      maximum_count: Types::RELEASE_SET_LIFECYCLE_MAXIMUM_EVENTS,
+      maximum_count: Types::RELEASE_SET_LIFECYCLE_MAXIMUM_EVENTS + 1,
       direction: :asc
     )
 

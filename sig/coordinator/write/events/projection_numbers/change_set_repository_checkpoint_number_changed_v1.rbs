@@ -1,0 +1,13 @@
+module Coordinator
+  module Write
+    module Events
+      module ProjectionNumbers
+        class ChangeSetRepositoryCheckpointNumberChangedV1 < Coordinator::Write::Events::Base
+          def change_set_id: () -> String
+          def repository_id: () -> String
+          def checkpoints_number: () -> Integer
+        end
+      end
+    end
+  end
+end

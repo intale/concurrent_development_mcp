@@ -1,0 +1,10 @@
+module Coordinator
+  module Processes
+    module Subscriptions
+      class CheckpointStatistics < Coordinator::Shared::Subscriptions::Registration
+        DEFINITION: Coordinator::Shared::Subscriptions::Definition
+        def initialize: (handler: Coordinator::Processes::ProcessManagers::CheckpointStatistics, ?pull_interval: Float) -> void
+      end
+    end
+  end
+end

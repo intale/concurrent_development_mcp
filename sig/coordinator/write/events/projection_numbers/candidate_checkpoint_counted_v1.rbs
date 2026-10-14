@@ -1,0 +1,12 @@
+module Coordinator
+  module Write
+    module Events
+      module ProjectionNumbers
+        class CandidateCheckpointCountedV1 < Coordinator::Write::Events::Base
+          def statistics_id: () -> String
+          def candidate_id: () -> String
+        end
+      end
+    end
+  end
+end

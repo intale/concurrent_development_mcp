@@ -28,6 +28,10 @@ RSpec.describe Coordinator::Processes::OperationBatches::ItemExecutor, :event_st
     expect(appended_streams.uniq).to eq([ "OperationBatch" ])
     expect(registry_reads).to be_empty
     expect(history(command.batch_id).count { _1.type == "OperationBatchItemEnqueued" }).to eq(1000)
+    expect(history(command.batch_id).first(5).map(&:type)).to eq(%w[
+      OperationBatchCreated OperationBatchTargetSelected OperationBatchManifestAccepted
+      OperationBatchSucceededItemsNumberChanged OperationBatchUnsuccessfulItemsNumberChanged
+    ])
   ensure
     trace&.disable
   end

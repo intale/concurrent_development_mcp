@@ -20,10 +20,14 @@ module Coordinator::Write
             return Failure(error(:operation_batch_items_in_flight, "Started Batch items must be reconciled before cancellation", command))
           end
 
-          event = Events::OperationBatchCancelledV2.new(batch_id: command.batch_id)
+          events = [
+            Events::ProjectionNumbers::OperationBatchOutcomeRecordedV1.new(batch_id: command.batch_id, outcome: "cancelled"),
+            Events::OperationBatchCancelledV2.new(batch_id: command.batch_id)
+          ]
+          stream = @stream_factory.operation_batch(command.batch_id)
           Success(
             EventPlan.new(
-              writes: [ EventWrite.new(stream: @stream_factory.operation_batch(command.batch_id), event:) ]
+              writes: events.map { EventWrite.new(stream:, event: _1) }
             )
           )
         end

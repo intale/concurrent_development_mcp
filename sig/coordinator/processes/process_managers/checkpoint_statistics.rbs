@@ -1,0 +1,18 @@
+module Coordinator
+  module Processes
+    module ProcessManagers
+      class CheckpointStatistics
+        def initialize: (
+          event_store: Coordinator::Write::_EventStore,
+          ?planner: Coordinator::Processes::ProcessStepPlanner,
+          ?loader: Coordinator::Write::ProjectionStatistics::CheckpointsLoader,
+          ?ensure_statistics: Coordinator::Write::Operations::ExecuteEnsureChangeSetRepositoryCheckpointStatistics,
+          ?count: Coordinator::Write::Operations::ExecuteCountCandidateCheckpoint
+        ) -> void
+        def call: (PgEventstore::Event event) -> nil
+        private
+        def plan: (PgEventstore::Event event, String step_name, String subject_id, ?allocate_target_entity: bool) -> Coordinator::Write::ProcessSteps::PlannedV1
+      end
+    end
+  end
+end
