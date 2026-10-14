@@ -31,7 +31,7 @@ RSpec.describe Coordinator::Read::Projectors::DecisionInterpretationsV1, :read_m
       actor_id: "guidance-host"
     )
 
-    [ proposal, proposal, clarification, clarification, acceptance, acceptance ].each { projector.call(_1) }
+    2.times { projector.call([ proposal, clarification, acceptance ]) }
 
     projected = projected_interpretation
     expect(projected).to have_attributes(
@@ -60,7 +60,7 @@ RSpec.describe Coordinator::Read::Projectors::DecisionInterpretationsV1, :read_m
     expect(projected.causation_id).to eq(guidance_event.id)
     expect(Coordinator::Read::DecisionInterpretation.count).to eq(1)
     expect(Coordinator::Read::DecisionInterpretation.sole.updated_at).to eq(acceptance.created_at)
-    expect(processed_events.count).to eq(3)
+    expect(Coordinator::Read::ProcessedProjectionEvent.count).to eq(0)
   end
 
   it "serves adjudication clarification before rejection without activating policy" do
@@ -77,8 +77,7 @@ RSpec.describe Coordinator::Read::Projectors::DecisionInterpretationsV1, :read_m
       actor_id: "guidance-host"
     )
 
-    projector.call(proposal)
-    projector.call(clarification)
+    projector.call([ proposal, clarification ])
     clarified = projected_interpretation
     expect(clarified).to have_attributes(lifecycle_status: "clarification_required", policy_status: "proposal_only")
     expect(clarified.assessment.questions.sole.prompt).to eq("Which repository should this interpretation govern?")
@@ -89,7 +88,7 @@ RSpec.describe Coordinator::Read::Projectors::DecisionInterpretationsV1, :read_m
       adjudicated_at: clarification.created_at.utc.iso8601(6)
     )
 
-    projector.call(rejection)
+    projector.call([ rejection ])
     expect(projected_interpretation).to have_attributes(lifecycle_status: "rejected", policy_status: "proposal_only")
     expect(projected_interpretation.adjudication.to_h).to include(
       action: "reject", outcome: "rejected", event: include(event_id: rejection.id),
@@ -97,40 +96,81 @@ RSpec.describe Coordinator::Read::Projectors::DecisionInterpretationsV1, :read_m
     )
   end
 
-  it "rejects a message-keyed interpretation stream before claiming projection delivery" do
-    event = ProjectionEventFactory.build(
-      payload: proposal_payload,
-      stream: streams.interpretation(message_id),
-      stream_revision: 0,
-      global_position: 100,
-      policy_version: "interpretation-proposal/v1"
+  it "patches acceptance without depending on a matching projected proposal definition" do
+    row = create(:coordinator_read_decision_interpretation, interpretation_id:, message_id:)
+    original = row.attributes.slice("source_event", "source_span", "classifier", "proposed_decision", "assessment", "proposal_status")
+    event = append_event(
+      Coordinator::Write::Events::DecisionInterpretationAcceptedV2.new(
+        interpretation_id:, source_message_id: message_id,
+        slot: Coordinator::Write::Interpretations::InterpretationSlotBuilder.new.call(proposal_payload),
+        rationale: "The host accepts this interpretation."
+      )
     )
 
-    expect { projector.call(event) }.to raise_error(
-      Coordinator::Read::InvalidProjectionSource, "interpretation identity does not match its source stream"
-    )
-    expect(processed_events).to be_empty
-    expect(Coordinator::Read::DecisionInterpretation).not_to exist
+    2.times { projector.call([ event ]) }
+
+    expect(row.reload.lifecycle_status).to eq("accepted")
+    expect(row.attributes.slice(*original.keys)).to eq(original)
+    expect(row.adjudication.fetch("event").fetch("event_id")).to eq(event.id)
   end
 
-  it "rolls back its delivery claim when selected text is absent from persisted guidance" do
-    event = proposal_event(payload: Coordinator::Write::Events::DecisionInterpretationProposedV2.new(
-      proposal_payload.to_h.merge(source_span: "missing excerpt")
+  it "does not reset terminal adjudication or clarification questions when a proposal is replayed" do
+    proposal = proposal_event
+    clarification = clarification_event(proposal, origin: "proposal_assessment")
+    acceptance = append_event(Coordinator::Write::Events::DecisionInterpretationAcceptedV2.new(
+      interpretation_id:, source_message_id: message_id,
+      slot: Coordinator::Write::Interpretations::InterpretationSlotBuilder.new.call(proposal_payload),
+      rationale: "The host accepts this interpretation."
+    ))
+    projector.call([ proposal, clarification, acceptance ])
+    row = Coordinator::Read::DecisionInterpretation.find(interpretation_id)
+    original = row.attributes.slice("lifecycle_status", "adjudication", "clarification_required", "clarification_event_id")
+    questions = row.assessment.fetch("questions")
+
+    projector.call([ proposal ])
+
+    expect(row.reload.attributes.slice(*original.keys)).to eq(original)
+    expect(row.assessment.fetch("questions")).to eq(questions)
+  end
+
+  it "clears only the adjudication slot on rejection even when the row has a newer timestamp" do
+    row = create(:coordinator_read_decision_interpretation, interpretation_id:, message_id:,
+      updated_at: Time.now.utc + 60, clarification_required: true)
+    original = row.attributes.slice("source_event", "proposed_decision", "assessment")
+    event = append_event(Coordinator::Write::Events::DecisionInterpretationRejectedV2.new(
+      interpretation_id:, source_message_id: message_id, rationale: "The proposed reading is rejected."
     ))
 
-    expect { projector.call(event) }.to raise_error(
-      Coordinator::Read::InvalidProjectionSource, "Interpretation source span is not present in guidance"
-    )
-    expect(processed_events).to be_empty
-    expect(Coordinator::Read::DecisionInterpretation).not_to exist
+    projector.call([ event ])
+
+    expect(row.reload).to have_attributes(lifecycle_status: "rejected", clarification_required: false)
+    expect(row.adjudication.fetch("slot")).to be_nil
+    expect(row.attributes.slice(*original.keys)).to eq(original)
   end
 
-  it "rejects missing classifier provenance without inventing a projection" do
-    event = proposal_event(metadata: common_metadata)
+  it "reduces a thousand independent adjudications to one compatible database update" do
+    rows = Array.new(1000) { attributes_for(:coordinator_read_decision_interpretation) }
+    Coordinator::Read::DecisionInterpretation.insert_all!(rows)
+    prototype = append_event(Coordinator::Write::Events::DecisionInterpretationRejectedV2.new(
+      interpretation_id:, source_message_id: message_id, rationale: "Rejected."
+    ))
+    events = rows.map.with_index do |attributes, index|
+      event = prototype.dup
+      event.id = SecureRandom.uuid_v7
+      event.data = prototype.data.merge("interpretation_id" => attributes.fetch(:interpretation_id),
+        "source_message_id" => attributes.fetch(:message_id))
+      event.stream = Coordinator::Write::PgStreamFactory.new.call(streams.interpretation(attributes.fetch(:interpretation_id)))
+      event.global_position = prototype.global_position + index
+      event
+    end
+    statements = []
+    ActiveSupport::Notifications.subscribed(->(*args) { statements << args.last.fetch(:sql) }, "sql.active_record") do
+      projector.call(events)
+    end
 
-    expect { projector.call(event) }.to raise_error(Coordinator::Read::InvalidProjectionSource, /classifier/)
-    expect(processed_events).to be_empty
-    expect(Coordinator::Read::DecisionInterpretation).not_to exist
+    expect(statements.count { _1.start_with?("UPDATE") }).to eq(1)
+    expect(Coordinator::Read::DecisionInterpretation.where(lifecycle_status: "rejected").count).to eq(1000)
+    expect(Coordinator::Read::ProcessedProjectionEvent.count).to eq(0)
   end
 
   def proposal_payload
@@ -215,9 +255,5 @@ RSpec.describe Coordinator::Read::Projectors::DecisionInterpretationsV1, :read_m
     Coordinator::Read::Repositories::DecisionInterpretations.new.page(
       Coordinator::Read::InterpretationListQueryV1.new(message_id:, after_revision: -1, limit: 20)
     ).records.sole
-  end
-
-  def processed_events
-    Coordinator::Read::ProcessedProjectionEvent.where(projection_name: "decision_interpretations")
   end
 end

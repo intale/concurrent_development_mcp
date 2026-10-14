@@ -1,0 +1,15 @@
+module Coordinator
+  module Read
+    module Projections
+      class DecisionInterpretations
+        def initialize: (patches: Batches::ColumnPatches, sources: Hash[String, Read::Interpretations::projection_source], ?assessments: Hash[String, CommandResults::document]) -> void
+        def apply: (PgEventstore::Event event) -> nil
+        private
+        def propose: (PgEventstore::Event event, Hash[String, CommandResults::json] data) -> nil
+        def clarify: (PgEventstore::Event event, Hash[String, CommandResults::json] data) -> nil
+        def adjudicate: (PgEventstore::Event event, Hash[String, CommandResults::json] data, action: String, outcome: String, code: String, ?slot: CommandResults::json) -> nil
+        def adjudication: (PgEventstore::Event event, Hash[String, CommandResults::json] data, action: String, outcome: String, code: String, ?slot: CommandResults::json, ?clarification: CommandResults::json) -> CommandResults::document
+      end
+    end
+  end
+end

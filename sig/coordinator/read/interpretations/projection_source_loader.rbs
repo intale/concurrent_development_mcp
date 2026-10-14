@@ -1,9 +1,15 @@
 module Coordinator
   module Read
     module Interpretations
+      type projection_source = {
+        source_event: CommandResults::document, source_span: CommandResults::document,
+        classifier: CommandResults::document, scope_provenance: CommandResults::document,
+        ambiguities: Array[CommandResults::document]
+      }
+
       class ProjectionSourceLoader
-        def initialize: (event_store: Write::EventStore, ?schema_registry: Write::EventSchemaRegistry) -> void
-        def call: (PgEventstore::Event event, Write::Events::DecisionInterpretationProposedV2 proposal) -> InterpretationProjectionSourceV2
+        def initialize: (event_store: Write::_EventStore) -> void
+        def call: (PgEventstore::Event event) -> projection_source
       end
     end
   end

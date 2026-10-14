@@ -8,22 +8,6 @@ module Coordinator
         end
 
         def page: (InterpretationListQueryV1 query) -> Page
-        def store_proposal: (
-          event: PgEventstore::Event,
-          source: InterpretationProjectionSourceV2
-        ) -> DecisionInterpretation
-        def require_clarification: (
-          event: PgEventstore::Event,
-          clarification: Write::Events::DecisionClarificationRequiredV2
-        ) -> DecisionInterpretation
-        def accept: (
-          event: PgEventstore::Event,
-          acceptance: Write::Events::DecisionInterpretationAcceptedV2
-        ) -> DecisionInterpretation
-        def reject: (
-          event: PgEventstore::Event,
-          rejection: Write::Events::DecisionInterpretationRejectedV2
-        ) -> DecisionInterpretation
       end
     end
   end

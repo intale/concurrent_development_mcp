@@ -187,7 +187,7 @@ RSpec.describe Coordinator::Read::Subscriptions::ReadModelSet do
   end
 
   it "opts converted builders into native batches without changing process-manager delivery" do
-    registrations = [ agent_choice_registration, agent_choice_impact_registration,
+    registrations = [ agent_choice_registration, agent_choice_impact_registration, interpretation_registration,
       repository_registration, resource_registration, utterance_registration ]
     registrations << Coordinator::Container["subscriptions.work_intention_renewals"]
 

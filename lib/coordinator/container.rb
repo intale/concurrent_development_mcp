@@ -914,12 +914,8 @@ module Coordinator
     register("projectors.decision_interpretations_v1", memoize: true) do
       Read::Projectors::DecisionInterpretationsV1.new(
         source_loader: Read::Interpretations::ProjectionSourceLoader.new(
-          event_store: self["event_store"],
-          schema_registry: self["event_schema_registry"]
-        ),
-        schema_registry: self["event_schema_registry"],
-        interpretations: self["repositories.decision_interpretations"],
-        processed_events: self["repositories.processed_projection_events"]
+          event_store: self["event_store"]
+        )
       )
     end
 

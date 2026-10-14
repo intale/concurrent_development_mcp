@@ -94,10 +94,14 @@ RSpec.describe Coordinator::Read::Projectors::AgentChoicesV1, :read_model do
     rows = Array.new(1000) { attributes_for(:coordinator_read_agent_choice) }
     Coordinator::Read::AgentChoice.insert_all!(rows)
     _, prototype = choice_events
-    events = rows.map do |attributes|
+    events = rows.map.with_index do |attributes, index|
       event = prototype.dup
       event.id = SecureRandom.uuid_v7
       event.data = prototype.data.merge("choice_id" => attributes.fetch(:choice_id))
+      event.stream = Coordinator::Write::PgStreamFactory.new.call(
+        Coordinator::Write::StreamFactory.new.agent_choice(attributes.fetch(:choice_id))
+      )
+      event.global_position = prototype.global_position + index
       event
     end
     statements = []

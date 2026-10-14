@@ -2,7 +2,7 @@
 
 module Coordinator::Read
   module Subscriptions
-    class DecisionInterpretations < Coordinator::Shared::Subscriptions::Registration
+    class DecisionInterpretations < BatchRegistration
       DEFINITION = ReadModelDefinition.new(
         set_name: ReadModelSet::SET_NAME,
         subscription_name: "decision-interpretations-v1",

@@ -1,7 +1,7 @@
 module Coordinator
   module Read
     module Subscriptions
-      class DecisionInterpretations < Shared::Subscriptions::Registration
+      class DecisionInterpretations < BatchRegistration
         DEFINITION: ReadModelDefinition
 
         def initialize: (

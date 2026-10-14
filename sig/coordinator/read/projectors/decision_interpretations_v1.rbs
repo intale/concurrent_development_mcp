@@ -2,16 +2,8 @@ module Coordinator
   module Read
     module Projectors
       class DecisionInterpretationsV1
-        PROJECTION: ProjectionDefinition
-
-        def initialize: (
-          ?contract: Contracts::DecisionInterpretationSourceEvent,
-          source_loader: Interpretations::ProjectionSourceLoader,
-          ?schema_registry: Write::EventSchemaRegistry,
-          ?interpretations: Repositories::DecisionInterpretations,
-          ?processed_events: Repositories::ProcessedProjectionEvents
-        ) -> void
-        def call: (PgEventstore::Event event) -> void
+        def initialize: (source_loader: Read::Interpretations::ProjectionSourceLoader) -> void
+        def call: (Array[PgEventstore::Event] events) -> nil
       end
     end
   end
