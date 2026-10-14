@@ -858,8 +858,7 @@ module Coordinator
     register("read.release_sets.preparation_loader") do
       Read::ReleaseSets::PreparationLoader.new(
         event_store: self["event_store"],
-        stream_factory: self["stream_factory"],
-        schema_registry: self["event_schema_registry"]
+        stream_factory: self["stream_factory"]
       )
     end
 
@@ -1020,10 +1019,7 @@ module Coordinator
 
     register("projectors.release_sets_v1", memoize: true) do
       Read::Projectors::ReleaseSetsV1.new(
-        schema_registry: self["event_schema_registry"],
-        preparation_loader: self["read.release_sets.preparation_loader"],
-        release_sets: self["repositories.release_sets"],
-        processed_events: self["repositories.processed_projection_events"]
+        preparation_loader: self["read.release_sets.preparation_loader"]
       )
     end
 

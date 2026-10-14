@@ -2,7 +2,7 @@
 
 module Coordinator::Read
   module Subscriptions
-    class ReleaseSets < Coordinator::Shared::Subscriptions::Registration
+    class ReleaseSets < BatchRegistration
       DEFINITION = ReadModelDefinition.new(
         set_name: ReadModelSet::SET_NAME,
         subscription_name: "release-sets-v1",
@@ -16,6 +16,7 @@ module Coordinator::Read
           "ReleaseSetCreated",
           "ReleaseSetMemberAdded",
           "ReleaseSetPrepared",
+          "ReleaseSetVerificationRequested",
           "RepositoryIntegrationRecorded",
           "RepositoryIntegrationMergeLinked",
           "ReleaseSetVerificationRecorded",

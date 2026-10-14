@@ -1,98 +1,51 @@
 # frozen_string_literal: true
 
-module Coordinator::Read
-  module Projectors
-    class ReleaseSetsV1
-      PROJECTION = ProjectionDefinition.new(name: "release-sets", version: 1)
+module Coordinator::Read::Projectors
+  class ReleaseSetsV1
+    EVENT_COLUMNS = {
+      "RepositoryIntegrationRecorded" => :integrations, "RepositoryIntegrationMergeLinked" => :integrations,
+      "ReleaseSetVerificationRecorded" => :verifications, "ReleaseSetIntegrationLinked" => :verifications,
+      "ReleaseSetActivated" => :verifications, "ReleaseSetCompensationRequested" => :compensation_request,
+      "ReleaseSetSuccessfulIntegrationLinked" => :compensation_request,
+      "RepositoryCompensationRecorded" => :completion, "ReleaseSetOutcomeRecorded" => :completion, "ReleaseSetCompleted" => :completion
+    }.freeze
 
-      def initialize(
-        contract: Contracts::ReleaseSetSourceEvent.new,
-        schema_registry: Coordinator::Write::EventSchemaRegistry.new,
-        preparation_loader:,
-        release_sets: Repositories::ReleaseSets.new,
-        processed_events: Repositories::ProcessedProjectionEvents.new
-      )
-        @contract = contract
-        @schema_registry = schema_registry
-        @preparation_loader = preparation_loader
-        @release_sets = release_sets
-        @processed_events = processed_events
-      end
+    def initialize(preparation_loader:)
+      @preparation_loader = preparation_loader
+    end
 
-      def call(event)
-        payload = load_payload(event)
-        unless event.stream.stream_id == payload.release_set_id
-          raise InvalidProjectionSource, "Projection identity does not match its source stream"
+    def call(events)
+      preparations = events.select { _1.type == "ReleaseSetPrepared" }.uniq { [ _1.data.fetch("release_set_id"), _1.stream_revision ] }
+        .to_h do |event|
+          id = event.data.fetch("release_set_id")
+          [ [ id, event.stream_revision ], @preparation_loader.call(id, through_revision: event.stream_revision) ]
         end
-
-        ApplicationRecord.transaction do
-          next unless @processed_events.claim(
-            definition: PROJECTION,
-            identity: ProjectionEventIdentity.from_event(event),
-            processed_at: event.created_at
-          )
-
-          project(event:, payload:)
-        end
-        nil
-      end
-
-      private
-
-      def project(event:, payload:)
-        case payload
-        when Coordinator::Write::Events::ReleaseSetCreatedV1,
-             Coordinator::Write::Events::ReleaseSetMemberAddedV1
-          true
-        when Coordinator::Write::Events::ReleaseSetPreparedV2
-          @release_sets.store(event:, preparation: @preparation_loader.call(payload.release_set_id))
-        when Coordinator::Write::Events::RepositoryIntegrationRecordedV2
-          @release_sets.record_integration(event:, integration: payload)
-        when Coordinator::Write::Events::RepositoryIntegrationMergeLinkedV1
-          @release_sets.link_integration(event:, link: payload)
-        when Coordinator::Write::Events::ReleaseSetVerificationRecordedV2
-          @release_sets.record_verification(event:, verification: payload)
-        when Coordinator::Write::Events::ReleaseSetIntegrationLinkedV1
-          @release_sets.link_verification_integration(event:, link: payload)
-        when Coordinator::Write::Events::ReleaseSetActivatedV2
-          @release_sets.record_activation(event:, activation: payload)
-        when Coordinator::Write::Events::ReleaseSetCompensationRequestedV2
-          @release_sets.record_compensation_request(event:, request: payload)
-        when Coordinator::Write::Events::ReleaseSetSuccessfulIntegrationLinkedV1
-          @release_sets.link_compensation_integration(event:, link: payload)
-        when Coordinator::Write::Events::RepositoryCompensationRecordedV1
-          @release_sets.record_repository_compensation(event:, compensation: payload)
-        when Coordinator::Write::Events::ReleaseSetOutcomeRecordedV1
-          @release_sets.record_outcome(event:, outcome: payload)
-        when Coordinator::Write::Events::ReleaseSetCompletedV2
-          @release_sets.record_completion(event:, completion: payload)
-        else
-          raise UnknownProjectionEvent, payload.class.name
+      model = Coordinator::Read::ReleaseSet
+      model.connection_pool.with_connection do |connection|
+        connection.transaction do
+          documents = load_documents(events)
+          patches = Coordinator::Read::Projections::Batches::ColumnPatches.new(identity_columns: [ :release_set_id ])
+          fold = Coordinator::Read::Projections::ReleaseSets.new(patches:, documents:)
+          events.each do |event|
+            preparation = preparations[[ event.data.fetch("release_set_id"), event.stream_revision ]]
+            fold.apply(event, preparation:)
+          end
+          Coordinator::Read::Repositories::BatchWriter.new(model:, patches:).call
         end
       end
+      nil
+    end
 
-      def load_payload(event)
-        result = @contract.call(
-          event_type: event.type,
-          schema_version: event.metadata["schema_version"],
-          stream_context: event.stream.context,
-          stream_name: event.stream.stream_name,
-          stream_id: event.stream.stream_id,
-          stream_revision: event.stream_revision,
-          global_position: event.global_position,
-          command_id: event.metadata["command_id"],
-          actor_kind: event.metadata["actor_kind"],
-          actor_id: event.metadata["actor_id"],
-          recorded_by: event.metadata["recorded_by"],
-          policy_version: event.metadata["policy_version"]
-        )
-        raise InvalidProjectionSource, result.errors.to_h.inspect if result.failure?
+    private
 
-        @schema_registry.load(
-          type: event.type,
-          schema_version: event.metadata.fetch("schema_version"),
-          data: event.data
-        )
+    def load_documents(events)
+      affected = events.select { EVENT_COLUMNS.key?(_1.type) }
+      return {} if affected.empty?
+
+      columns = affected.map { EVENT_COLUMNS.fetch(_1.type) }.uniq
+      ids = affected.map { _1.data.fetch("release_set_id") }.uniq
+      Coordinator::Read::ReleaseSet.where(release_set_id: ids).pluck(:release_set_id, *columns).to_h do |id, *values|
+        [ id, columns.zip(values.map { Coordinator::Read::CommandResults::Source.document(_1) }).to_h ]
       end
     end
   end

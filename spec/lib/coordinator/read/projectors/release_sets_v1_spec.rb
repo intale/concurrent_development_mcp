@@ -1,6 +1,6 @@
 # frozen_string_literal: true
 
-RSpec.describe Coordinator::Read::Projectors::ReleaseSetsV1, :read_model do
+RSpec.describe Coordinator::Read::Projectors::ReleaseSetsV1, :read_model, :event_store do
   subject(:projector) do
     described_class.new(preparation_loader:)
   end
@@ -16,46 +16,15 @@ RSpec.describe Coordinator::Read::Projectors::ReleaseSetsV1, :read_model do
   end
   let(:candidate_ids) { %w[CAN-release-1 CAN-release-2] }
   let(:correlation_id) { SecureRandom.uuid_v7 }
-  let(:preparation_loader) do
-    Class.new do
-      def initialize(preparation)
-        @preparation = preparation
-      end
-
-      def call(_release_set_id)
-        @preparation
-      end
-    end.new(preparation)
-  end
-  let(:preparation) do
-    Coordinator::Read::ReleaseSetPreparationViewV2.new(
-      release_set_id:,
-      change_set_id:,
-      ordered_members: repository_ids.each_with_index.map do |repository_id, index|
-        Coordinator::Read::ReleaseSetMemberViewV1.new(
-          position: index + 1,
-          repository_id:,
-          merge_snapshot_id: "MS-release-#{index + 1}",
-          ordered_candidate_ids: [ candidate_ids.fetch(index) ],
-          authorization_event: source_reference(
-            "MergeAuthorizationGranted",
-            "MergeAuthorization",
-            SecureRandom.uuid_v7,
-            0
-          )
-        )
-      end,
-      release_digest: digest("1"),
-      policy_version: "release-set-preparation/v1"
-    )
-  end
+  let(:event_store) { Coordinator::Write::EventStore.new(client: PgEventstore.client) }
+  let(:preparation_loader) { Coordinator::Read::ReleaseSets::PreparationLoader.new(event_store:) }
 
   it "serves lagging not-found content and converges idempotently without a freshness gate" do
     query = Coordinator::Read::Queries::ReleaseSetGet.new
     expect(query.call(release_set_id:).value!.status).to eq("not_found")
 
-    projector.call(prepared_event)
-    projector.call(prepared_event)
+    projector.call([ persisted_prepared_event ])
+    projector.call([ persisted_prepared_event ])
 
     observed = query.call(release_set_id:).value!
     expect(observed.status).to eq("ok")
@@ -70,7 +39,7 @@ RSpec.describe Coordinator::Read::Projectors::ReleaseSetsV1, :read_model do
   end
 
   it "keeps the older view available while integration and verification lag, then converges in stream order" do
-    projector.call(prepared_event)
+    create_release_set
 
     expect(repository.fetch(release_set_id)).to have_attributes(
       status: "prepared",
@@ -80,8 +49,8 @@ RSpec.describe Coordinator::Read::Projectors::ReleaseSetsV1, :read_model do
     )
 
     [ *integration_events, *verification_events ].each do |event|
-      projector.call(event)
-      projector.call(event)
+      projector.call([ event ])
+      projector.call([ event ])
     end
 
     observed = repository.fetch(release_set_id)
@@ -92,7 +61,8 @@ RSpec.describe Coordinator::Read::Projectors::ReleaseSetsV1, :read_model do
   end
 
   it "serves verified content while activation completion lags and then converges idempotently" do
-    [ prepared_event, *integration_events, *verification_events ].each { projector.call(_1) }
+    create_release_set
+    [ *integration_events, *verification_events ].each { projector.call([ _1 ]) }
 
     expect(repository.fetch(release_set_id)).to have_attributes(
       status: "verified",
@@ -101,8 +71,8 @@ RSpec.describe Coordinator::Read::Projectors::ReleaseSetsV1, :read_model do
     )
 
     [ activation_event, outcome_event, completion_event ].each do |event|
-      projector.call(event)
-      projector.call(event)
+      projector.call([ event ])
+      projector.call([ event ])
     end
 
     observed = repository.fetch(release_set_id)
@@ -112,8 +82,8 @@ RSpec.describe Coordinator::Read::Projectors::ReleaseSetsV1, :read_model do
   end
 
   it "projects each external repository compensation into the terminal view" do
+    create_release_set
     [
-      prepared_event,
       *integration_events,
       compensation_request_event,
       compensation_integration_link_event,
@@ -121,8 +91,8 @@ RSpec.describe Coordinator::Read::Projectors::ReleaseSetsV1, :read_model do
       compensated_outcome_event,
       compensated_completion_event
     ].each do |event|
-      projector.call(event)
-      projector.call(event)
+      projector.call([ event ])
+      projector.call([ event ])
     end
 
     observed = repository.fetch(release_set_id)
@@ -138,6 +108,93 @@ RSpec.describe Coordinator::Read::Projectors::ReleaseSetsV1, :read_model do
       run_id: "release-compensation-projection"
     )
     expect(evidence.producer).to have_attributes(name: "release-reverter", version: "1.0")
+  end
+
+  it "starts verification only from its explicit fact, not the projected integration collection" do
+    create_release_set
+    projector.call(integration_events)
+    expect(repository.fetch(release_set_id).status).to eq("integrating")
+
+    requested = projection_event(Coordinator::Write::Events::ProjectionNumbers::ReleaseSetVerificationRequestedV1.new(release_set_id:),
+      revision: 8, position: 399, policy_version: "release-set-integration/v1", actor_kind: "system")
+    2.times { projector.call([ requested ]) }
+
+    expect(repository.fetch(release_set_id)).to have_attributes(status: "verifying", verification_status: "unverified")
+    expect(Coordinator::Read::ProcessedProjectionEvent.count).to eq(0)
+  end
+
+  it "reapplies preparation columns without erasing lifecycle columns absent from that batch" do
+    completion = { "outcome" => "activated", "operator_note" => "retained" }
+    record = create_release_set(status: "completed", verification_status: "passed", completion:)
+    original = record.attributes.slice("status", "verification_status", "completion", "integrations", "verifications")
+
+    projector.call([ persisted_prepared_event ])
+
+    expect(record.reload.attributes.slice(*original.keys)).to eq(original)
+    expect(record.release_digest).to eq(digest("1"))
+    expect(Coordinator::Read::ProcessedProjectionEvent.count).to eq(0)
+  end
+
+  it "preserves linked evidence and collection order when recording facts or individual links are redelivered" do
+    create_release_set
+    projector.call([ *integration_events, *verification_events ])
+    record = Coordinator::Read::ReleaseSet.find(release_set_id)
+    original = record.attributes.slice("integrations", "verifications")
+
+    projector.call([ integration_record_events.first, verification_event ])
+    projector.call([ verification_events.fetch(1) ])
+
+    expect(record.reload.attributes.slice(*original.keys)).to eq(original)
+    expect(record.verifications.sole.fetch("integration_events").length).to eq(2)
+  end
+
+  it "converges a complete compensation chunk without duplicate integrations, links or compensation evidence" do
+    create_release_set
+    events = [ *integration_events, compensation_request_event, compensation_integration_link_event,
+      repository_compensation_event, compensated_outcome_event, compensated_completion_event ]
+    2.times { projector.call(events) }
+
+    record = Coordinator::Read::ReleaseSet.find(release_set_id)
+    expect(record.integrations.length).to eq(2)
+    expect(record.compensation_request.fetch("successful_integrations").length).to eq(1)
+    expect(record.compensation_request.fetch("integration_link_events").length).to eq(1)
+    expect(record.completion.fetch("compensation_evidence").length).to eq(1)
+    expect(repository.fetch(release_set_id).completion.outcome).to eq("compensated")
+  end
+
+  it "folds a thousand independent integrations into grouped updates without per-event SQL" do
+    rows = Array.new(1000) { |index| attributes_for(:coordinator_read_release_set, release_set_id: "RS-batch-#{index}") }
+    Coordinator::Read::ReleaseSet.insert_all!(rows)
+    prototype = integration_record_events.first
+    events = rows.map.with_index do |row, index|
+      payload = Coordinator::Write::Events::RepositoryIntegrationRecordedV2.new(
+        **prototype.data.transform_keys(&:to_sym).merge(release_set_id: row.fetch(:release_set_id)))
+      projection_event(payload, revision: 4, position: index + 2000,
+        metadata: Coordinator::Write::Metadata::RepositoryIntegrationV2.new(
+          **metadata_attributes("release-set-integration/v1"), integration_digest: digest("4"),
+          observation_digest: digest("2"), release_digest: digest("1")))
+    end
+    statements = []
+    ActiveSupport::Notifications.subscribed(->(*args) { statements << args.last.fetch(:sql) }, "sql.active_record") do
+      projector.call(events)
+    end
+
+    expect(statements.count { _1.start_with?("UPDATE") }).to be_between(1, 2)
+    expect(statements.count { _1.start_with?("SELECT") && _1.include?('FROM "release_sets"') }).to eq(1)
+    expect(Coordinator::Read::ReleaseSet.where(status: "integrating").count).to eq(1000)
+    projector.call(events)
+    expect(Coordinator::Read::ReleaseSet.all.map { _1.integrations.length }.uniq).to eq([ 1 ])
+    expect(Coordinator::Read::ProcessedProjectionEvent.count).to eq(0)
+  end
+
+  def create_release_set(**attributes)
+    create(:coordinator_read_release_set, release_set_id:, change_set_id:, repository_ids:, **attributes)
+  end
+
+  def persisted_prepared_event
+    @persisted_prepared_event ||= event_store.append(
+      Coordinator::Write::StreamFactory.new.release_set(release_set_id), preparation_events
+    ).last
   end
 
   def preparation_events
@@ -408,7 +465,7 @@ RSpec.describe Coordinator::Read::Projectors::ReleaseSetsV1, :read_model do
   def projection_event(payload, revision:, position:, policy_version: nil, actor_kind: "agent", metadata: nil, caused_by: nil)
     ProjectionEventFactory.build(
       payload:,
-      stream: Coordinator::Write::StreamFactory.new.release_set(release_set_id),
+      stream: Coordinator::Write::StreamFactory.new.release_set(payload.release_set_id),
       stream_revision: revision,
       global_position: position,
       policy_version: policy_version || metadata.policy_version,

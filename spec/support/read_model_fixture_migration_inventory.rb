@@ -83,6 +83,7 @@ module ReadModelFixtureMigrationInventory
     spec/lib/coordinator/read/projectors/decision_governance_v1_spec.rb
     spec/lib/coordinator/read/projectors/decision_interpretations_v1_spec.rb
     spec/lib/coordinator/read/projectors/development_artifacts_v1_spec.rb
+    spec/lib/coordinator/read/projectors/release_sets_v1_spec.rb
     spec/lib/coordinator/read/projectors/skills_v1_spec.rb
     spec/lib/coordinator/read/projectors/verification_obligations_v1_spec.rb
   ].freeze

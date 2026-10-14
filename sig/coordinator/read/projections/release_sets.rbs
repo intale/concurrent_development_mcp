@@ -1,0 +1,28 @@
+module Coordinator
+  module Read
+    module Projections
+      class ReleaseSets
+        def initialize: (patches: Batches::ColumnPatches, ?documents: Hash[String, CommandResults::document]) -> void
+        def apply: (PgEventstore::Event event, ?preparation: Read::ReleaseSets::preparation?) -> nil
+        private
+        def prepare: (PgEventstore::Event event, Read::ReleaseSets::preparation preparation) -> nil
+        def integration: (PgEventstore::Event event, CommandResults::document data) -> nil
+        def merge_link: (PgEventstore::Event event, CommandResults::document data) -> nil
+        def verification: (PgEventstore::Event event, CommandResults::document data) -> nil
+        def verification_link: (PgEventstore::Event event, CommandResults::document data) -> nil
+        def activation: (PgEventstore::Event event, CommandResults::document data) -> nil
+        def compensation_request: (PgEventstore::Event event, CommandResults::document data) -> nil
+        def compensation_link: (PgEventstore::Event event, CommandResults::document data) -> nil
+        def repository_compensation: (PgEventstore::Event event, CommandResults::document data) -> nil
+        def outcome: (PgEventstore::Event event, CommandResults::document data) -> nil
+        def assign: (String id, **CommandResults::json attributes) -> nil
+        def value: (String id, Symbol column, CommandResults::json default) -> CommandResults::json
+        def upsert: (Array[CommandResults::document] entries, CommandResults::document introduced, ?defaults: CommandResults::document) -> Array[CommandResults::document]
+        def linked_parent: (Array[CommandResults::document] entries, PgEventstore::Event event) -> Integer
+        def add_reference: (Array[CommandResults::document] entries, CommandResults::document reference) -> Array[CommandResults::document]
+        def timestamp: (PgEventstore::Event event) -> String
+        def evidence: (PgEventstore::Event event) -> CommandResults::document
+      end
+    end
+  end
+end

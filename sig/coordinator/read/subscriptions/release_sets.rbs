@@ -1,5 +1,5 @@
 module Coordinator::Read::Subscriptions
-  class ReleaseSets < Coordinator::Shared::Subscriptions::Registration
+  class ReleaseSets < Coordinator::Read::Subscriptions::BatchRegistration
     DEFINITION: Coordinator::Read::ReadModelDefinition
 
     def initialize: (handler: Coordinator::Read::Projectors::ReleaseSetsV1, ?pull_interval: Float) -> void
