@@ -103,7 +103,6 @@ RSpec.describe Coordinator::Read::Projectors::MergeSnapshotsV1, :read_model, :ev
 
     expect(record.reload.attributes.slice(*original.keys)).to eq(original)
     expect(record.snapshot_digest).to eq(digest("2"))
-    expect(Coordinator::Read::ProcessedProjectionEvent.count).to eq(0)
   end
 
   it "keeps verification entries and completed selection stable under whole-chunk and individual redelivery" do
@@ -117,7 +116,6 @@ RSpec.describe Coordinator::Read::Projectors::MergeSnapshotsV1, :read_model, :ev
     expect(record.reload.verification_submissions.length).to eq(1)
     expect(record.verified_decision).to eq(original)
     expect(repository.fetch(merge_snapshot_id).verification.status).to eq("verified")
-    expect(Coordinator::Read::ProcessedProjectionEvent.count).to eq(0)
   end
 
   it "preserves the assigned authorization when the original observation is redelivered" do
@@ -153,7 +151,6 @@ RSpec.describe Coordinator::Read::Projectors::MergeSnapshotsV1, :read_model, :ev
     expect(statements.count { _1.start_with?("UPDATE") }).to eq(1)
     expect(statements.count { _1.start_with?("SELECT") && _1.include?('FROM "merge_snapshots"') }).to eq(0)
     expect(Coordinator::Read::MergeSnapshot.where(updated_at: events.first.created_at).count).to eq(1000)
-    expect(Coordinator::Read::ProcessedProjectionEvent.count).to eq(0)
   end
 
   def project_verified_snapshot

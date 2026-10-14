@@ -1357,25 +1357,6 @@ CREATE TABLE public.operation_batches (
 
 
 --
--- Name: processed_projection_events; Type: TABLE; Schema: public; Owner: -
---
-
-CREATE TABLE public.processed_projection_events (
-    command_id character varying,
-    event_id character varying NOT NULL,
-    event_type character varying NOT NULL,
-    processed_at timestamp(6) without time zone NOT NULL,
-    projection_name character varying NOT NULL,
-    projection_version integer NOT NULL,
-    stream_context character varying NOT NULL,
-    stream_id character varying NOT NULL,
-    stream_name character varying NOT NULL,
-    stream_revision bigint NOT NULL,
-    updated_at timestamp(6) without time zone NOT NULL
-);
-
-
---
 -- Name: release_sets; Type: TABLE; Schema: public; Owner: -
 --
 
@@ -2372,20 +2353,6 @@ CREATE INDEX idx_on_target_kind_target_id_389d0c51da ON public.development_artif
 --
 
 CREATE INDEX idx_operation_batches_event_time ON public.operation_batches USING btree (updated_at DESC, batch_id DESC);
-
-
---
--- Name: idx_processed_projection_events_command; Type: INDEX; Schema: public; Owner: -
---
-
-CREATE INDEX idx_processed_projection_events_command ON public.processed_projection_events USING btree (projection_name, projection_version, command_id);
-
-
---
--- Name: idx_processed_projection_events_identity; Type: INDEX; Schema: public; Owner: -
---
-
-CREATE UNIQUE INDEX idx_processed_projection_events_identity ON public.processed_projection_events USING btree (projection_name, projection_version, stream_context, stream_name, stream_id, stream_revision);
 
 
 --
@@ -3442,6 +3409,7 @@ ALTER TABLE ONLY public.operation_batch_outcomes
 SET search_path TO "$user", public;
 
 INSERT INTO "schema_migrations" (version) VALUES
+('20261014134600'),
 ('20261014131800'),
 ('20261014125000'),
 ('20261012111000'),

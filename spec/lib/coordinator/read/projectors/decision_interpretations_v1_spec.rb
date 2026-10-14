@@ -60,7 +60,6 @@ RSpec.describe Coordinator::Read::Projectors::DecisionInterpretationsV1, :read_m
     expect(projected.causation_id).to eq(guidance_event.id)
     expect(Coordinator::Read::DecisionInterpretation.count).to eq(1)
     expect(Coordinator::Read::DecisionInterpretation.sole.updated_at).to eq(acceptance.created_at)
-    expect(Coordinator::Read::ProcessedProjectionEvent.count).to eq(0)
   end
 
   it "serves adjudication clarification before rejection without activating policy" do
@@ -170,7 +169,6 @@ RSpec.describe Coordinator::Read::Projectors::DecisionInterpretationsV1, :read_m
 
     expect(statements.count { _1.start_with?("UPDATE") }).to eq(1)
     expect(Coordinator::Read::DecisionInterpretation.where(lifecycle_status: "rejected").count).to eq(1000)
-    expect(Coordinator::Read::ProcessedProjectionEvent.count).to eq(0)
   end
 
   def proposal_payload

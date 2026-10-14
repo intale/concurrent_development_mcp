@@ -1,4 +1,0 @@
-module Coordinator::Read::Repositories
-  module EventTimestamped
-  end
-end

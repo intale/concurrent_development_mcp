@@ -12,7 +12,7 @@ module Coordinator::Read
             stream_name: "Interpretation"
           )
         ],
-        event_types: Contracts::DecisionInterpretationSourceEvent::EVENT_TYPES
+        event_types: %w[DecisionInterpretationProposed DecisionClarificationRequired DecisionInterpretationAccepted DecisionInterpretationRejected]
       )
 
       def initialize(handler:, pull_interval: 1.0)

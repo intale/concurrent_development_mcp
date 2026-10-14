@@ -1,6 +1,0 @@
-module Coordinator
-  module Read
-    class InvalidProjectionSource < StandardError
-    end
-  end
-end

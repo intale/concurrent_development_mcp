@@ -47,7 +47,6 @@ RSpec.describe Coordinator::Read::Projectors::AgentChoicesV1, :read_model do
       correlation_id: accepted.correlation_id
     )
     expect(Coordinator::Read::AgentChoice.count).to eq(1)
-    expect(Coordinator::Read::ProcessedProjectionEvent.count).to eq(0)
   end
 
   it "patches acceptance without validating unrelated projected context" do

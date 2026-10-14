@@ -63,7 +63,6 @@ RSpec.describe Coordinator::Read::Projectors::SkillsV1, :read_model, :event_stor
     expect(Coordinator::Read::Skill.count).to eq(1)
     expect(Coordinator::Read::SkillRevision.count).to eq(1)
     expect(Coordinator::Read::SkillAsset.count).to eq(1)
-    expect(Coordinator::Read::ProcessedProjectionEvent.count).to eq(0)
     expect(current.to_h.keys & %i[fresh pending projection_status]).to be_empty
     [ Coordinator::Read::Skill, Coordinator::Read::SkillRevision, Coordinator::Read::SkillAsset ].each do |model|
       expect(model.sole.updated_at).to eq(second_event.created_at)
@@ -96,7 +95,6 @@ RSpec.describe Coordinator::Read::Projectors::SkillsV1, :read_model, :event_stor
     historical = repository.fetch(name: "review", scope: "project:alpha", revision: 1)
     expect(current).to have_attributes(revision: 1, instructions: "Inspect the complete diff.")
     expect(historical).to have_attributes(revision: 1)
-    expect(Coordinator::Read::ProcessedProjectionEvent.count).to eq(0)
     expect(Coordinator::Read::Skill.sole.updated_at).to eq(second_event.created_at)
     expect(search_items("skill.instructions", "complete diff").sole.updated_at).to eq(second_event.created_at.utc.iso8601(6))
     expect(search_items("skill.instructions", "Newest")).to be_empty
@@ -136,7 +134,6 @@ RSpec.describe Coordinator::Read::Projectors::SkillsV1, :read_model, :event_stor
     expect(Coordinator::Read::SkillRevision.sole.asset_count).to eq(1)
     expect(Coordinator::Read::SkillAsset.sole.id).to eq(asset_id)
     expect(Coordinator::Read::SkillAsset.sole.content_text).to eq("Second asset.")
-    expect(Coordinator::Read::ProcessedProjectionEvent.count).to eq(0)
   end
 
   it "removes only superseded revisions for each owner in a mixed-Skill batch" do

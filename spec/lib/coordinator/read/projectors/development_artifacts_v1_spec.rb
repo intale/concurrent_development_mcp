@@ -132,7 +132,6 @@ RSpec.describe Coordinator::Read::Projectors::DevelopmentArtifactsV1, :read_mode
         arguments: have_attributes(artifact_id: target.artifact_id)
       )
     )
-    expect(processed_events.count).to eq(0)
     expect(view.to_h.keys & %i[fresh pending projection_status]).to be_empty
     expect(Coordinator::Read::DevelopmentArtifactObservation.find(observation.observation_id).updated_at)
       .to eq(observations.last.created_at)
@@ -283,7 +282,6 @@ RSpec.describe Coordinator::Read::Projectors::DevelopmentArtifactsV1, :read_mode
     trace.enable { 2.times { projector.call([ link ]) } }
 
     expect(reads).to eq([ transaction_depth, transaction_depth ])
-    expect(processed_events.where(event_id: link.id).count).to eq(0)
     expect(Coordinator::Read::DevelopmentArtifactObservationFactLink.where(link_event_id: link.id).count).to eq(1)
     expect(observation.reload.title).to eq("Linked title")
   end
@@ -303,7 +301,6 @@ RSpec.describe Coordinator::Read::Projectors::DevelopmentArtifactsV1, :read_mode
     expect(observation.reload).to have_attributes(classification_revision: 2, classification_reason: "Correction", content_text: original_content)
     expect(observation.classified_event.fetch("event_id")).to eq(corrected.id)
     expect(observation.observed_event.fetch("event_id")).to eq(recorded.id)
-    expect(processed_events.count).to eq(0)
   end
 
   it "folds mixed label facts in delivered order and keeps stable children on whole-batch redelivery" do
@@ -319,7 +316,6 @@ RSpec.describe Coordinator::Read::Projectors::DevelopmentArtifactsV1, :read_mode
     expect(artifact.reload.labels).to eq(%w[base final])
     expect(observation.reload.labels).to eq(%w[base final])
     expect(Coordinator::Read::DevelopmentArtifactObservationFactLink.where(link_event_id: links.map(&:id)).count).to eq(3)
-    expect(processed_events.count).to eq(0)
   end
 
   it "replays relation and supersession facts with deterministic cursor identity" do
@@ -514,10 +510,6 @@ RSpec.describe Coordinator::Read::Projectors::DevelopmentArtifactsV1, :read_mode
       command_id: "cmd-artifact-projector-#{position}", policy_version: "development-artifact-repository/v1",
       actor_id: "agent-projector", correlation_id:, markers:
     )
-  end
-
-  def processed_events
-    Coordinator::Read::ProcessedProjectionEvent.where(projection_name: "development-artifacts", projection_version: 5)
   end
 
   def relation_query

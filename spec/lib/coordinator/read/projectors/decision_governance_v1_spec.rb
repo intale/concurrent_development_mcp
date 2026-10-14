@@ -43,7 +43,6 @@ RSpec.describe Coordinator::Read::Projectors::DecisionGovernanceV1, :read_model,
       include("decision_id" => "D-project", "decision_revision" => 1)
     )
     expect(Coordinator::Read::DecisionDefinition.count).to eq(1)
-    expect(Coordinator::Read::ProcessedProjectionEvent.count).to eq(0)
   end
 
   it "reapplies ordered membership deltas without skipping already projected events" do
@@ -131,7 +130,6 @@ RSpec.describe Coordinator::Read::Projectors::DecisionGovernanceV1, :read_model,
     projector.call([ lifecycle.fetch(:activated) ])
     expect(repository.fetch("D-project").policy_status).to eq("active")
     expect(record.reload).to have_attributes(correction_count: 7, recorded_event: recorded_source)
-    expect(Coordinator::Read::ProcessedProjectionEvent.count).to eq(0)
   end
 
   it "preserves independent lifecycle and absolute count columns when recording facts are replayed" do
@@ -141,7 +139,6 @@ RSpec.describe Coordinator::Read::Projectors::DecisionGovernanceV1, :read_model,
     projector.call([ lifecycle.fetch(:recorded) ])
 
     expect(record.reload).to have_attributes(policy_status: "active", correction_count: 7, interpretation_id: "I-project")
-    expect(Coordinator::Read::ProcessedProjectionEvent.count).to eq(0)
   end
 
   it "bounds immutable head enrichment by the delivered partition fact rather than a future correction" do
@@ -184,7 +181,6 @@ RSpec.describe Coordinator::Read::Projectors::DecisionGovernanceV1, :read_model,
     expect(Coordinator::Read::DecisionDefinition.order(:correction_count).pluck(:correction_count)).to eq((0...1000).to_a)
     projector.call(events)
     expect(Coordinator::Read::DecisionDefinition.sum(:correction_count)).to eq((0...1000).sum)
-    expect(Coordinator::Read::ProcessedProjectionEvent.count).to eq(0)
   end
 
   def activation_lifecycle(decision_id: "D-project", interpretation_id: "I-project", message_id: "M-project",

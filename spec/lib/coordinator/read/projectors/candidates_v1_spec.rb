@@ -61,7 +61,6 @@ RSpec.describe Coordinator::Read::Projectors::CandidatesV1, :read_model, :event_
     expect(Coordinator::Read::CandidateChangedResource.pluck(:path)).to eq([ "lib/candidate.rb" ])
     expect(Coordinator::Read::CandidateObservedInput.pluck(:path)).to eq([ "lib/candidate.rb" ])
     expect(Coordinator::Read::Candidate.count).to eq(1)
-    expect(Coordinator::Read::ProcessedProjectionEvent.count).to eq(0)
   end
 
   it "does not add a later intention to the immutable submitted instruction references" do
@@ -114,7 +113,6 @@ RSpec.describe Coordinator::Read::Projectors::CandidatesV1, :read_model, :event_
       [ "assumes", "database:postgresql" ]
     )
     expect(repository.fetch(candidate_id).to_h.keys & %i[fresh pending projection_status]).to be_empty
-    expect(Coordinator::Read::ProcessedProjectionEvent.count).to eq(0)
     expect(surface_event.stream_revision).to eq(0)
   end
 
@@ -132,7 +130,6 @@ RSpec.describe Coordinator::Read::Projectors::CandidatesV1, :read_model, :event_
     expect(Coordinator::Read::CandidateObservedInput.sole.created_at).to eq(first_observed)
     expect(Coordinator::Read::CandidateChangedResource.count).to eq(1)
     expect(Coordinator::Read::CandidateObservedInput.count).to eq(1)
-    expect(Coordinator::Read::ProcessedProjectionEvent.count).to eq(0)
   end
 
   it "patches only Impact columns on a factory-created Candidate and keeps key tuples stable" do
@@ -170,7 +167,6 @@ RSpec.describe Coordinator::Read::Projectors::CandidatesV1, :read_model, :event_
     expect(Coordinator::Read::Candidate.where(target_branch: "feature/batch").count).to eq(1000)
     projector.call(events)
     expect(Coordinator::Read::Candidate.first.submitted_event).to eq(rows.first.fetch(:submitted_event))
-    expect(Coordinator::Read::ProcessedProjectionEvent.count).to eq(0)
   end
 
   def persist_candidate_source

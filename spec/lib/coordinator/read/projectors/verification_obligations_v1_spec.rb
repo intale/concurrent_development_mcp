@@ -78,7 +78,6 @@ RSpec.describe Coordinator::Read::Projectors::VerificationObligationsV1, :read_m
     projector.call([ second, first ])
     expect(record.reload.claimant_id).to eq("agent-blue")
     expect(record.obligation).to eq(original)
-    expect(Coordinator::Read::ProcessedProjectionEvent.count).to eq(0)
   end
 
   it "keeps partial evidence available and reconstructs selected native satisfaction on rebuild" do
@@ -203,7 +202,6 @@ RSpec.describe Coordinator::Read::Projectors::VerificationObligationsV1, :read_m
     record = Coordinator::Read::VerificationObligation.find(obligation_id)
     expect(record).to have_attributes(status: "waived", evidence_count: 3, claim_id: event_payload(claim).claim_id)
     expect(record.terminal_outcome.fetch("previous_status")).to eq("open")
-    expect(Coordinator::Read::ProcessedProjectionEvent.count).to eq(0)
   end
 
   it "bulk patches a thousand absolute progress facts without counting evidence or loading unrelated state" do
@@ -222,7 +220,6 @@ RSpec.describe Coordinator::Read::Projectors::VerificationObligationsV1, :read_m
     expect(Coordinator::Read::VerificationObligation.where(evidence_count: 2).count).to eq(1000)
     projector.call(events)
     expect(Coordinator::Read::VerificationObligation.first.obligation).to eq(rows.first.fetch(:obligation))
-    expect(Coordinator::Read::ProcessedProjectionEvent.count).to eq(0)
   end
 
   def progress_events(count:, passed:, missing:)

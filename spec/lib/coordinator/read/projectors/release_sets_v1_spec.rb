@@ -120,7 +120,6 @@ RSpec.describe Coordinator::Read::Projectors::ReleaseSetsV1, :read_model, :event
     2.times { projector.call([ requested ]) }
 
     expect(repository.fetch(release_set_id)).to have_attributes(status: "verifying", verification_status: "unverified")
-    expect(Coordinator::Read::ProcessedProjectionEvent.count).to eq(0)
   end
 
   it "reapplies preparation columns without erasing lifecycle columns absent from that batch" do
@@ -132,7 +131,6 @@ RSpec.describe Coordinator::Read::Projectors::ReleaseSetsV1, :read_model, :event
 
     expect(record.reload.attributes.slice(*original.keys)).to eq(original)
     expect(record.release_digest).to eq(digest("1"))
-    expect(Coordinator::Read::ProcessedProjectionEvent.count).to eq(0)
   end
 
   it "preserves linked evidence and collection order when recording facts or individual links are redelivered" do
@@ -184,7 +182,6 @@ RSpec.describe Coordinator::Read::Projectors::ReleaseSetsV1, :read_model, :event
     expect(Coordinator::Read::ReleaseSet.where(status: "integrating").count).to eq(1000)
     projector.call(events)
     expect(Coordinator::Read::ReleaseSet.all.map { _1.integrations.length }.uniq).to eq([ 1 ])
-    expect(Coordinator::Read::ProcessedProjectionEvent.count).to eq(0)
   end
 
   def create_release_set(**attributes)

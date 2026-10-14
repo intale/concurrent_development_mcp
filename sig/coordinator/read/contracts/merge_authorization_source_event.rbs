@@ -1,4 +1,0 @@
-module Coordinator::Read::Contracts
-  class MergeAuthorizationSourceEvent < Dry::Validation::Contract
-  end
-end

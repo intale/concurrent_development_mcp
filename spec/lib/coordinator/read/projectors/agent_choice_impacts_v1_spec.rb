@@ -44,7 +44,6 @@ RSpec.describe Coordinator::Read::Projectors::AgentChoiceImpactsV1, :read_model,
     choice = Coordinator::Read::Repositories::AgentChoices.new.fetch(choice_id)
     expect(choice).to have_attributes(observation_status: "accepted", invalidation: nil)
     expect(Coordinator::Read::AgentChoiceImpact.count).to eq(1)
-    expect(Coordinator::Read::ProcessedProjectionEvent.count).to eq(0)
   end
 
   it "lets the Choice builder own invalidation without waiting for an Impact or accepted Choice projection" do

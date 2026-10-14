@@ -24,7 +24,6 @@ RSpec.describe Coordinator::Read::Projectors::CommandReceiptsV2, :read_model, :e
     expect(good.emitted_events.map(&:event_id)).to eq(effects.map(&:id))
     expect(bad).to have_attributes(status: "denied", receipt: nil, summary: "ChangeSet already exists")
     expect(sql.count { _1.start_with?("UPDATE") }).to eq(1)
-    expect(Coordinator::Read::ProcessedProjectionEvent.count).to eq(0)
   end
 
   it "reprocesses the same immutable terminal without a claim ledger or duplicate receipt" do

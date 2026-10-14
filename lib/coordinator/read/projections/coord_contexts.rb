@@ -221,7 +221,8 @@ module Coordinator::Read::Projections
       key = [ event.stream.context, event.stream.stream_name, event.stream.stream_id ]
       positions.reject! { _1.values_at(:stream_context, :stream_name, :stream_id) == key }
       positions << { stream_context: key[0], stream_name: key[1], stream_id: key[2], stream_revision: event.stream_revision }
-      positions.select! { retained_streams(state).include?(_1.values_at(:stream_context, :stream_name, :stream_id)) }
+      retained = retained_streams(state).to_set
+      positions.select! { retained.include?(_1.values_at(:stream_context, :stream_name, :stream_id)) }
       positions.sort_by! { _1.values_at(:stream_context, :stream_name, :stream_id) }
       attributes = { change_set_id: id, projection_version: VERSION, document: state, source_positions: positions, last_processed_at: event.created_at }
       @contexts.insert(attributes.merge(repository_checkpoint_numbers: @checkpoint_numbers.fetch(id, {}), created_at: event.created_at, updated_at: event.created_at))

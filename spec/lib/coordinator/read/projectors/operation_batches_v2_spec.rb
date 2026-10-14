@@ -62,7 +62,6 @@ RSpec.describe Coordinator::Read::Projectors::OperationBatchesV2, :read_model do
     expect(Coordinator::Read::OperationBatch.count).to eq(1)
     expect(Coordinator::Read::OperationBatchItem.count).to eq(2)
     expect(Coordinator::Read::OperationBatchOutcome.count).to eq(2)
-    expect(Coordinator::Read::ProcessedProjectionEvent.count).to eq(0)
   end
 
   it "exposes accepted cancellation before terminal completion and marks only terminal remainder not run" do
@@ -163,7 +162,6 @@ RSpec.describe Coordinator::Read::Projectors::OperationBatchesV2, :read_model do
       status: "command_id_reused", command_id: item.command_id, receipt: nil, data: error
     )
     expect(fetch(limit: 1)).to have_attributes(rejected: 1, pending: 0)
-    expect(Coordinator::Read::ProcessedProjectionEvent.count).to eq(0)
   end
 
   it "preserves canonical assignments and terminal progress when only creation and item facts are replayed" do
@@ -213,7 +211,6 @@ RSpec.describe Coordinator::Read::Projectors::OperationBatchesV2, :read_model do
 
     expect(statements.count { _1.start_with?("UPDATE") }).to eq(2)
     expect(Coordinator::Read::OperationBatchItem.where.not(target_command_id: nil).count).to eq(1000)
-    expect(Coordinator::Read::ProcessedProjectionEvent.count).to eq(0)
   end
 
   def completed_events

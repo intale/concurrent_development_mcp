@@ -35,7 +35,6 @@ RSpec.describe Coordinator::Read::Projectors::CoordContextV1, :read_model, :even
     expect(snapshot.state.work_item_ids).to eq([ work_item_id ])
     expect(snapshot.state.work_items.sole).to have_attributes(work_item_id:, repository_id:, status: "planned")
     expect(snapshot.source_positions.length).to eq(2)
-    expect(processed_events.count).to eq(0)
     expect(Coordinator::Read::CoordContextScope.find_by!(scope_kind: "work_item", scope_id: work_item_id).updated_at)
       .to eq(planning.last.created_at)
     expect(snapshot.state.change_set.created_at).to eq(timestamp(planning.first))
@@ -149,7 +148,6 @@ RSpec.describe Coordinator::Read::Projectors::CoordContextV1, :read_model, :even
     projector.call([ finished ])
     projector.call(events.first(9))
     expect(repository.fetch(change_set_id).state.change_set.status).to eq("completed")
-    expect(processed_events.count).to eq(0)
   end
 
   it "bulk folds a thousand activations while preserving unrelated document fields" do
@@ -166,7 +164,6 @@ RSpec.describe Coordinator::Read::Projectors::CoordContextV1, :read_model, :even
     expect(context_updates.length).to be_between(1, 20)
     expect(Coordinator::Read::CoordContext.first.document.fetch("work_items")).to eq(rows.first.fetch(:document).fetch("work_items"))
     expect(Coordinator::Read::CoordContext.pluck(:document).map { _1.fetch("change_set").fetch("status") }.uniq).to eq([ "active" ])
-    expect(processed_events.count).to eq(0)
   end
 
   it "projects absolute repository checkpoint numbers independently of the clipped checkpoint list" do
@@ -441,10 +438,6 @@ RSpec.describe Coordinator::Read::Projectors::CoordContextV1, :read_model, :even
       event_id: event.id, type: event.type, stream_context: event.stream.context,
       stream_name: event.stream.stream_name, stream_id: event.stream.stream_id, stream_revision: event.stream_revision
     )
-  end
-
-  def processed_events
-    Coordinator::Read::ProcessedProjectionEvent.where(projection_name: "coord_context")
   end
 
   def assert_abandoned_context(event, reason:)

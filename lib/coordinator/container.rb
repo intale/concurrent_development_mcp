@@ -758,10 +758,6 @@ module Coordinator
       Write::Tasks::SemanticResultMapper.new
     end
 
-    register("repositories.processed_projection_events", memoize: true) do
-      Read::Repositories::ProcessedProjectionEvents.new
-    end
-
     register("repositories.command_receipts", memoize: true) do
       Read::Repositories::CommandReceipts.new
     end
