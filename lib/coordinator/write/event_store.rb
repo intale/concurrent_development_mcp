@@ -248,22 +248,6 @@ module Coordinator::Write
       []
     end
 
-    def stream_head(reference)
-      @client.read(@pg_stream_factory.call(reference),
-        options: { direction: :desc, max_count: 1 }).first
-    rescue PgEventstore::StreamNotFoundError
-      nil
-    end
-
-    def read_stream_history_page(reference, criteria)
-      @client.read(@pg_stream_factory.call(reference), options: {
-        direction: :asc, from_revision: criteria.from_revision, to_revision: criteria.to_revision,
-        max_count: criteria.page_size, filter: { event_types: criteria.event_types }
-      })
-    rescue PgEventstore::StreamNotFoundError
-      []
-    end
-
     def read_stream_marked_page(reference, criteria)
       @client.read(
         @pg_stream_factory.call(reference),

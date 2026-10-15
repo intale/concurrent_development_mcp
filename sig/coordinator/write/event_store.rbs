@@ -4,8 +4,6 @@ module Coordinator
       include _EventStore
 
       def initialize: (client: PgEventstore::Client, ?pg_stream_factory: PgStreamFactory) -> void
-      def stream_head: (StreamReference) -> PgEventstore::Event?
-      def read_stream_history_page: (StreamReference, StreamHistoryPageCriteria) -> Array[PgEventstore::Event]
     end
   end
 end
