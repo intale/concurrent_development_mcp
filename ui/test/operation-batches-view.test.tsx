@@ -95,14 +95,19 @@ function renderDetail(overrides: Partial<OperationBatchDetailViewProps> = {}) {
   );
 }
 
-test("presents progress, one primary batch action, and a spatial item detail", () => {
+test("presents operation batches in a semantic table with tool-name detail links", () => {
   const list = renderList();
-  assert.match(list, /2 of 4 items succeeded/);
-  assert.match(list, />Open batch/);
+  assert.match(list, /<caption class="visually-hidden">Operation batches<\/caption>/);
+  assert.match(list, /<th scope="col">Items<\/th>/);
+  assert.match(list, /<a aria-label="Open batch batch:uiux:05"[^>]*>development artifact capture<\/a>/);
   assert.match(list, /batch%3Auiux%3A05\?status=RUNNING/);
+  assert.match(list, /<td[^>]*>4<\/td>/);
+  assert.match(list, /<td[^>]*>2<\/td>/);
 
   const detail = renderDetail();
   assert.match(detail, /Batch items/);
+  assert.match(detail, /<caption class="visually-hidden">Batch items<\/caption>/);
+  assert.match(detail, /<th scope="col">Command ID<\/th>/);
   assert.match(detail, /Artifact captured/);
   assert.match(detail, /Page 2/);
   assert.match(detail, /href="\/operations\/batches\?status=RUNNING&amp;after=batch-cursor"/);

@@ -22,14 +22,13 @@ import {
 } from "../src/governance/project-governance-model.js";
 import {
   AvailableStale,
-  ChoiceCards,
+  ChoiceTable,
   ChoiceDetailCard,
-  DecisionCards,
+  DecisionTable,
   DecisionDetailCard,
-  GovernanceNavigation,
-  GuidanceCards,
+  GuidanceTable,
   GuidanceDetailCard,
-  ImpactCards,
+  ImpactTable,
   ImpactDetailCard,
   InitialError,
   LoadingState,
@@ -37,7 +36,7 @@ import {
 } from "../src/governance/project-governance-view.js";
 
 const timestamp = "2026-09-01T06:30:00.000000Z";
-const projectRef = "project-ref-governance";
+const projectRef = "project:concurrent_development_mcp";
 const repositoryId = "018f0f4d-4e45-7abc-8def-000000000081";
 const assessmentId = `choice-impact-v1:${"1".repeat(64)}`;
 const value = { schema: "named-choice/v1", name: "rspec", items: null, targetKind: null, targetId: null, action: null };
@@ -131,15 +130,22 @@ function render(node: React.ReactNode): string {
   return renderToStaticMarkup(<MemoryRouter>{node}</MemoryRouter>);
 }
 
-test("presents four focused Governance collections with stable detail actions", () => {
-  const markup = render(<><GovernanceNavigation basePath={`/projects/${projectRef}/governance`} /><DecisionCards connection={decisions} hrefFor={(id) => `/decisions/${id}`} /><GuidanceCards connection={guidance} hrefFor={(id) => `/guidance/${id}`} /><ChoiceCards connection={choices} hrefFor={(id) => `/choices/${id}`} /><ImpactCards connection={impacts} hrefFor={(id) => `/impacts/${id}`} /></>);
-  assert.match(markup, /Governance views/);
+test("presents Governance collections as accessible tables with stable detail links", () => {
+  const markup = render(<><DecisionTable connection={decisions} hrefFor={(id) => `/decisions/${id}`} /><GuidanceTable connection={guidance} hrefFor={(id) => `/guidance/${id}`} /><ChoiceTable connection={choices} hrefFor={(id) => `/choices/${id}`} /><ImpactTable connection={impacts} hrefFor={(id) => `/impacts/${id}`} /></>);
   assert.match(markup, /Project Decisions/);
   assert.match(markup, /approved testing boundary/);
   assert.match(markup, /Use RSpec for Rails boundaries/);
-  assert.match(markup, /View impact/);
   assert.match(markup, /href="\/decisions\/D-governance"/);
-  assert.doesNotMatch(markup, /<table/);
+  assert.match(markup, /<caption class="visually-hidden">Project Decisions<\/caption>/);
+  assert.match(markup, /<table/);
+  assert.match(markup, /<th scope="col">Topic<\/th>/);
+  assert.match(markup, /<th scope="col">Status<\/th>/);
+  assert.match(markup, /<th scope="col">Modality\/effect<\/th>/);
+  assert.match(markup, /<th scope="col">Current<\/th>/);
+  assert.match(markup, /rspec/);
+  assert.match(markup, /href="\/impacts\//);
+  assert.doesNotMatch(markup, /<article class="card h-100"/);
+  assert.match(render(<DecisionTable connection={{ ...decisions, nodes: [] }} hrefFor={() => "/decision"} />), /No Decisions match these filters/);
 });
 
 test("keeps each substantial Governance detail in its own in-context page", () => {
@@ -154,7 +160,7 @@ test("keeps each substantial Governance detail in its own in-context page", () =
 });
 
 test("keeps available content visible during refresh failures and provides explicit initial states", () => {
-  assert.match(render(<><AvailableStale message="Projection unavailable" onRetry={() => undefined} /><DecisionCards connection={decisions} hrefFor={() => "/decision"} /></>), /last available projection remains visible/);
+  assert.match(render(<><AvailableStale message="Projection unavailable" onRetry={() => undefined} /><DecisionTable connection={decisions} hrefFor={() => "/decision"} /></>), /last available projection remains visible/);
   assert.match(render(<LoadingState label="Decisions" />), /Loading Decisions/);
   assert.match(render(<InitialError label="Decisions" message="Network unavailable" onRetry={() => undefined} />), /Retry/);
 });
@@ -170,12 +176,15 @@ test("binds preserved data, pagination trails, and return locations to the same 
   const second = nextPageParams(first, "cursor-2");
   assert.equal(second.get("after"), "cursor-2");
   assert.equal(previousPageParams(second).get("after"), null);
-  assert.match(detailLocation("/governance/decisions", "D one", "/governance/decisions?status=ACTIVE"), /D%20one/);
-  assert.equal(safeGovernanceReturnTo("https://example.test", "/fallback", "/projects/p/governance"), "/fallback");
+  const detail = detailLocation(`/projects/${projectRef}/decisions`, "D one");
+  assert.equal(detail, `/projects/${projectRef}/decisions/D%20one`);
+  assert.equal(new URL(detail, "https://coordinator.test").search, "");
+  assert.equal(safeGovernanceReturnTo("https://example.test", "/fallback", "/projects/p"), "/fallback");
 });
 
-test("renders explicit previous and next controls for cursor navigation", () => {
+test("pagination controls render explicit previous and next actions", () => {
   const markup = render(<PaginationControls canPrevious nextCursor="next" onNext={() => undefined} onPrevious={() => undefined} />);
   assert.match(markup, /Previous/);
   assert.match(markup, /Next/);
+  assert.match(markup, /aria-label="Collection pages"/);
 });

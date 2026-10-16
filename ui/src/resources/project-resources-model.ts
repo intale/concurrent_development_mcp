@@ -128,9 +128,7 @@ export function listLocation(pathname: string, params: URLSearchParams): string 
   return query ? `${pathname}?${query}` : pathname;
 }
 
-export function detailLocation(pathname: string, id: string, returnTo: string): string {
-  return `${pathname}/${encodeURIComponent(id)}?${new URLSearchParams({ returnTo }).toString()}`;
-}
+export { detailPath as detailLocation } from "../navigation.js";
 
 export function safeReturnTo(value: string | null, expectedPath: string): string {
   return value === expectedPath || value?.startsWith(`${expectedPath}?`) ? value : expectedPath;

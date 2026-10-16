@@ -81,21 +81,26 @@ function renderDetail(overrides: Partial<CommandReceiptDetailViewProps> = {}) {
   );
 }
 
-test("presents one primary receipt action and a spatial detail route", () => {
+test("presents receipts in a semantic table with tool-name detail links", () => {
   const list = renderList();
   assert.match(list, /work_item_acquire/);
-  assert.match(list, />Open receipt/);
+  assert.match(list, /<caption class="visually-hidden">Command receipts<\/caption>/);
+  assert.match(list, /<th scope="col">Command<\/th>/);
+  assert.match(list, /<a aria-label="Open receipt cmd:uiux:05"[^>]*>work_item_acquire<\/a>/);
+  assert.match(list, /scope="row"/);
   assert.match(list, /cmd%3Auiux%3A05\?tool=work_item_acquire/);
-  assert.match(list, /1 emitted event/);
+  assert.match(list, /1 events · 1 warnings/);
 
   const detail = renderDetail();
   assert.match(detail, /Emitted event facts/);
+  assert.match(detail, /<caption class="visually-hidden">Emitted event facts<\/caption>/);
+  assert.match(detail, /<th scope="col">Stream<\/th>/);
   assert.match(detail, /WorkItemAcquired/);
   assert.match(detail, /href="\/audit\/command-receipts\?tool=work_item_acquire"/);
   assert.doesNotMatch(detail, /Available receipts/);
 });
 
-test("gives long command identities a full-width wrapping row below each status header", () => {
+test("keeps long command identities readable beside linked tool names", () => {
   const commandId = "adj.20260826.candidate.1.submit.with-a-long-coordination-identity";
   const markup = renderList({
     page: {
@@ -104,9 +109,9 @@ test("gives long command identities a full-width wrapping row below each status 
     }
   });
 
-  assert.match(markup, /card-title fw-semibold text-break/);
-  assert.match(markup, /badge text-bg-success flex-shrink-0/);
-  assert.match(markup, new RegExp(`text-break w-100"><code>${commandId}`));
+  assert.match(markup, new RegExp(`<a aria-label="Open receipt ${commandId}"[^>]*>work_item_acquire<\/a>`));
+  assert.match(markup, new RegExp(`small text-body-secondary">${commandId}`));
+  assert.match(markup, /<th scope="col">Status<\/th>/);
 
   const detail = renderDetail({ receipt: { ...receipt, commandId } });
   assert.match(detail, /card-header"><div class="d-flex align-items-start justify-content-between gap-2"/);

@@ -1,4 +1,5 @@
-import { Link } from "react-router-dom";
+import { ContextLink as Link } from "../navigation.js";
+import { DataTable, TextPreview, Timestamp } from "../data-table.js";
 import { CopyIdentifier } from "../copy-identifier.js";
 import { RetryRefresh } from "../retry-refresh.js";
 import type { CommandReceipt, CommandReceiptPage } from "./command-receipts-model.js";
@@ -96,36 +97,13 @@ export function CommandReceiptListView(props: CommandReceiptListViewProps) {
           {props.loadingRequestedPage ? "Loading the requested page…" : "\u00a0"}
         </span>
       </div>
-      <div className="row row-cols-1 row-cols-xl-2 g-3">
-        {props.page.nodes.map((receipt) => (
-          <div className="col" key={receipt.commandId}>
-            <article className="card card-outline card-secondary h-100">
-              <div className="card-header">
-                <div className="d-flex align-items-start justify-content-between gap-2">
-                  <h3 className="card-title fw-semibold text-break mb-1">{receipt.toolName}</h3>
-                  <span className="badge text-bg-success flex-shrink-0">{receipt.status.toLowerCase()}</span>
-                </div>
-                <div className="small text-body-secondary text-break w-100"><code>{receipt.commandId}</code></div>
-              </div>
-              <div className="card-body vstack gap-2">
-                <p className="mb-0">{receipt.summary}</p>
-                <div className="small text-body-secondary">
-                  Completed <time dateTime={receipt.completedAt}>{formattedTimestamp(receipt.completedAt)}</time>
-                </div>
-                <div className="small">
-                  {receipt.emittedEvents.length} emitted {receipt.emittedEvents.length === 1 ? "event" : "events"}
-                  {receipt.warnings.length > 0 ? ` · ${receipt.warnings.length} warnings` : ""}
-                </div>
-              </div>
-              <div className="card-footer d-grid">
-                <Link className="btn btn-primary" to={props.receiptHref(receipt.commandId)}>
-                  Open receipt <i aria-hidden="true" className="bi bi-arrow-right ms-1" />
-                </Link>
-              </div>
-            </article>
-          </div>
-        ))}
-      </div>
+      <DataTable caption="Command receipts" rows={props.page.nodes} rowKey={(receipt) => receipt.commandId} columns={[
+        { key: "tool", label: "Command", render: (receipt) => <><Link aria-label={`Open receipt ${receipt.commandId}`} className="fw-semibold" to={props.receiptHref(receipt.commandId)}>{receipt.toolName}</Link><div className="small text-body-secondary">{receipt.commandId}</div></> },
+        { key: "status", label: "Status", render: (receipt) => <span className="badge text-bg-success">{receipt.status.toLowerCase()}</span> },
+        { key: "summary", label: "Outcome", render: (receipt) => <TextPreview text={receipt.summary} /> },
+        { key: "events", label: "Events / warnings", render: (receipt) => `${receipt.emittedEvents.length} events · ${receipt.warnings.length} warnings` },
+        { key: "completed", label: "Completed", render: (receipt) => <Timestamp value={receipt.completedAt} /> }
+      ]} />
       <nav aria-label="Command receipt pagination" className="d-flex justify-content-between gap-3">
         <button className="btn btn-outline-secondary" disabled={!props.canGoBack} onClick={props.onPrevious} type="button">
           Previous page
@@ -203,17 +181,12 @@ export function CommandReceiptDetailView(props: CommandReceiptDetailViewProps) {
             {receipt.emittedEvents.length === 0 ? (
               <p className="text-body-secondary mb-0">No emitted events were recorded.</p>
             ) : (
-              <div className="list-group">
-                {receipt.emittedEvents.map((event) => (
-                  <div className="list-group-item" key={event.id}>
-                    <div className="d-flex flex-wrap justify-content-between gap-2">
-                      <strong>{event.type}</strong><span>revision {event.streamRevision}</span>
-                    </div>
-                    <div className="text-break"><code>{event.streamContext}/{event.streamName}/{event.streamId}</code></div>
-                    <div className="small text-body-secondary text-break">{event.id}</div>
-                  </div>
-                ))}
-              </div>
+              <DataTable caption="Emitted event facts" rows={receipt.emittedEvents} rowKey={(event) => event.id} columns={[
+                { key: "type", label: "Event type", render: (event) => <strong>{event.type}</strong> },
+                { key: "stream", label: "Stream", render: (event) => <span className="small">{event.streamContext}/{event.streamName}/{event.streamId}</span> },
+                { key: "revision", label: "Revision", render: (event) => event.streamRevision },
+                { key: "id", label: "Event ID", render: (event) => <code>{event.id}</code> }
+              ]} />
             )}
           </section>
         </div>

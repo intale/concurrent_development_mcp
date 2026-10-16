@@ -1,4 +1,5 @@
-import { Link } from "react-router-dom";
+import { ContextLink as Link, projectPath } from "../navigation.js";
+import { DataTable } from "../data-table.js";
 import { RetryRefresh } from "../retry-refresh.js";
 import type { ProjectRow } from "./project-catalog-model.js";
 
@@ -93,46 +94,12 @@ export function ProjectCatalogView(props: ProjectCatalogViewProps) {
           {props.showingPreviousData ? <><i aria-hidden="true" className="bi bi-arrow-repeat me-1" />Loading the requested page…</> : "\u00a0"}
         </span>
       </div>
-      <div className="row row-cols-1 row-cols-xl-2 g-3">
-        {props.rows.map((project) => (
-          <div className="col" key={project.projectRef}>
-            <article className="card card-outline card-primary h-100">
-              <div className="card-header d-flex align-items-start justify-content-between gap-3">
-                <div>
-                  <h3 className="card-title fw-semibold mb-1">{project.displayLabel}</h3>
-                  <div className="small text-body-secondary text-break"><code>{project.scope}</code></div>
-                </div>
-                <span className="badge text-bg-secondary text-nowrap">
-                  {project.repositoryCount} {project.repositoryCount === 1 ? "Repository" : "Repositories"}
-                </span>
-              </div>
-              <div className="card-body">
-                <h4 className="h6">Repository members</h4>
-                <ul className="list-group list-group-flush">
-                  {project.repositories.map((repository) => (
-                    <li className="list-group-item px-0" key={repository.id}>
-                      <div className="fw-medium">{repository.displayName}</div>
-                      <div className="small text-body-secondary text-break">
-                        {repository.paths[0] ?? "No projected path"}
-                      </div>
-                    </li>
-                  ))}
-                </ul>
-                {project.hasMoreRepositories ? (
-                  <p className="small text-body-secondary mt-2 mb-0">
-                    More Repository members are available in the Project overview.
-                  </p>
-                ) : null}
-              </div>
-              <div className="card-footer d-grid">
-                <Link className="btn btn-primary" to={`/projects/${project.projectRef}`}>
-                  Open project <i aria-hidden="true" className="bi bi-arrow-right ms-1" />
-                </Link>
-              </div>
-            </article>
-          </div>
-        ))}
-      </div>
+      <DataTable caption="Projects" rows={props.rows} rowKey={(project) => project.projectRef} columns={[
+        { key: "project", label: "Project", render: (project) => <><Link aria-label={`Open project ${project.displayLabel}`} className="fw-semibold" to={projectPath(project.projectRef)}>{project.displayLabel}</Link><div className="small text-body-secondary d-md-none">{project.scope}</div></> },
+        { key: "scope", label: "Scope", className: "d-none d-md-table-cell", render: (project) => <span className="small">{project.scope}</span> },
+        { key: "count", label: "Repositories", render: (project) => project.repositoryCount },
+        { key: "members", label: "Repository members", className: "d-none d-lg-table-cell", render: (project) => <>{project.repositories.map((repository) => repository.displayName).join(", ")}{project.hasMoreRepositories ? ", …" : ""}</> }
+      ]} />
       <nav aria-label="Project catalog pagination" className="d-flex align-items-center justify-content-between gap-3">
         <button
           className="btn btn-outline-secondary"

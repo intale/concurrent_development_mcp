@@ -1,6 +1,7 @@
+import { projectPath, navigationReturnTo, ContextLink as Link } from "../navigation.js";
 import { useEffect, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { Link, useLocation, useParams, useSearchParams } from "react-router-dom";
+import { useLocation, useParams, useSearchParams } from "react-router-dom";
 import type {
   AgentChoiceImpactOutcome,
   AgentChoiceKind,
@@ -29,7 +30,6 @@ import {
   detailLocation,
   GUIDANCE_SOURCES,
   IMPACT_OUTCOMES,
-  listLocation,
   matching,
   nextPageParams,
   preserveCollection,
@@ -39,14 +39,14 @@ import {
 } from "./project-governance-model.js";
 import {
   AvailableStale,
-  ChoiceCards,
+  ChoiceTable,
   ChoiceDetailCard,
-  DecisionCards,
+  DecisionTable,
   DecisionDetailCard,
-  GovernanceNavigation,
-  GuidanceCards,
+
+  GuidanceTable,
   GuidanceDetailCard,
-  ImpactCards,
+  ImpactTable,
   ImpactDetailCard,
   InitialError,
   LoadingState,
@@ -82,8 +82,7 @@ export function ProjectGovernanceImpactsPage() {
 
 function DecisionsPage({ projectRef }: { readonly projectRef: string }) {
   const [searchParams, setSearchParams] = useSearchParams();
-  const listPath = `/projects/${projectRef}/governance/decisions`;
-  const basePath = `/projects/${projectRef}/governance`;
+  const listPath = `${projectPath(projectRef)}/decisions`;
   const topicId = searchParams.get("topic") ?? "";
   const policyStatus = matching<DecisionPolicyStatus>(searchParams.get("status"), DECISION_POLICY_STATUSES);
   const sort = parseLatestUpdateSort(searchParams.get("sort"));
@@ -105,7 +104,7 @@ function DecisionsPage({ projectRef }: { readonly projectRef: string }) {
 
   return (
     <div className="vstack gap-3">
-      <GovernanceNavigation basePath={basePath} />
+
       <PageHeading description="Review current coordination policy facts and their exact scope basis." headingRef={headingRef} title="Decisions" />
       <form aria-label="Decision filters" className="card card-body" onSubmit={(event) => { event.preventDefault(); setSearchParams(applyFilters(searchParams, draft)); }}>
         <div className="row g-3 align-items-end">
@@ -116,7 +115,7 @@ function DecisionsPage({ projectRef }: { readonly projectRef: string }) {
         </div>
       </form>
       <CollectionState connection={connection} errorMessage={errorMessage} label="Decisions" loading={query.isPending} retry={() => { void query.refetch(); }}>
-        {connection ? <><DecisionCards connection={connection} hrefFor={(id) => detailLocation(listPath, id, listLocation(listPath, searchParams))} /><PaginationControls canPrevious={searchParams.getAll("trail").length > 0} nextCursor={connection.pageInfo.hasNextPage ? connection.pageInfo.endCursor : null} onNext={(cursor) => setSearchParams(nextPageParams(searchParams, cursor))} onPrevious={() => setSearchParams(previousPageParams(searchParams))} /></> : null}
+        {connection ? <><DecisionTable connection={connection} hrefFor={(id) => detailLocation(listPath, id)} /><PaginationControls canPrevious={searchParams.getAll("trail").length > 0} nextCursor={connection.pageInfo.hasNextPage ? connection.pageInfo.endCursor : null} onNext={(cursor) => setSearchParams(nextPageParams(searchParams, cursor))} onPrevious={() => setSearchParams(previousPageParams(searchParams))} /></> : null}
       </CollectionState>
     </div>
   );
@@ -124,8 +123,7 @@ function DecisionsPage({ projectRef }: { readonly projectRef: string }) {
 
 function GuidanceListPage({ projectRef }: { readonly projectRef: string }) {
   const [searchParams, setSearchParams] = useSearchParams();
-  const listPath = `/projects/${projectRef}/governance/guidance`;
-  const basePath = `/projects/${projectRef}/governance`;
+  const listPath = `${projectPath(projectRef)}/guidance`;
   const source = matching<GuidanceSource>(searchParams.get("source"), GUIDANCE_SOURCES);
   const sort = parseLatestUpdateSort(searchParams.get("sort"));
   const after = searchParams.get("after");
@@ -143,13 +141,13 @@ function GuidanceListPage({ projectRef }: { readonly projectRef: string }) {
 
   return (
     <div className="vstack gap-3">
-      <GovernanceNavigation basePath={basePath} />
+
       <PageHeading description="Read user guidance, its actors, anchors, and interpretation proposals." headingRef={headingRef} title="Guidance" />
       <form aria-label="Guidance filters" className="card card-body">
         <div className="row g-3 align-items-end"><div className="col-12 col-md-5"><label className="form-label" htmlFor="guidance-source">Source</label><select className="form-select" id="guidance-source" onChange={(event) => setSearchParams(applyFilters(searchParams, { source: event.target.value }))} value={source ?? ""}><option value="">All sources</option>{GUIDANCE_SOURCES.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}</select></div><LatestUpdateSortControl id="guidance-sort" onChange={(value) => setSearchParams(latestUpdateSortParams(searchParams, value))} value={sort} /><div className="col-12 col-md-4"><button className="btn btn-outline-secondary" onClick={() => setSearchParams({})} type="button">Clear</button></div></div>
       </form>
       <CollectionState connection={connection} errorMessage={errorMessage} label="Guidance" loading={query.isPending} retry={() => { void query.refetch(); }}>
-        {connection ? <><GuidanceCards connection={connection} hrefFor={(id) => detailLocation(listPath, id, listLocation(listPath, searchParams))} /><PaginationControls canPrevious={searchParams.getAll("trail").length > 0} nextCursor={connection.pageInfo.hasNextPage ? connection.pageInfo.endCursor : null} onNext={(cursor) => setSearchParams(nextPageParams(searchParams, cursor))} onPrevious={() => setSearchParams(previousPageParams(searchParams))} /></> : null}
+        {connection ? <><GuidanceTable connection={connection} hrefFor={(id) => detailLocation(listPath, id)} /><PaginationControls canPrevious={searchParams.getAll("trail").length > 0} nextCursor={connection.pageInfo.hasNextPage ? connection.pageInfo.endCursor : null} onNext={(cursor) => setSearchParams(nextPageParams(searchParams, cursor))} onPrevious={() => setSearchParams(previousPageParams(searchParams))} /></> : null}
       </CollectionState>
     </div>
   );
@@ -157,8 +155,7 @@ function GuidanceListPage({ projectRef }: { readonly projectRef: string }) {
 
 function ChoicesPage({ projectRef }: { readonly projectRef: string }) {
   const [searchParams, setSearchParams] = useSearchParams();
-  const listPath = `/projects/${projectRef}/governance/choices`;
-  const basePath = `/projects/${projectRef}/governance`;
+  const listPath = `${projectPath(projectRef)}/choices`;
   const choiceType = matching<AgentChoiceKind>(searchParams.get("type"), AGENT_CHOICE_KINDS);
   const status = matching<AgentChoiceStatus>(searchParams.get("status"), AGENT_CHOICE_STATUSES);
   const sort = parseLatestUpdateSort(searchParams.get("sort"));
@@ -177,7 +174,7 @@ function ChoicesPage({ projectRef }: { readonly projectRef: string }) {
 
   return (
     <div className="vstack gap-3">
-      <GovernanceNavigation basePath={basePath} />
+
       <PageHeading description="Inspect agent-selected options, reasons, coordination context, and lifecycle." headingRef={headingRef} title="AgentChoices" />
       <form aria-label="AgentChoice filters" className="card card-body"><div className="row g-3 align-items-end">
         <div className="col-12 col-md-5"><label className="form-label" htmlFor="choice-type">Type</label><select className="form-select" id="choice-type" onChange={(event) => setSearchParams(applyFilters(searchParams, { type: event.target.value, status: status ?? "" }))} value={choiceType ?? ""}><option value="">All types</option>{AGENT_CHOICE_KINDS.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}</select></div>
@@ -186,7 +183,7 @@ function ChoicesPage({ projectRef }: { readonly projectRef: string }) {
         <div className="col-12 col-md-2"><button className="btn btn-outline-secondary" onClick={() => setSearchParams({})} type="button">Clear</button></div>
       </div></form>
       <CollectionState connection={connection} errorMessage={errorMessage} label="AgentChoices" loading={query.isPending} retry={() => { void query.refetch(); }}>
-        {connection ? <><ChoiceCards connection={connection} hrefFor={(id) => detailLocation(listPath, id, listLocation(listPath, searchParams))} /><PaginationControls canPrevious={searchParams.getAll("trail").length > 0} nextCursor={connection.pageInfo.hasNextPage ? connection.pageInfo.endCursor : null} onNext={(cursor) => setSearchParams(nextPageParams(searchParams, cursor))} onPrevious={() => setSearchParams(previousPageParams(searchParams))} /></> : null}
+        {connection ? <><ChoiceTable connection={connection} hrefFor={(id) => detailLocation(listPath, id)} /><PaginationControls canPrevious={searchParams.getAll("trail").length > 0} nextCursor={connection.pageInfo.hasNextPage ? connection.pageInfo.endCursor : null} onNext={(cursor) => setSearchParams(nextPageParams(searchParams, cursor))} onPrevious={() => setSearchParams(previousPageParams(searchParams))} /></> : null}
       </CollectionState>
     </div>
   );
@@ -194,8 +191,7 @@ function ChoicesPage({ projectRef }: { readonly projectRef: string }) {
 
 function ImpactsPage({ projectRef }: { readonly projectRef: string }) {
   const [searchParams, setSearchParams] = useSearchParams();
-  const listPath = `/projects/${projectRef}/governance/impacts`;
-  const basePath = `/projects/${projectRef}/governance`;
+  const listPath = `${projectPath(projectRef)}/impacts`;
   const outcome = matching<AgentChoiceImpactOutcome>(searchParams.get("outcome"), IMPACT_OUTCOMES);
   const sort = parseLatestUpdateSort(searchParams.get("sort"));
   const after = searchParams.get("after");
@@ -213,62 +209,58 @@ function ImpactsPage({ projectRef }: { readonly projectRef: string }) {
 
   return (
     <div className="vstack gap-3">
-      <GovernanceNavigation basePath={basePath} />
+
       <PageHeading description="Review how Decision changes affected previously recorded AgentChoices." headingRef={headingRef} title="Decision impacts" />
       <form aria-label="Decision impact filters" className="card card-body"><div className="row g-3 align-items-end"><div className="col-12 col-md-5"><label className="form-label" htmlFor="impact-outcome">Outcome</label><select className="form-select" id="impact-outcome" onChange={(event) => setSearchParams(applyFilters(searchParams, { outcome: event.target.value }))} value={outcome ?? ""}><option value="">All outcomes</option>{IMPACT_OUTCOMES.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}</select></div><LatestUpdateSortControl id="impact-sort" onChange={(value) => setSearchParams(latestUpdateSortParams(searchParams, value))} value={sort} /><div className="col-12 col-md-4"><button className="btn btn-outline-secondary" onClick={() => setSearchParams({})} type="button">Clear</button></div></div></form>
       <CollectionState connection={connection} errorMessage={errorMessage} label="Decision impacts" loading={query.isPending} retry={() => { void query.refetch(); }}>
-        {connection ? <><ImpactCards connection={connection} hrefFor={(id) => detailLocation(listPath, id, listLocation(listPath, searchParams))} /><PaginationControls canPrevious={searchParams.getAll("trail").length > 0} nextCursor={connection.pageInfo.hasNextPage ? connection.pageInfo.endCursor : null} onNext={(cursor) => setSearchParams(nextPageParams(searchParams, cursor))} onPrevious={() => setSearchParams(previousPageParams(searchParams))} /></> : null}
+        {connection ? <><ImpactTable connection={connection} hrefFor={(id) => detailLocation(listPath, id)} /><PaginationControls canPrevious={searchParams.getAll("trail").length > 0} nextCursor={connection.pageInfo.hasNextPage ? connection.pageInfo.endCursor : null} onNext={(cursor) => setSearchParams(nextPageParams(searchParams, cursor))} onPrevious={() => setSearchParams(previousPageParams(searchParams))} /></> : null}
       </CollectionState>
     </div>
   );
 }
 
 function DecisionPage({ projectRef, decisionId }: { readonly projectRef: string; readonly decisionId: string }) {
-  const [searchParams] = useSearchParams();
-  const basePath = `/projects/${projectRef}/governance`;
+  const basePath = `${projectPath(projectRef)}`;
   const listPath = `${basePath}/decisions`;
-  const backTo = safeGovernanceReturnTo(searchParams.get("returnTo"), listPath, basePath);
+  const backTo = safeGovernanceReturnTo(navigationReturnTo(useLocation().state), listPath, basePath);
   const headingRef = useGovernanceHeading("Decision detail", decisionId);
   const query = useQuery({ queryKey: ["project-governance-decision", projectRef, decisionId], queryFn: ({ signal }) => fetchGovernanceDecision(projectRef, decisionId, signal), placeholderData: (data, previous) => preserveDetail(data, previous?.queryKey, projectRef, decisionId), refetchInterval: REFRESH_INTERVAL_MS });
   const detail = query.data?.projectDecision ?? null;
-  return <DetailPage basePath={basePath} backLabel="Decisions" backTo={backTo} description="Current policy, scope, lifecycle, and event evidence." detail={detail} error={query.error} headingRef={headingRef} label="Decision detail" loading={query.isPending} retry={() => { void query.refetch(); }}>{detail ? <DecisionDetailCard backTo={backTo} detail={detail} /> : null}</DetailPage>;
+  return <DetailPage backLabel="Decisions" backTo={backTo} description="Current policy, scope, lifecycle, and event evidence." detail={detail} error={query.error} headingRef={headingRef} label="Decision detail" loading={query.isPending} retry={() => { void query.refetch(); }}>{detail ? <DecisionDetailCard backTo={backTo} detail={detail} /> : null}</DetailPage>;
 }
 
 function GuidancePage({ projectRef, messageId }: { readonly projectRef: string; readonly messageId: string }) {
   const [searchParams, setSearchParams] = useSearchParams();
-  const basePath = `/projects/${projectRef}/governance`;
+  const basePath = `${projectPath(projectRef)}`;
   const listPath = `${basePath}/guidance`;
-  const backTo = safeGovernanceReturnTo(searchParams.get("returnTo"), listPath, basePath);
+  const backTo = safeGovernanceReturnTo(navigationReturnTo(useLocation().state), listPath, basePath);
   const after = searchParams.get("after");
   const headingRef = useGovernanceHeading("Guidance detail", messageId);
   const query = useQuery({ queryKey: ["project-governance-guidance-detail", projectRef, messageId, after], queryFn: ({ signal }) => fetchGovernanceGuidance(projectRef, messageId, after, signal), placeholderData: (data, previous) => preserveDetail(data, previous?.queryKey, projectRef, messageId), refetchInterval: REFRESH_INTERVAL_MS });
   const detail = query.data?.projectGuidance ?? null;
-  return <DetailPage basePath={basePath} backLabel="Guidance" backTo={backTo} description="Original guidance, anchors, actor, and interpretation proposals." detail={detail} error={query.error} headingRef={headingRef} label="Guidance detail" loading={query.isPending} retry={() => { void query.refetch(); }}>{detail ? <><GuidanceDetailCard backTo={backTo} detail={detail} /><PaginationControls canPrevious={searchParams.getAll("trail").length > 0} nextCursor={detail.interpretations.pageInfo.hasNextPage ? detail.interpretations.pageInfo.endCursor : null} onNext={(cursor) => setSearchParams(nextPageParams(searchParams, cursor))} onPrevious={() => setSearchParams(previousPageParams(searchParams))} /></> : null}</DetailPage>;
+  return <DetailPage backLabel="Guidance" backTo={backTo} description="Original guidance, anchors, actor, and interpretation proposals." detail={detail} error={query.error} headingRef={headingRef} label="Guidance detail" loading={query.isPending} retry={() => { void query.refetch(); }}>{detail ? <><GuidanceDetailCard backTo={backTo} detail={detail} /><PaginationControls canPrevious={searchParams.getAll("trail").length > 0} nextCursor={detail.interpretations.pageInfo.hasNextPage ? detail.interpretations.pageInfo.endCursor : null} onNext={(cursor) => setSearchParams(nextPageParams(searchParams, cursor))} onPrevious={() => setSearchParams(previousPageParams(searchParams))} /></> : null}</DetailPage>;
 }
 
 function ChoicePage({ projectRef, choiceId }: { readonly projectRef: string; readonly choiceId: string }) {
   const [searchParams, setSearchParams] = useSearchParams();
-  const location = useLocation();
-  const basePath = `/projects/${projectRef}/governance`;
+  const basePath = `${projectPath(projectRef)}`;
   const listPath = `${basePath}/choices`;
-  const backTo = safeGovernanceReturnTo(searchParams.get("returnTo"), listPath, basePath);
+  const backTo = safeGovernanceReturnTo(navigationReturnTo(useLocation().state), listPath, basePath);
   const after = searchParams.get("after");
   const headingRef = useGovernanceHeading("AgentChoice detail", choiceId);
   const query = useQuery({ queryKey: ["project-governance-choice", projectRef, choiceId, after], queryFn: ({ signal }) => fetchGovernanceAgentChoice(projectRef, choiceId, after, signal), placeholderData: (data, previous) => preserveDetail(data, previous?.queryKey, projectRef, choiceId), refetchInterval: REFRESH_INTERVAL_MS });
   const detail = query.data?.projectAgentChoice ?? null;
-  const currentLocation = `${location.pathname}${location.search}`;
-  return <DetailPage basePath={basePath} backLabel="AgentChoices" backTo={backTo} description="Selected option, alternatives, assessment basis, context, and lifecycle." detail={detail} error={query.error} headingRef={headingRef} label="AgentChoice detail" loading={query.isPending} retry={() => { void query.refetch(); }}>{detail ? <><ChoiceDetailCard backTo={backTo} detail={detail} impactHref={(id) => detailLocation(`${basePath}/impacts`, id, currentLocation)} /><PaginationControls canPrevious={searchParams.getAll("trail").length > 0} nextCursor={detail.impacts.pageInfo.hasNextPage ? detail.impacts.pageInfo.endCursor : null} onNext={(cursor) => setSearchParams(nextPageParams(searchParams, cursor))} onPrevious={() => setSearchParams(previousPageParams(searchParams))} /></> : null}</DetailPage>;
+  return <DetailPage backLabel="AgentChoices" backTo={backTo} description="Selected option, alternatives, assessment basis, context, and lifecycle." detail={detail} error={query.error} headingRef={headingRef} label="AgentChoice detail" loading={query.isPending} retry={() => { void query.refetch(); }}>{detail ? <><ChoiceDetailCard backTo={backTo} detail={detail} impactHref={(id) => detailLocation(`${basePath}/impacts`, id)} /><PaginationControls canPrevious={searchParams.getAll("trail").length > 0} nextCursor={detail.impacts.pageInfo.hasNextPage ? detail.impacts.pageInfo.endCursor : null} onNext={(cursor) => setSearchParams(nextPageParams(searchParams, cursor))} onPrevious={() => setSearchParams(previousPageParams(searchParams))} /></> : null}</DetailPage>;
 }
 
 function ImpactPage({ projectRef, assessmentId }: { readonly projectRef: string; readonly assessmentId: string }) {
-  const [searchParams] = useSearchParams();
-  const basePath = `/projects/${projectRef}/governance`;
+  const basePath = `${projectPath(projectRef)}`;
   const listPath = `${basePath}/impacts`;
-  const backTo = safeGovernanceReturnTo(searchParams.get("returnTo"), listPath, basePath);
+  const backTo = safeGovernanceReturnTo(navigationReturnTo(useLocation().state), listPath, basePath);
   const headingRef = useGovernanceHeading("Decision impact detail", assessmentId);
   const query = useQuery({ queryKey: ["project-governance-impact", projectRef, assessmentId], queryFn: ({ signal }) => fetchGovernanceDecisionImpact(projectRef, assessmentId, signal), placeholderData: (data, previous) => preserveDetail(data, previous?.queryKey, projectRef, assessmentId), refetchInterval: REFRESH_INTERVAL_MS });
   const detail = query.data?.projectDecisionImpact ?? null;
-  return <DetailPage basePath={basePath} backLabel="Decision impacts" backTo={backTo} description="Before-and-after policy evaluation with causal evidence." detail={detail} error={query.error} headingRef={headingRef} label="Decision impact detail" loading={query.isPending} retry={() => { void query.refetch(); }}>{detail ? <ImpactDetailCard backTo={backTo} choiceHref={`${basePath}/choices/${encodeURIComponent(detail.impact.choiceId)}`} decisionHref={`${basePath}/decisions/${encodeURIComponent(detail.impact.decisionId)}`} detail={detail} /> : null}</DetailPage>;
+  return <DetailPage backLabel="Decision impacts" backTo={backTo} description="Before-and-after policy evaluation with causal evidence." detail={detail} error={query.error} headingRef={headingRef} label="Decision impact detail" loading={query.isPending} retry={() => { void query.refetch(); }}>{detail ? <ImpactDetailCard backTo={backTo} choiceHref={`${basePath}/choices/${encodeURIComponent(detail.impact.choiceId)}`} decisionHref={`${basePath}/decisions/${encodeURIComponent(detail.impact.decisionId)}`} detail={detail} /> : null}</DetailPage>;
 }
 
 function PageHeading({ description, headingRef, title }: {
@@ -297,8 +289,7 @@ function CollectionState({ children, connection, errorMessage, label, loading, r
   return <>{errorMessage ? <AvailableStale message={errorMessage} onRetry={retry} /> : null}{children}</>;
 }
 
-function DetailPage({ basePath, backLabel, backTo, children, description, detail, error, headingRef, label, loading, retry }: {
-  readonly basePath: string;
+function DetailPage({ backLabel, backTo, children, description, detail, error, headingRef, label, loading, retry }: {
   readonly backLabel: string;
   readonly backTo: string;
   readonly children: React.ReactNode;
@@ -313,7 +304,7 @@ function DetailPage({ basePath, backLabel, backTo, children, description, detail
   const errorMessage = error instanceof Error ? error.message : null;
   return (
     <div className="vstack gap-3">
-      <GovernanceNavigation basePath={basePath} />
+
       <div><Link className="btn btn-outline-secondary mb-3" to={backTo}>← Back to {backLabel}</Link><h2 className="h3 mb-1" ref={headingRef} tabIndex={-1}>{label}</h2><p className="text-body-secondary mb-0">{description}</p></div>
       {loading && !detail ? <LoadingState label={label} /> : null}
       {errorMessage && !detail ? <InitialError label={label} message={errorMessage} onRetry={retry} /> : null}

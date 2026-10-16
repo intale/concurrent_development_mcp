@@ -2,19 +2,10 @@ module Coordinator
   module Read
     module Web
       class ProjectReference
-        SCHEMA_VERSION: String
-
         class InvalidReference < ArgumentError
         end
 
-        class PayloadContract < Dry::Validation::Contract
-        end
-
-        def initialize: (
-          ?payload_contract: PayloadContract,
-          ?scope_contract: Contracts::RepositoryList,
-          ?canonical_json: Shared::CanonicalJson
-        ) -> void
+        def initialize: (?scope_contract: Coordinator::Read::Contracts::RepositoryList) -> void
 
         def encode: (scope: String) -> String
         def decode: (String reference) -> String

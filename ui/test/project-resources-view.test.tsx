@@ -14,14 +14,13 @@ import {
 import {
   AvailableStale,
   PaginationControls,
-  ResourceCards,
+  ResourceTable,
   ResourceDetail,
-  ResourceNavigation,
-  WorkIntentionCards,
+  WorkIntentionTable,
   WorkIntentionDetail
 } from "../src/resources/project-resources-view.js";
 
-const projectRef = "project-ref";
+const projectRef = "project:concurrent_development_mcp";
 const timestamp = "2026-08-31T12:00:00.000000Z";
 const resource = {
   id: "018f0f4d-4e45-7abc-8def-000000000062",
@@ -75,15 +74,15 @@ function render(node: ReactNode, route = "/") {
   return renderToStaticMarkup(<MemoryRouter initialEntries={[route]}>{node}</MemoryRouter>);
 }
 
-test("resource and active work-intention collections lead with meaning and an adjacent primary action", () => {
+test("resource and active work-intention collections use semantic tables and preserve row context", () => {
   const resourceMarkup = render(
-    <ResourceCards
+    <ResourceTable
       connection={{ nodes: [resource], pageInfo: { endCursor: "next", hasNextPage: true } }}
       hrefFor={(id) => `/resources/${id}`}
     />
   );
   const intentionMarkup = render(
-    <WorkIntentionCards
+    <WorkIntentionTable
       connection={{ asOf: timestamp, nodes: [{ ...intention, status: "ACTIVE" }], pageInfo: { endCursor: null, hasNextPage: false } }}
       hrefFor={(id) => `/work-intentions/${id}`}
     />
@@ -91,20 +90,31 @@ test("resource and active work-intention collections lead with meaning and an ad
 
   assert.match(resourceMarkup, /app\/models\/leased.rb/);
   assert.match(resourceMarkup, /current/);
-  assert.match(resourceMarkup, /View Resource/);
-  assert.match(resourceMarkup, /class="btn btn-primary align-self-start mt-auto"/);
-  assert.match(intentionMarkup, /shared intention:<\/strong> Coordinate the Resource change/);
-  assert.match(intentionMarkup, /Agent:<\/strong> luna-owner/);
+  assert.match(resourceMarkup, /<caption class="visually-hidden">Project resources<\/caption>/);
+  assert.match(resourceMarkup, /<th scope="col">Last transition<\/th>/);
+  assert.match(resourceMarkup, /href="\/resources\/018f0f4d-4e45-7abc-8def-000000000062"/);
+  assert.match(resourceMarkup, /018f0f4d-4e45-7abc-8def-000000000062/);
+  assert.doesNotMatch(resourceMarkup, /<article/);
+  assert.match(intentionMarkup, /<caption class="visually-hidden">Active Resource work intentions<\/caption>/);
+  assert.match(intentionMarkup, /<th scope="col">Expires<\/th>/);
+  assert.match(intentionMarkup, /href="\/work-intentions\/018f0f4d-4e45-7abc-8def-000000000065"/);
+  assert.match(intentionMarkup, /Coordinate the Resource change/);
+  assert.match(intentionMarkup, /Another agent can safely work in parallel\./);
+  assert.match(intentionMarkup, /luna-owner/);
   assert.match(intentionMarkup, /W-owner/);
-  assert.match(intentionMarkup, /View work intention/);
+  assert.match(intentionMarkup, /Attempt A-owner/);
+  assert.match(intentionMarkup, /<div class="small badge text-bg-warning">active<\/div>/);
+  assert.doesNotMatch(intentionMarkup, /<article/);
   assert.match(intentionMarkup, /advisory intentions, not merge guarantees/);
+  const empty = render(<ResourceTable connection={{ nodes: [], pageInfo: { endCursor: null, hasNextPage: false } }} hrefFor={() => "/resource"} />);
+  assert.match(empty, /<tbody><tr><td[^>]*(?:colSpan|colspan)="5"[^>]*>No Resources match these filters\.<\/td><\/tr><\/tbody>/);
 });
 
 test("focused details place Back and related navigation with the selected content", () => {
-  const resourceMarkup = render(<ResourceDetail backTo="/inventory?path=app" resource={resource} />);
+  const resourceMarkup = render(<ResourceDetail backTo={`/projects/${projectRef}/resources?path=app`} resource={resource} />);
   const intentionMarkup = render(
     <WorkIntentionDetail
-      backTo="/work-intentions?agent=luna-owner"
+      backTo={`/projects/${projectRef}/work-intentions?agent=luna-owner`}
       intention={intention}
       projectPath={`/projects/${projectRef}`}
     />
@@ -120,20 +130,11 @@ test("focused details place Back and related navigation with the selected conten
   assert.match(intentionMarkup, /Back to active work intentions/);
 });
 
-test("Resource subnavigation and recoverable pagination are explicit", () => {
-  const markup = render(
-    <>
-      <ResourceNavigation basePath={`/projects/${projectRef}/resources`} />
-      <PaginationControls canPrevious nextCursor="next" onNext={() => undefined} onPrevious={() => undefined} />
-    </>,
-    `/projects/${projectRef}/resources/inventory`
-  );
-
-  assert.match(markup, /aria-label="Resource views"/);
-  assert.match(markup, /Resource inventory/);
-  assert.match(markup, /Active work intentions/);
+test("resource pagination exposes Previous and Next controls", () => {
+  const markup = render(<PaginationControls canPrevious nextCursor="next" onNext={() => undefined} onPrevious={() => undefined} />);
   assert.match(markup, /Previous/);
   assert.match(markup, /Next/);
+  assert.match(markup, /aria-label="Collection pages"/);
 });
 
 test("filter, paging, detail, and Back state remain URL-backed and bounded", () => {
@@ -144,15 +145,16 @@ test("filter, paging, detail, and Back state remain URL-backed and bounded", () 
   });
   const next = nextPageParams(filtered, "next-cursor");
   const previous = previousPageParams(next);
-  const listPath = `/projects/${projectRef}/resources/inventory`;
-  const detail = detailLocation(listPath, resource.id, `${listPath}?${filtered.toString()}`);
+  const listPath = `/projects/${projectRef}/resources`;
+  const detail = detailLocation(listPath, resource.id);
 
   assert.equal(filtered.get("path"), "app/models");
   assert.equal(filtered.get("kind"), "FILE");
   assert.equal(filtered.has("after"), false);
   assert.equal(next.get("after"), "next-cursor");
   assert.equal(previous.get("after"), null);
-  assert.match(detail, /returnTo=/);
+  assert.equal(detail, `${listPath}/${resource.id}`);
+  assert.equal(new URL(detail, "https://coordinator.test").search, "");
   assert.equal(safeReturnTo(`${listPath}?path=app`, listPath), `${listPath}?path=app`);
   assert.equal(safeReturnTo("https://example.test", listPath), listPath);
 });
@@ -161,7 +163,7 @@ test("available data stays visible beside a localized refresh failure", () => {
   const markup = render(
     <>
       <AvailableStale message="Projection endpoint unavailable" onRetry={() => undefined} />
-      <ResourceCards
+      <ResourceTable
         connection={{ nodes: [resource], pageInfo: { endCursor: null, hasNextPage: false } }}
         hrefFor={() => "/resource"}
       />

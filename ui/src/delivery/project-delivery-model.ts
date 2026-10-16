@@ -112,9 +112,7 @@ export function listLocation(path: string, searchParams: URLSearchParams): strin
   return query ? `${path}?${query}` : path;
 }
 
-export function detailLocation(path: string, id: string, returnTo: string): string {
-  return `${path}/${encodeURIComponent(id)}?${new URLSearchParams({ returnTo }).toString()}`;
-}
+export { detailPath as detailLocation } from "../navigation.js";
 
 export function safeDeliveryReturnTo(value: string | null, fallback: string, basePath: string): string {
   if (!value) return fallback;

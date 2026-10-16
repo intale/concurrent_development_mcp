@@ -268,7 +268,7 @@ module ProjectGovernanceGraphqlSpec
         projectRef: project_ref,
         guidanceAfter: "not-a-cursor"
       )
-      malformed = execute(COLLECTIONS_QUERY, projectRef: "not-a-reference", first: 20)
+      malformed = execute(COLLECTIONS_QUERY, projectRef: " project:invalid", first: 20)
       outside = execute(
         DECISION_QUERY,
         projectRef: other_project_ref,

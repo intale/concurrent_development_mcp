@@ -1,6 +1,7 @@
 import { useEffect, useRef } from "react";
 import type { RefObject } from "react";
-import { Link, NavLink } from "react-router-dom";
+import { DataTable, TextPreview, Timestamp } from "../data-table.js";
+import { ContextLink as Link } from "../navigation.js";
 import { CopyIdentifier } from "../copy-identifier.js";
 import { RetryRefresh } from "../retry-refresh.js";
 import type {
@@ -12,7 +13,6 @@ import type {
   GuidanceDetail,
   ImpactConnection,
   ImpactDetail,
-  ImpactSummary
 } from "./project-governance-model.js";
 import { badgeClass, humanized } from "./project-governance-model.js";
 
@@ -25,19 +25,6 @@ export function useGovernanceHeading(title: string, focusKey: string): RefObject
   return headingRef;
 }
 
-export function GovernanceNavigation({ basePath }: { readonly basePath: string }) {
-  const navClassName = ({ isActive }: { readonly isActive: boolean }) => `nav-link${isActive ? " active" : ""}`;
-  return (
-    <nav aria-label="Governance views" className="mb-3">
-      <ul className="nav nav-pills flex-column flex-sm-row gap-2">
-        <li className="nav-item"><NavLink className={navClassName} to={`${basePath}/decisions`}>Decisions</NavLink></li>
-        <li className="nav-item"><NavLink className={navClassName} to={`${basePath}/guidance`}>Guidance</NavLink></li>
-        <li className="nav-item"><NavLink className={navClassName} to={`${basePath}/choices`}>AgentChoices</NavLink></li>
-        <li className="nav-item"><NavLink className={navClassName} to={`${basePath}/impacts`}>Decision impacts</NavLink></li>
-      </ul>
-    </nav>
-  );
-}
 
 export function LoadingState({ label }: { readonly label: string }) {
   return (
@@ -99,101 +86,55 @@ export function PaginationControls({ canPrevious, nextCursor, onNext, onPrevious
   );
 }
 
-export function DecisionCards({ connection, hrefFor }: {
+export function DecisionTable({ connection, hrefFor }: {
   readonly connection: DecisionConnection;
   readonly hrefFor: (id: string) => string;
 }) {
-  if (connection.nodes.length === 0) return <div className="alert alert-info" role="status">No Decisions match these filters.</div>;
-  return (
-    <div aria-label="Project Decisions" className="row g-3">
-      {connection.nodes.map((decision) => (
-        <div className="col-12 col-xl-6" key={decision.id}>
-          <article className="card card-outline card-primary h-100">
-            <div className="card-body d-flex flex-column gap-2">
-              <div className="d-flex flex-wrap justify-content-between gap-2">
-                <h3 className="h5 text-break mb-0">{decision.topicId}</h3>
-                <span className={`badge ${badgeClass(decision.policyStatus)}`}>{humanized(decision.policyStatus)}</span>
-              </div>
-              <div className="text-break"><code>{decision.id}</code></div>
-              <div>{decision.modality} {humanized(decision.effect)} · {decisionValue(decision.value)}</div>
-              <div className="small text-body-secondary">Scope basis: {scopeBasis(decision.scope)} · current {formatted(decision.currentAt)}</div>
-              <Link className="btn btn-primary align-self-start mt-auto" to={hrefFor(decision.id)}>View Decision</Link>
-            </div>
-          </article>
-        </div>
-      ))}
-    </div>
-  );
+  return <DataTable caption="Project Decisions" rows={connection.nodes} rowKey={(decision) => decision.id} emptyMessage="No Decisions match these filters." columns={[
+    { key: "topic", label: "Topic", render: (decision) => <><Link to={hrefFor(decision.id)}>{decision.topicId}</Link><div><code>{decision.id}</code></div><TextPreview text={decisionValue(decision.value)} /></> },
+    { key: "status", label: "Status", render: (decision) => <span className={`badge ${badgeClass(decision.policyStatus)}`}>{humanized(decision.policyStatus)}</span> },
+    { key: "effect", label: "Modality/effect", render: (decision) => <>{decision.modality} {humanized(decision.effect)} · {decisionValue(decision.value)}</> },
+    { key: "scope", label: "Scope basis", render: (decision) => scopeBasis(decision.scope) },
+    { key: "current", label: "Current", render: (decision) => <Timestamp value={decision.currentAt} /> }
+  ]} />;
 }
 
-export function GuidanceCards({ connection, hrefFor }: {
+export function GuidanceTable({ connection, hrefFor }: {
   readonly connection: GuidanceConnection;
   readonly hrefFor: (id: string) => string;
 }) {
-  if (connection.nodes.length === 0) return <div className="alert alert-info" role="status">No Guidance matches this source.</div>;
-  return (
-    <div aria-label="Project Guidance" className="row g-3">
-      {connection.nodes.map((guidance) => (
-        <div className="col-12 col-xl-6" key={guidance.id}>
-          <article className="card card-outline card-info h-100">
-            <div className="card-body d-flex flex-column gap-2">
-              <div className="d-flex flex-wrap justify-content-between gap-2">
-                <h3 className="h5 mb-0">Guidance</h3>
-                <span className="badge text-bg-info">{humanized(guidance.source)}</span>
-              </div>
-              <p className="mb-0">{guidance.excerpt}</p>
-              <div className="small text-body-secondary text-break"><code>{guidance.id}</code> · {guidance.actor.kind}/{guidance.actor.id}</div>
-              <div className="small text-body-secondary">Recorded {formatted(guidance.recordedAt)}</div>
-              <Link className="btn btn-info align-self-start mt-auto" to={hrefFor(guidance.id)}>View Guidance</Link>
-            </div>
-          </article>
-        </div>
-      ))}
-    </div>
-  );
+  return <DataTable caption="Project Guidance" rows={connection.nodes} rowKey={(guidance) => guidance.id} emptyMessage="No Guidance matches this source." columns={[
+    { key: "excerpt", label: "Guidance excerpt", render: (guidance) => <><Link to={hrefFor(guidance.id)}><TextPreview text={guidance.excerpt} /></Link><div><code>{guidance.id}</code></div></> },
+    { key: "source", label: "Source", render: (guidance) => <span className="badge text-bg-info">{humanized(guidance.source)}</span> },
+    { key: "actor", label: "Actor", render: (guidance) => `${guidance.actor.kind}/${guidance.actor.id}` },
+    { key: "recorded", label: "Recorded", render: (guidance) => <Timestamp value={guidance.recordedAt} /> }
+  ]} />;
 }
 
-export function ChoiceCards({ connection, hrefFor }: {
+export function ChoiceTable({ connection, hrefFor }: {
   readonly connection: ChoiceConnection;
   readonly hrefFor: (id: string) => string;
 }) {
-  if (connection.nodes.length === 0) return <div className="alert alert-info" role="status">No AgentChoices match these filters.</div>;
-  return (
-    <div aria-label="Project AgentChoices" className="row g-3">
-      {connection.nodes.map((choice) => (
-        <div className="col-12 col-xl-6" key={choice.id}>
-          <article className="card card-outline card-warning h-100">
-            <div className="card-body d-flex flex-column gap-2">
-              <div className="d-flex flex-wrap justify-content-between gap-2">
-                <h3 className="h5 mb-0">{humanized(choice.choiceType)}</h3>
-                <span className={`badge ${badgeClass(choice.observationStatus)}`}>{humanized(choice.observationStatus)}</span>
-              </div>
-              <div><strong>{choice.selected.summary}</strong> <code>{choice.selected.id}</code></div>
-              <p className="mb-0">{choice.reasonSummary}</p>
-              <div className="small text-body-secondary text-break">WorkItem <code>{choice.context.workItemId}</code> · Attempt <code>{choice.context.attemptId}</code></div>
-              <Link className="btn btn-warning align-self-start mt-auto" to={hrefFor(choice.id)}>View AgentChoice</Link>
-            </div>
-          </article>
-        </div>
-      ))}
-    </div>
-  );
+  return <DataTable caption="Project AgentChoices" rows={connection.nodes} rowKey={(choice) => choice.id} emptyMessage="No AgentChoices match these filters." columns={[
+    { key: "choice", label: "Choice", render: (choice) => <><Link to={hrefFor(choice.id)}>{humanized(choice.choiceType)}</Link><div><code>{choice.id}</code></div></> },
+    { key: "status", label: "Status", render: (choice) => <span className={`badge ${badgeClass(choice.observationStatus)}`}>{humanized(choice.observationStatus)}</span> },
+    { key: "selected", label: "Selected value/alternative", render: (choice) => <>{choice.selected.summary} <code>{choice.selected.id}</code><p className="mb-0">{choice.reasonSummary}</p></> },
+    { key: "agent", label: "Agent/Attempt", render: (choice) => <>WorkItem <code>{choice.context.workItemId}</code> · Attempt <code>{choice.context.attemptId}</code></> },
+    { key: "recorded", label: "Recorded", render: (choice) => <Timestamp value={choice.recordedAt} /> }
+  ]} />;
 }
 
-export function ImpactCards({ connection, hrefFor }: {
+export function ImpactTable({ connection, hrefFor }: {
   readonly connection: ImpactConnection;
   readonly hrefFor: (id: string) => string;
 }) {
-  if (connection.nodes.length === 0) return <div className="alert alert-info" role="status">No decision impacts match this outcome.</div>;
-  return (
-    <div aria-label="Project decision impacts" className="row g-3">
-      {connection.nodes.map((impact) => (
-        <div className="col-12 col-xl-6" key={impact.assessmentId}>
-          <ImpactCard href={hrefFor(impact.assessmentId)} impact={impact} />
-        </div>
-      ))}
-    </div>
-  );
+  return <DataTable caption="Project decision impacts" rows={connection.nodes} rowKey={(impact) => impact.assessmentId} emptyMessage="No decision impacts match this outcome." columns={[
+    { key: "choice", label: "Choice", render: (impact) => <><Link to={hrefFor(impact.assessmentId)}><code>{impact.choiceId}</code></Link><div><code>{impact.assessmentId}</code></div></> },
+    { key: "outcome", label: "Outcome", render: (impact) => <span className={`badge ${badgeClass(impact.outcome)}`}>{humanized(impact.outcome)}</span> },
+    { key: "decision", label: "Decision", render: (impact) => <><code>{impact.decisionId}</code><div>{humanized(impact.decisionChangeKind)}</div></> },
+    { key: "reasons", label: "Reasons/evidence", render: (impact) => <>{humanized(impact.beforeStatus)} → {humanized(impact.afterStatus)} · {humanized(impact.reason)}</> },
+    { key: "assessed", label: "Assessed", render: (impact) => <Timestamp value={impact.assessedAt} /> }
+  ]} />;
 }
 
 export function DecisionDetailCard({ detail, backTo }: {
@@ -262,14 +203,11 @@ export function GuidanceDetailCard({ detail, backTo }: {
           ["Message", guidance.id]
         ]} />
         <section aria-labelledby="guidance-interpretations-heading"><h4 className="h6" id="guidance-interpretations-heading">Interpretations</h4><div className="vstack gap-3">
-          {detail.interpretations.nodes.length === 0 ? <p className="text-body-secondary mb-0">No interpretation proposals were projected.</p> : detail.interpretations.nodes.map((interpretation) => (
-            <article className="border rounded p-3" key={interpretation.id}>
-              <div className="d-flex flex-wrap justify-content-between gap-2"><strong>{interpretation.topicId}</strong><span className="badge text-bg-secondary">{humanized(interpretation.lifecycleStatus)}</span></div>
-              <p className="mb-1">{interpretation.modality ?? "—"} {humanized(interpretation.effect ?? "unspecified")} · {decisionValue(interpretation.value)}</p>
-              <div className="small text-body-secondary">Assessment: {humanized(interpretation.assessmentStatus)} · {interpretation.assessmentReasons.join(", ") || "No reasons"}</div>
-              {interpretation.sourceSpanText ? <div className="small mt-2">Source span: “{interpretation.sourceSpanText}”</div> : null}
-            </article>
-          ))}
+          <DataTable caption="Interpretations" rows={detail.interpretations.nodes} rowKey={(row) => row.id} emptyMessage="No interpretation proposals were projected." columns={[
+            { key: "topic", label: "Topic", render: (row) => <><strong>{row.topicId}</strong><div>{row.modality ?? "—"} {humanized(row.effect ?? "unspecified")} · {decisionValue(row.value)}</div>{row.sourceSpanText ? <div>Source span: “{row.sourceSpanText}”</div> : null}</> },
+            { key: "lifecycle", label: "Lifecycle", render: (row) => <span className="badge text-bg-secondary">{humanized(row.lifecycleStatus)}</span> },
+            { key: "assessment", label: "Assessment", render: (row) => `${humanized(row.assessmentStatus)} · ${row.assessmentReasons.join(", ") || "No reasons"}` }
+          ]} />
         </div></section>
         <Link className="btn btn-outline-secondary align-self-start" to={backTo}>Back to Guidance</Link>
       </div>
@@ -289,7 +227,7 @@ export function ChoiceDetailCard({ detail, backTo, impactHref }: {
       <div className="card-body vstack gap-4">
         <CopyIdentifier label="AgentChoice ID" value={choice.id} />
         <section><h4 className="h6">Selected option</h4><p className="h5 mb-1">{choice.selected.summary}</p><code>{choice.selected.id}</code><p className="mt-2 mb-0">{choice.reasonSummary}</p></section>
-        <section><h4 className="h6">Alternatives considered</h4>{choice.alternatives.length === 0 ? <p className="text-body-secondary mb-0">No alternatives recorded.</p> : <ul className="mb-0">{choice.alternatives.map((option) => <li key={option.id}>{option.summary} (<code>{option.id}</code>)</li>)}</ul>}</section>
+        <section><h4 className="h6">Alternatives considered</h4><DataTable caption="Alternatives considered" rows={choice.alternatives} rowKey={(row) => row.id} emptyMessage="No alternatives recorded." columns={[{ key: "summary", label: "Alternative", render: (row) => row.summary }, { key: "id", label: "Identifier", render: (row) => <code>{row.id}</code> }]} /></section>
         <DetailGroup title="Coordination context" rows={[
           ["Repository", choice.context.repositoryId],
           ["ChangeSet", choice.context.changeSetId],
@@ -307,9 +245,7 @@ export function ChoiceDetailCard({ detail, backTo, impactHref }: {
           ["Accepted", choice.acceptedAt ? `${formatted(choice.acceptedAt)} by ${choice.acceptedBy?.kind}/${choice.acceptedBy?.id}` : null],
           ["Invalidated", choice.invalidatedAt ? `${formatted(choice.invalidatedAt)} · ${choice.invalidationReason ?? "No reason"}` : null]
         ]} />
-        <section aria-labelledby="choice-impacts-heading"><h4 className="h6" id="choice-impacts-heading">Decision impacts</h4><div className="row g-3">
-          {detail.impacts.nodes.length === 0 ? <p className="text-body-secondary mb-0">No decision impacts were projected.</p> : detail.impacts.nodes.map((impact) => <div className="col-12 col-xl-6" key={impact.assessmentId}><ImpactCard href={impactHref(impact.assessmentId)} impact={impact} /></div>)}
-        </div></section>
+        <section aria-labelledby="choice-impacts-heading"><h4 className="h6" id="choice-impacts-heading">Decision impacts</h4><DetailImpactTable connection={detail.impacts} hrefFor={impactHref} /></section>
         <Link className="btn btn-outline-secondary align-self-start" to={backTo}>Back to AgentChoices</Link>
       </div>
     </article>
@@ -346,19 +282,14 @@ export function ImpactDetailCard({ detail, backTo, choiceHref, decisionHref }: {
   );
 }
 
-function ImpactCard({ impact, href }: { readonly impact: ImpactSummary; readonly href: string }) {
-  return (
-    <article className="card h-100">
-      <div className="card-body d-flex flex-column gap-2">
-        <div className="d-flex flex-wrap justify-content-between gap-2"><h3 className="h5 mb-0">{humanized(impact.decisionChangeKind)}</h3><span className={`badge ${badgeClass(impact.outcome)}`}>{humanized(impact.outcome)}</span></div>
-        <div className="text-break"><strong>Decision:</strong> <code>{impact.decisionId}</code></div>
-        <div className="text-break"><strong>AgentChoice:</strong> <code>{impact.choiceId}</code></div>
-        <div>{humanized(impact.beforeStatus)} → {humanized(impact.afterStatus)}</div>
-        <div className="small text-body-secondary">Assessed {formatted(impact.assessedAt)}</div>
-        <Link className="btn btn-outline-secondary align-self-start mt-auto" to={href}>View impact</Link>
-      </div>
-    </article>
-  );
+function DetailImpactTable({ connection, hrefFor }: { readonly connection: ImpactConnection; readonly hrefFor: (id: string) => string }) {
+  return <DataTable caption="Decision impacts" rows={connection.nodes} rowKey={(impact) => impact.assessmentId} emptyMessage="No decision impacts were projected." columns={[
+    { key: "choice", label: "Choice", render: (impact) => <><Link to={hrefFor(impact.assessmentId)}><code>{impact.choiceId}</code></Link><div><code>{impact.assessmentId}</code></div></> },
+    { key: "outcome", label: "Outcome", render: (impact) => <span className={`badge ${badgeClass(impact.outcome)}`}>{humanized(impact.outcome)}</span> },
+    { key: "decision", label: "Decision", render: (impact) => <><code>{impact.decisionId}</code><div>{humanized(impact.decisionChangeKind)}</div></> },
+    { key: "reasons", label: "Reasons/evidence", render: (impact) => <>{humanized(impact.beforeStatus)} → {humanized(impact.afterStatus)} · {humanized(impact.reason)}</> },
+    { key: "assessed", label: "Assessed", render: (impact) => <Timestamp value={impact.assessedAt} /> }
+  ]} />;
 }
 
 function DetailGroup({ title, rows }: {

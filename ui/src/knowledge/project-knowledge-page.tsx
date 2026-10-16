@@ -1,6 +1,7 @@
+import { projectPath, navigationReturnTo, ContextLink as Link } from "../navigation.js";
 import { useEffect, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { Link, useLocation, useParams, useSearchParams } from "react-router-dom";
+import { useLocation, useParams, useSearchParams } from "react-router-dom";
 import type {
   ArtifactRelationDirection,
   DevelopmentArtifactKind,
@@ -24,7 +25,6 @@ import {
   ARTIFACT_RELATIONS,
   ARTIFACT_SOURCE_KINDS,
   detailLocation,
-  listLocation,
   nextPageParams,
   preserveCollection,
   preserveDetail,
@@ -33,16 +33,16 @@ import {
   safeKnowledgeReturnTo
 } from "./project-knowledge-model.js";
 import {
-  ArtifactCards,
+  ArtifactTable,
   ArtifactDetail,
   AvailableStale,
   InitialError,
-  KnowledgeNavigation,
+
   LoadingState,
   PaginationControls,
-  RelationshipCards,
+  RelationshipTable,
   SkillAssetDetail,
-  SkillCards,
+  SkillTable,
   SkillDetail,
   useKnowledgeHeading
 } from "./project-knowledge-view.js";
@@ -73,8 +73,7 @@ export function ProjectArtifactRelationshipsPage() {
 
 function SkillsPage({ projectRef }: { readonly projectRef: string }) {
   const [searchParams, setSearchParams] = useSearchParams();
-  const listPath = `/projects/${projectRef}/knowledge/skills`;
-  const sectionPath = `/projects/${projectRef}/knowledge`;
+  const listPath = `${projectPath(projectRef)}/skills`;
   const name = searchParams.get("name") ?? "";
   const after = searchParams.get("after");
   const sort = parseLatestUpdateSort(searchParams.get("sort"));
@@ -94,7 +93,7 @@ function SkillsPage({ projectRef }: { readonly projectRef: string }) {
 
   return (
     <div className="vstack gap-3">
-      <KnowledgeNavigation basePath={sectionPath} />
+
       <div><h2 className="h3 mb-1" ref={headingRef} tabIndex={-1}>Skills</h2><p className="text-body-secondary mb-0">Browse current Skills shared by this exact Project scope.</p></div>
       <form aria-label="Skill filters" className="card card-body" onSubmit={(event) => { event.preventDefault(); setSearchParams(applyFilters(searchParams, { name: draftName })); }}>
         <div className="row g-3 align-items-end">
@@ -106,18 +105,17 @@ function SkillsPage({ projectRef }: { readonly projectRef: string }) {
       {query.isPending ? <LoadingState label="Skills" /> : null}
       {errorMessage && !connection ? <InitialError label="Skills" message={errorMessage} onRetry={() => { void query.refetch(); }} /> : null}
       {!query.isPending && !errorMessage && !connection ? <div className="alert alert-warning" role="status">This Project is not available in the latest projection.</div> : null}
-      {connection ? <>{errorMessage ? <AvailableStale message={errorMessage} onRetry={() => { void query.refetch(); }} /> : null}<SkillCards connection={connection} hrefFor={(skill) => detailLocation(listPath, skill.name, listLocation(listPath, searchParams))} /><PaginationControls canPrevious={searchParams.getAll("trail").length > 0} nextCursor={connection.pageInfo.hasNextPage ? connection.pageInfo.endCursor : null} onNext={(cursor) => setSearchParams(nextPageParams(searchParams, cursor))} onPrevious={() => setSearchParams(previousPageParams(searchParams))} /></> : null}
+      {connection ? <>{errorMessage ? <AvailableStale message={errorMessage} onRetry={() => { void query.refetch(); }} /> : null}<SkillTable connection={connection} hrefFor={(skill) => detailLocation(listPath, skill.name)} /><PaginationControls canPrevious={searchParams.getAll("trail").length > 0} nextCursor={connection.pageInfo.hasNextPage ? connection.pageInfo.endCursor : null} onNext={(cursor) => setSearchParams(nextPageParams(searchParams, cursor))} onPrevious={() => setSearchParams(previousPageParams(searchParams))} /></> : null}
       <p className="small text-body-secondary mb-0">Only each Skill&apos;s latest projected revision is shown.</p>
     </div>
   );
 }
 
 function SkillPage({ projectRef, skillName }: { readonly projectRef: string; readonly skillName: string }) {
-  const [searchParams] = useSearchParams();
   const location = useLocation();
-  const listPath = `/projects/${projectRef}/knowledge/skills`;
-  const basePath = `/projects/${projectRef}/knowledge`;
-  const backTo = safeKnowledgeReturnTo(searchParams.get("returnTo"), listPath, basePath);
+  const listPath = `${projectPath(projectRef)}/skills`;
+  const basePath = `${projectPath(projectRef)}`;
+  const backTo = safeKnowledgeReturnTo(navigationReturnTo(useLocation().state), listPath, basePath);
   const headingRef = useKnowledgeHeading("Skill detail", skillName);
   const query = useQuery({
     queryKey: ["project-skill", projectRef, skillName],
@@ -127,16 +125,15 @@ function SkillPage({ projectRef, skillName }: { readonly projectRef: string; rea
   });
   const detail = query.data?.projectSkill ?? null;
   const errorMessage = query.error instanceof Error ? query.error.message : null;
-  const currentLocation = `${location.pathname}${location.search}`;
 
   return (
     <div className="vstack gap-3">
-      <KnowledgeNavigation basePath={basePath} />
+
       <div><Link className="btn btn-outline-secondary mb-3" to={backTo}>← Back to Skills</Link><h2 className="h3 mb-1" ref={headingRef} tabIndex={-1}>Skill detail</h2><p className="text-body-secondary mb-0">Current instructions and the current asset manifest.</p></div>
       {query.isPending ? <LoadingState label="Skill detail" /> : null}
       {errorMessage && !detail ? <InitialError label="Skill detail" message={errorMessage} onRetry={() => { void query.refetch(); }} /> : null}
       {!query.isPending && !errorMessage && !detail ? <div className="alert alert-info" role="status">This Skill is not available inside the Project.</div> : null}
-      {detail ? <>{errorMessage ? <AvailableStale message={errorMessage} onRetry={() => { void query.refetch(); }} /> : null}<SkillDetail assetHref={(path) => `${location.pathname}/assets/${encodeAssetPath(path)}?${new URLSearchParams({ returnTo: currentLocation }).toString()}`} backTo={backTo} detail={detail} /></> : null}
+      {detail ? <>{errorMessage ? <AvailableStale message={errorMessage} onRetry={() => { void query.refetch(); }} /> : null}<SkillDetail assetHref={(path) => `${location.pathname}/assets/${encodeAssetPath(path)}`} backTo={backTo} detail={detail} /></> : null}
     </div>
   );
 }
@@ -146,11 +143,10 @@ function AssetPage({ projectRef, skillName, assetPath }: {
   readonly skillName: string;
   readonly assetPath: string;
 }) {
-  const [searchParams] = useSearchParams();
-  const listPath = `/projects/${projectRef}/knowledge/skills`;
-  const basePath = `/projects/${projectRef}/knowledge`;
+  const listPath = `${projectPath(projectRef)}/skills`;
+  const basePath = `${projectPath(projectRef)}`;
   const skillPath = `${listPath}/${encodeURIComponent(skillName)}`;
-  const backTo = safeKnowledgeReturnTo(searchParams.get("returnTo"), skillPath, basePath);
+  const backTo = safeKnowledgeReturnTo(navigationReturnTo(useLocation().state), skillPath, basePath);
   const identity = `${skillName}:${assetPath}`;
   const headingRef = useKnowledgeHeading("Skill asset", identity);
   const query = useQuery({
@@ -164,7 +160,7 @@ function AssetPage({ projectRef, skillName, assetPath }: {
 
   return (
     <div className="vstack gap-3">
-      <KnowledgeNavigation basePath={basePath} />
+
       <div><Link className="btn btn-outline-secondary mb-3" to={backTo}>← Back to Skill</Link><h2 className="h3 mb-1" ref={headingRef} tabIndex={-1}>Skill asset</h2><p className="text-body-secondary mb-0">Exact current content and projection evidence for one asset.</p></div>
       {query.isPending ? <LoadingState label="Skill asset" /> : null}
       {errorMessage && !detail ? <InitialError label="Skill asset" message={errorMessage} onRetry={() => { void query.refetch(); }} /> : null}
@@ -176,8 +172,7 @@ function AssetPage({ projectRef, skillName, assetPath }: {
 
 function ArtifactsPage({ projectRef }: { readonly projectRef: string }) {
   const [searchParams, setSearchParams] = useSearchParams();
-  const listPath = `/projects/${projectRef}/knowledge/artifacts`;
-  const sectionPath = `/projects/${projectRef}/knowledge`;
+  const listPath = `${projectPath(projectRef)}/artifacts`;
   const kind = validArtifactKind(searchParams.get("kind"));
   const sourceKind = validSourceKind(searchParams.get("source"));
   const labelValue = searchParams.get("labels") ?? "";
@@ -202,7 +197,7 @@ function ArtifactsPage({ projectRef }: { readonly projectRef: string }) {
 
   return (
     <div className="vstack gap-3">
-      <KnowledgeNavigation basePath={sectionPath} />
+
       <div><h2 className="h3 mb-1" ref={headingRef} tabIndex={-1}>Development Artifacts</h2><p className="text-body-secondary mb-0">Find documents, evidence, plans, and references captured for this exact Project scope.</p></div>
       <form aria-label="Artifact filters" className="card card-body" onSubmit={(event) => { event.preventDefault(); setSearchParams(applyFilters(searchParams, draft)); }}>
         <div className="row g-3 align-items-end">
@@ -216,17 +211,16 @@ function ArtifactsPage({ projectRef }: { readonly projectRef: string }) {
       {query.isPending ? <LoadingState label="Development Artifacts" /> : null}
       {errorMessage && !connection ? <InitialError label="Development Artifacts" message={errorMessage} onRetry={() => { void query.refetch(); }} /> : null}
       {!query.isPending && !errorMessage && !connection ? <div className="alert alert-warning" role="status">This Project is not available in the latest projection.</div> : null}
-      {connection ? <>{errorMessage ? <AvailableStale message={errorMessage} onRetry={() => { void query.refetch(); }} /> : null}<ArtifactCards connection={connection} hrefFor={(id) => detailLocation(listPath, id, listLocation(listPath, searchParams))} /><PaginationControls canPrevious={searchParams.getAll("trail").length > 0} nextCursor={connection.pageInfo.hasNextPage ? connection.pageInfo.endCursor : null} onNext={(cursor) => setSearchParams(nextPageParams(searchParams, cursor))} onPrevious={() => setSearchParams(previousPageParams(searchParams))} /></> : null}
+      {connection ? <>{errorMessage ? <AvailableStale message={errorMessage} onRetry={() => { void query.refetch(); }} /> : null}<ArtifactTable connection={connection} hrefFor={(id) => detailLocation(listPath, id)} /><PaginationControls canPrevious={searchParams.getAll("trail").length > 0} nextCursor={connection.pageInfo.hasNextPage ? connection.pageInfo.endCursor : null} onNext={(cursor) => setSearchParams(nextPageParams(searchParams, cursor))} onPrevious={() => setSearchParams(previousPageParams(searchParams))} /></> : null}
     </div>
   );
 }
 
 function ArtifactPage({ projectRef, artifactId }: { readonly projectRef: string; readonly artifactId: string }) {
-  const [searchParams] = useSearchParams();
   const location = useLocation();
-  const listPath = `/projects/${projectRef}/knowledge/artifacts`;
-  const basePath = `/projects/${projectRef}/knowledge`;
-  const backTo = safeKnowledgeReturnTo(searchParams.get("returnTo"), listPath, basePath);
+  const listPath = `${projectPath(projectRef)}/artifacts`;
+  const basePath = `${projectPath(projectRef)}`;
+  const backTo = safeKnowledgeReturnTo(navigationReturnTo(useLocation().state), listPath, basePath);
   const headingRef = useKnowledgeHeading("Artifact detail", artifactId);
   const query = useQuery({
     queryKey: ["project-artifact", projectRef, artifactId],
@@ -236,12 +230,11 @@ function ArtifactPage({ projectRef, artifactId }: { readonly projectRef: string;
   });
   const detail = query.data?.projectArtifact ?? null;
   const errorMessage = query.error instanceof Error ? query.error.message : null;
-  const currentLocation = `${location.pathname}${location.search}`;
-  const relationshipsHref = `${location.pathname}/relationships?${new URLSearchParams({ returnTo: currentLocation }).toString()}`;
+  const relationshipsHref = `${location.pathname}/relationships`;
 
   return (
     <div className="vstack gap-3">
-      <KnowledgeNavigation basePath={basePath} />
+
       <div><Link className="btn btn-outline-secondary mb-3" to={backTo}>← Back to Development Artifacts</Link><h2 className="h3 mb-1" ref={headingRef} tabIndex={-1}>Artifact detail</h2><p className="text-body-secondary mb-0">Classification, provenance, and exact current content.</p></div>
       {query.isPending ? <LoadingState label="Artifact detail" /> : null}
       {errorMessage && !detail ? <InitialError label="Artifact detail" message={errorMessage} onRetry={() => { void query.refetch(); }} /> : null}
@@ -253,11 +246,10 @@ function ArtifactPage({ projectRef, artifactId }: { readonly projectRef: string;
 
 function RelationshipsPage({ projectRef, artifactId }: { readonly projectRef: string; readonly artifactId: string }) {
   const [searchParams, setSearchParams] = useSearchParams();
-  const location = useLocation();
-  const listPath = `/projects/${projectRef}/knowledge/artifacts`;
-  const basePath = `/projects/${projectRef}/knowledge`;
+  const listPath = `${projectPath(projectRef)}/artifacts`;
+  const basePath = `${projectPath(projectRef)}`;
   const artifactPath = `${listPath}/${encodeURIComponent(artifactId)}`;
-  const backTo = safeKnowledgeReturnTo(searchParams.get("returnTo"), artifactPath, basePath);
+  const backTo = safeKnowledgeReturnTo(navigationReturnTo(useLocation().state), artifactPath, basePath);
   const direction = validDirection(searchParams.get("direction"));
   const relation = validRelation(searchParams.get("relation"));
   const after = searchParams.get("after");
@@ -272,11 +264,10 @@ function RelationshipsPage({ projectRef, artifactId }: { readonly projectRef: st
   });
   const detail = query.data?.projectArtifactRelationships ?? null;
   const errorMessage = query.error instanceof Error ? query.error.message : null;
-  const currentLocation = `${location.pathname}${location.search}`;
 
   return (
     <div className="vstack gap-3">
-      <KnowledgeNavigation basePath={basePath} />
+
       <div><Link className="btn btn-outline-secondary mb-3" to={backTo}>← Back to Artifact</Link><h2 className="h3 mb-1" ref={headingRef} tabIndex={-1}>Artifact relationships</h2><p className="text-body-secondary mb-0">Active incoming and outgoing semantic links with explicit direction and provenance.</p></div>
       <form aria-label="Relationship filters" className="card card-body">
         <div className="row g-3">
@@ -287,7 +278,7 @@ function RelationshipsPage({ projectRef, artifactId }: { readonly projectRef: st
       {query.isPending ? <LoadingState label="Artifact relationships" /> : null}
       {errorMessage && !detail ? <InitialError label="Artifact relationships" message={errorMessage} onRetry={() => { void query.refetch(); }} /> : null}
       {!query.isPending && !errorMessage && !detail ? <div className="alert alert-info" role="status">This Artifact is not available inside the Project.</div> : null}
-      {detail ? <>{errorMessage ? <AvailableStale message={errorMessage} onRetry={() => { void query.refetch(); }} /> : null}<div className="card card-body"><h3 className="h5 mb-1">{detail.artifact.title}</h3><div className="small text-body-secondary text-break"><code>{detail.artifact.source.locator}</code></div></div><RelationshipCards detail={detail} peerHref={(id) => detailLocation(listPath, id, currentLocation)} /><PaginationControls canPrevious={searchParams.getAll("trail").length > 0} nextCursor={detail.relationships.pageInfo.hasNextPage ? detail.relationships.pageInfo.endCursor : null} onNext={(cursor) => setSearchParams(nextPageParams(searchParams, cursor))} onPrevious={() => setSearchParams(previousPageParams(searchParams))} /></> : null}
+      {detail ? <>{errorMessage ? <AvailableStale message={errorMessage} onRetry={() => { void query.refetch(); }} /> : null}<div className="card card-body"><h3 className="h5 mb-1">{detail.artifact.title}</h3><div className="small text-body-secondary text-break"><code>{detail.artifact.source.locator}</code></div></div><RelationshipTable detail={detail} peerHref={(id) => detailLocation(listPath, id)} /><PaginationControls canPrevious={searchParams.getAll("trail").length > 0} nextCursor={detail.relationships.pageInfo.hasNextPage ? detail.relationships.pageInfo.endCursor : null} onNext={(cursor) => setSearchParams(nextPageParams(searchParams, cursor))} onPrevious={() => setSearchParams(previousPageParams(searchParams))} /></> : null}
       <p className="small text-body-secondary mb-0">Superseded relationship edges are intentionally absent from this latest projection.</p>
     </div>
   );

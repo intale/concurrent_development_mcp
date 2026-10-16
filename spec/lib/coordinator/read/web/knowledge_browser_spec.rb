@@ -137,7 +137,7 @@ RSpec.describe Coordinator::Read::Web::Queries::KnowledgeBrowser, :read_model do
 
   it "rejects malformed input and isolates Project-scoped details" do
     expect do
-      query.skills(project_ref: "invalid")
+        query.skills(project_ref: " project:invalid")
     end.to raise_error(Coordinator::Read::Web::ProjectReference::InvalidReference)
     expect do
       query.artifacts(project_ref:, labels: [ " padded" ])

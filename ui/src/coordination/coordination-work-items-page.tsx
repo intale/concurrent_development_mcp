@@ -1,14 +1,14 @@
+import { projectPath, navigationReturnTo, ContextLink as Link } from "../navigation.js";
 import { useMemo } from "react";
 import type { FormEvent } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { Link, useParams, useSearchParams } from "react-router-dom";
+import { useParams, useSearchParams, useLocation } from "react-router-dom";
 import type { CoordinationPresentationStatus, WorkItemSort } from "../gql/graphql.js";
 import { useProjectWorkspace } from "../projects/project-workspace-shell.js";
 import { fetchProjectWorkItem, fetchProjectWorkItems } from "./project-coordination-api.js";
 import {
   detailLocation,
   exactWorkItemFilterParams,
-  listLocation,
   nextPageParams,
   PRESENTATION_STATUSES,
   previousPageParams,
@@ -18,12 +18,12 @@ import {
 } from "./project-coordination-model.js";
 import {
   AvailableStale,
-  CoordinationNavigation,
+
   InitialError,
   LoadingState,
   PaginationControls,
   useCoordinationHeading,
-  WorkItemCards,
+  WorkItemTable,
   WorkItemDetail
 } from "./project-coordination-view.js";
 
@@ -45,7 +45,7 @@ function WorkItemListPage() {
   const changeSetId = searchParams.get("changeSet")?.trim() || undefined;
   const agentId = searchParams.get("agent")?.trim() || undefined;
   const after = searchParams.get("after") ?? undefined;
-  const basePath = `/projects/${projectRef}/coordination`;
+  const basePath = `${projectPath(projectRef)}`;
   const listPath = `${basePath}/work-items`;
   const headingRef = useCoordinationHeading(`WorkItems · ${project.displayLabel}`, after ?? "first");
   const filters = { presentationStatuses: statuses, sort, ...(changeSetId ? { changeSetId } : {}), ...(agentId ? { agentId } : {}) };
@@ -82,7 +82,7 @@ function WorkItemListPage() {
 
   return (
     <div className="vstack gap-3">
-      <CoordinationNavigation basePath={basePath} />
+
       <div><h2 className="h3 mb-1" ref={headingRef} tabIndex={-1}>Scheduled WorkItems</h2><p className="text-body-secondary mb-0">See what is pending, assigned, running, or completed—and who currently owns the work.</p></div>
       <form
         aria-label="WorkItem filters"
@@ -101,20 +101,19 @@ function WorkItemListPage() {
       {query.isPending ? <LoadingState label="WorkItems" /> : null}
       {errorMessage && !connection ? <InitialError label="WorkItems" message={errorMessage} onRetry={() => { void query.refetch(); }} /> : null}
       {!query.isPending && !errorMessage && !connection ? <div className="alert alert-warning" role="status">This Project is not available in the latest projection.</div> : null}
-      {connection ? <>{errorMessage ? <AvailableStale message={errorMessage} onRetry={() => { void query.refetch(); }} /> : null}<WorkItemCards hrefFor={(id) => detailLocation(listPath, id, listLocation(listPath, searchParams))} items={connection.nodes} /><PaginationControls canPrevious={searchParams.getAll("trail").length > 0} nextCursor={connection.pageInfo.hasNextPage ? connection.pageInfo.endCursor : null} onNext={(cursor) => setSearchParams(nextPageParams(searchParams, cursor))} onPrevious={() => setSearchParams(previousPageParams(searchParams))} /></> : null}
+      {connection ? <>{errorMessage ? <AvailableStale message={errorMessage} onRetry={() => { void query.refetch(); }} /> : null}<WorkItemTable hrefFor={(id) => detailLocation(listPath, id)} items={connection.nodes} /><PaginationControls canPrevious={searchParams.getAll("trail").length > 0} nextCursor={connection.pageInfo.hasNextPage ? connection.pageInfo.endCursor : null} onNext={(cursor) => setSearchParams(nextPageParams(searchParams, cursor))} onPrevious={() => setSearchParams(previousPageParams(searchParams))} /></> : null}
     </div>
   );
 }
 
 function WorkItemDetailPage({ workItemId }: { readonly workItemId: string }) {
   const { project, projectRef } = useProjectWorkspace();
-  const [searchParams] = useSearchParams();
-  const basePath = `/projects/${projectRef}/coordination`;
+  const basePath = `${projectPath(projectRef)}`;
   const listPath = `${basePath}/work-items`;
-  const backTo = safeReturnTo(searchParams.get("returnTo"), listPath);
+  const backTo = safeReturnTo(navigationReturnTo(useLocation().state), listPath);
   const headingRef = useCoordinationHeading(`WorkItem · ${project.displayLabel}`, workItemId);
   const query = useQuery({ queryKey: ["project-work-item", projectRef, workItemId], queryFn: ({ signal }) => fetchProjectWorkItem(projectRef, workItemId, signal), refetchInterval: REFRESH_INTERVAL_MS });
   const detail = query.data?.projectWorkItem;
   const errorMessage = query.error instanceof Error ? query.error.message : null;
-  return <div className="vstack gap-3"><CoordinationNavigation basePath={basePath} /><div><Link className="btn btn-outline-secondary mb-3" to={backTo}>← Back to WorkItems</Link><h2 className="h3 mb-0" ref={headingRef} tabIndex={-1}>WorkItem detail</h2></div>{query.isPending ? <LoadingState label="WorkItem detail" /> : null}{errorMessage && !detail ? <InitialError label="WorkItem detail" message={errorMessage} onRetry={() => { void query.refetch(); }} /> : null}{!query.isPending && !errorMessage && !detail ? <div className="alert alert-info" role="status">This WorkItem is not available in this Project.</div> : null}{detail ? <>{errorMessage ? <AvailableStale message={errorMessage} onRetry={() => { void query.refetch(); }} /> : null}<WorkItemDetail detail={detail} /></> : null}</div>;
+  return <div className="vstack gap-3"><div><Link className="btn btn-outline-secondary mb-3" to={backTo}>← Back to WorkItems</Link><h2 className="h3 mb-0" ref={headingRef} tabIndex={-1}>WorkItem detail</h2></div>{query.isPending ? <LoadingState label="WorkItem detail" /> : null}{errorMessage && !detail ? <InitialError label="WorkItem detail" message={errorMessage} onRetry={() => { void query.refetch(); }} /> : null}{!query.isPending && !errorMessage && !detail ? <div className="alert alert-info" role="status">This WorkItem is not available in this Project.</div> : null}{detail ? <>{errorMessage ? <AvailableStale message={errorMessage} onRetry={() => { void query.refetch(); }} /> : null}<WorkItemDetail detail={detail} /></> : null}</div>;
 }

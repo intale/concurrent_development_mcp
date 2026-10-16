@@ -4,6 +4,7 @@ Capybara.register_driver(:coordinator_headless_firefox) do |app|
   options = Selenium::WebDriver::Firefox::Options.new
   options.binary = ENV.fetch("FIREFOX_BINARY", "/snap/firefox/current/usr/lib/firefox/firefox")
   options.add_argument("-headless")
+  options.enable_bidi!
   options.add_preference("browser.chrome.favicons", false)
   options.add_preference("browser.chrome.site_icons", false)
 

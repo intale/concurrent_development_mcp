@@ -19,18 +19,17 @@ import {
   safeKnowledgeReturnTo
 } from "../src/knowledge/project-knowledge-model.js";
 import {
-  ArtifactCards,
+  ArtifactTable,
   ArtifactDetail,
   AvailableStale,
-  KnowledgeNavigation,
   PaginationControls,
-  RelationshipCards,
+  RelationshipTable,
   SkillAssetDetail,
-  SkillCards,
+  SkillTable,
   SkillDetail
 } from "../src/knowledge/project-knowledge-view.js";
 
-const projectRef = "project-ref";
+const projectRef = "project:concurrent_development_mcp";
 const scope = "project:knowledge";
 const timestamp = "2026-08-31T12:00:00.000000Z";
 const skillSummary = {
@@ -133,26 +132,37 @@ function render(node: ReactNode, route = "/") {
   return renderToStaticMarkup(<MemoryRouter initialEntries={[route]}>{node}</MemoryRouter>);
 }
 
-test("focused Skill and Artifact collections lead with meaning and adjacent primary actions", () => {
-  const skillsMarkup = render(<SkillCards connection={{ nodes: [skillSummary], pageInfo: { endCursor: "next", hasNextPage: true } }} hrefFor={(skill) => `/skills/${skill.name}`} />);
-  const artifactsMarkup = render(<ArtifactCards connection={{ nodes: [artifactSummary], pageInfo: { endCursor: "next", hasNextPage: true } }} hrefFor={(id) => `/artifacts/${id}`} />);
+test("Skill and Artifact collections use semantic tables with linked names and empty states", () => {
+  const skillsMarkup = render(<SkillTable connection={{ nodes: [skillSummary], pageInfo: { endCursor: "next", hasNextPage: true } }} hrefFor={(skill) => `/skills/${skill.name}`} />);
+  const artifactsMarkup = render(<ArtifactTable connection={{ nodes: [artifactSummary], pageInfo: { endCursor: "next", hasNextPage: true } }} hrefFor={(id) => `/artifacts/${id}`} />);
 
   assert.match(skillsMarkup, /Model coordination facts/);
-  assert.match(skillsMarkup, /View Skill/);
-  assert.match(skillsMarkup, /col-12 col-xl-6/);
+  assert.match(skillsMarkup, /<caption class="visually-hidden">Project Skills<\/caption>/);
+  assert.match(skillsMarkup, /<th scope="col">Name<\/th>/);
+  assert.match(skillsMarkup, /<th scope="col">Scope<\/th>/);
+  assert.match(skillsMarkup, /href="\/skills\/event-modeling"/);
+  assert.match(skillsMarkup, /project:knowledge/);
+  assert.doesNotMatch(skillsMarkup, /<article/);
   assert.match(artifactsMarkup, /Parent README/);
   assert.match(artifactsMarkup, /README.md/);
-  assert.match(artifactsMarkup, /View Artifact/);
+  assert.match(artifactsMarkup, /<caption class="visually-hidden">Development Artifacts<\/caption>/);
+  assert.match(artifactsMarkup, /<th scope="col">Captured<\/th>/);
+  assert.match(artifactsMarkup, /href="\/artifacts\//);
+  assert.doesNotMatch(artifactsMarkup, /<article/);
+  const empty = render(<SkillTable connection={{ nodes: [], pageInfo: { endCursor: null, hasNextPage: false } }} hrefFor={() => "/skill"} />);
+  assert.match(empty, /<tbody><tr><td[^>]*(?:colSpan|colspan)="5"[^>]*>No Skills match this name\.<\/td><\/tr><\/tbody>/);
 });
 
 test("Skill, asset, Artifact, and relationship details stay on focused pages", () => {
   const skillMarkup = render(<SkillDetail assetHref={(path) => `/asset/${path}`} backTo="/skills?name=event" detail={skill} />);
   const assetMarkup = render(<SkillAssetDetail backTo="/skills/event-modeling" detail={asset} />);
   const artifactMarkup = render(<ArtifactDetail backTo="/artifacts?kind=docs" detail={artifact} relationshipsHref="/artifact/relationships" />);
-  const relationshipMarkup = render(<RelationshipCards detail={relationships} peerHref={(id) => `/artifacts/${id}`} />);
+  const relationshipMarkup = render(<RelationshipTable detail={relationships} peerHref={(id) => `/artifacts/${id}`} />);
 
   assert.match(skillMarkup, /Given facts/);
-  assert.match(skillMarkup, /View asset/);
+  assert.match(skillMarkup, /href="\/asset\/references\/example\.md"/);
+  assert.match(skillMarkup, /<caption class="visually-hidden">Skill assets<\/caption>/);
+  assert.match(skillMarkup, /<th scope="col">Executable<\/th>/);
   assert.match(skillMarkup, /Back to Skills/);
   assert.match(assetMarkup, /Example content/);
   assert.match(assetMarkup, /Back to Skill/);
@@ -160,7 +170,10 @@ test("Skill, asset, Artifact, and relationship details stay on focused pages", (
   assert.match(artifactMarkup, /<h1>Parent README<\/h1>/);
   assert.doesNotMatch(artifactMarkup, /Child guide/);
   assert.match(relationshipMarkup, /Child guide/);
-  assert.match(relationshipMarkup, /View related Artifact/);
+  assert.match(relationshipMarkup, /<caption class="visually-hidden">Artifact relationships<\/caption>/);
+  assert.match(relationshipMarkup, /<th scope="col">Direction<\/th>/);
+  assert.match(relationshipMarkup, /href="\/artifacts\//);
+  assert.doesNotMatch(relationshipMarkup, /<article/);
 });
 
 test("Markdown content renders GFM without executing embedded HTML or unsafe links", () => {
@@ -179,37 +192,36 @@ test("Markdown content renders GFM without executing embedded HTML or unsafe lin
   assert.doesNotMatch(markup, /javascript:/);
 });
 
-test("Knowledge subnavigation and recoverable pagination are explicit", () => {
+test("knowledge pagination exposes Previous and Next controls", () => {
   const markup = render(
-    <><KnowledgeNavigation basePath={`/projects/${projectRef}/knowledge`} /><PaginationControls canPrevious nextCursor="next" onNext={() => undefined} onPrevious={() => undefined} /></>,
-    `/projects/${projectRef}/knowledge/skills`
+    <PaginationControls canPrevious nextCursor="next" onNext={() => undefined} onPrevious={() => undefined} />,
+    `/projects/${projectRef}/skills`
   );
-  assert.match(markup, /aria-label="Knowledge views"/);
-  assert.match(markup, /Skills/);
-  assert.match(markup, /Development Artifacts/);
   assert.match(markup, /Previous/);
   assert.match(markup, /Next/);
+  assert.match(markup, /aria-label="Collection pages"/);
 });
 
 test("filters, paging, details, and Back state remain URL-backed and Project-bounded", () => {
   const filtered = applyFilters(new URLSearchParams("after=old&trail=start"), { kind: " DOCUMENTATION ", labels: "docs", source: "" });
   const next = nextPageParams(filtered, "next-cursor");
   const previous = previousPageParams(next);
-  const listPath = `/projects/${projectRef}/knowledge/artifacts`;
-  const detail = detailLocation(listPath, artifactSummary.id, `${listPath}?${filtered.toString()}`);
+  const listPath = `/projects/${projectRef}/artifacts`;
+  const detail = detailLocation(listPath, artifactSummary.id);
 
   assert.equal(filtered.get("kind"), "DOCUMENTATION");
   assert.equal(filtered.has("after"), false);
   assert.equal(next.get("after"), "next-cursor");
   assert.equal(previous.get("after"), null);
-  assert.match(detail, /returnTo=/);
-  assert.equal(safeKnowledgeReturnTo(`${listPath}?kind=DOCUMENTATION`, listPath, `/projects/${projectRef}/knowledge`), `${listPath}?kind=DOCUMENTATION`);
-  assert.equal(safeKnowledgeReturnTo("https://example.test", listPath, `/projects/${projectRef}/knowledge`), listPath);
+  assert.equal(detail, `${listPath}/${encodeURIComponent(artifactSummary.id)}`);
+  assert.equal(new URL(detail, "https://coordinator.test").search, "");
+  assert.equal(safeKnowledgeReturnTo(`${listPath}?kind=DOCUMENTATION`, listPath, `/projects/${projectRef}`), `${listPath}?kind=DOCUMENTATION`);
+  assert.equal(safeKnowledgeReturnTo("https://example.test", listPath, `/projects/${projectRef}`), listPath);
 });
 
 test("available knowledge remains visible beside a localized refresh failure", () => {
   const markup = render(
-    <><AvailableStale message="Projection endpoint unavailable" onRetry={() => undefined} /><SkillCards connection={{ nodes: [skillSummary], pageInfo: { endCursor: null, hasNextPage: false } }} hrefFor={() => "/skill"} /></>
+    <><AvailableStale message="Projection endpoint unavailable" onRetry={() => undefined} /><SkillTable connection={{ nodes: [skillSummary], pageInfo: { endCursor: null, hasNextPage: false } }} hrefFor={() => "/skill"} /></>
   );
   assert.match(markup, /last available projection remains visible/);
   assert.match(markup, /Projection endpoint unavailable/);

@@ -1,6 +1,7 @@
 import { useEffect, useRef } from "react";
 import type { RefObject } from "react";
-import { Link, NavLink } from "react-router-dom";
+import { ContextLink as Link } from "../navigation.js";
+import { DataTable, TextPreview, Timestamp } from "../data-table.js";
 import { CopyIdentifier } from "../copy-identifier.js";
 import type { CoordinationPresentationStatus } from "../gql/graphql.js";
 import { RetryRefresh } from "../retry-refresh.js";
@@ -21,19 +22,6 @@ export function useCoordinationHeading(title: string, focusKey: string): RefObje
   return headingRef;
 }
 
-export function CoordinationNavigation({ basePath }: { readonly basePath: string }) {
-  const navClassName = ({ isActive }: { readonly isActive: boolean }) => `nav-link${isActive ? " active" : ""}`;
-
-  return (
-    <nav aria-label="Coordination views" className="mb-3">
-      <ul className="nav nav-pills flex-column flex-sm-row gap-2">
-        <li className="nav-item"><NavLink className={navClassName} to={`${basePath}/change-sets`}>ChangeSets</NavLink></li>
-        <li className="nav-item"><NavLink className={navClassName} to={`${basePath}/work-items`}>WorkItems</NavLink></li>
-        <li className="nav-item"><NavLink className={navClassName} to={`${basePath}/dependencies`}>Dependencies</NavLink></li>
-      </ul>
-    </nav>
-  );
-}
 
 export function LoadingState({ label }: { readonly label: string }) {
   return (
@@ -99,31 +87,18 @@ export function PaginationControls({ canPrevious, nextCursor, onNext, onPrevious
   );
 }
 
-export function ChangeSetCards({ items, hrefFor }: {
+export function ChangeSetTable({ items, hrefFor }: {
   readonly items: readonly CoordinationChangeSet[];
   readonly hrefFor: (id: string) => string;
 }) {
   if (items.length === 0) return <div className="alert alert-info" role="status">No ChangeSets are available.</div>;
   return (
-    <div aria-label="ChangeSets" className="row g-3">
-      {items.map((item) => (
-        <div className="col-12 col-xl-6" key={item.id}>
-          <article className="card h-100 card-outline card-primary">
-            <div className="card-body d-flex flex-column gap-2">
-              <div className="d-flex flex-wrap justify-content-between gap-2">
-                <h3 className="h5 mb-0">{item.goal}</h3>
-                <span className="badge text-bg-secondary">{item.domainStatus}</span>
-              </div>
-              <div className="small text-body-secondary">
-                {item.runningWorkItemCount} running · {item.openWorkItemCount} open · {item.workItemCount} total
-              </div>
-              <code className="small text-break">{item.id}</code>
-              <Link className="btn btn-primary align-self-start mt-auto" to={hrefFor(item.id)}>View ChangeSet</Link>
-            </div>
-          </article>
-        </div>
-      ))}
-    </div>
+    <DataTable caption="ChangeSets" rows={items} rowKey={(item) => item.id} columns={[
+      { key: "goal", label: "Change set", render: (item) => <><Link aria-label={`View ChangeSet ${item.id}`} className="fw-semibold" to={hrefFor(item.id)}><TextPreview text={item.goal} /></Link><div className="small text-body-secondary">{item.id}</div></> },
+      { key: "status", label: "Status", render: (item) => <span className={`badge ${item.domainStatus === "completed" ? "text-bg-success" : "text-bg-secondary"}`}>{item.domainStatus}</span> },
+      { key: "work", label: "Work items", render: (item) => `${item.runningWorkItemCount} running · ${item.openWorkItemCount} open · ${item.workItemCount} total` },
+      { key: "updated", label: "Updated", render: (item) => <Timestamp value={item.lastProcessedAt} /> }
+    ]} />
   );
 }
 
@@ -131,60 +106,36 @@ function StatusBadge({ status }: { readonly status: CoordinationPresentationStat
   return <span className={`badge ${statusBadgeClass(status)}`}>{status.toLowerCase()}</span>;
 }
 
-export function WorkItemCards({ items, hrefFor }: {
+export function WorkItemTable({ items, hrefFor }: {
   readonly items: readonly CoordinationWorkItem[];
   readonly hrefFor: (id: string) => string;
 }) {
   if (items.length === 0) return <div className="alert alert-info" role="status">No WorkItems match these filters.</div>;
   return (
-    <div aria-label="Scheduled WorkItems" className="row g-3">
-      {items.map((item) => (
-        <div className="col-12 col-xl-6" key={item.id}>
-          <article className="card h-100 card-outline card-primary">
-            <div className="card-body d-flex flex-column gap-2">
-              <div className="d-flex flex-wrap justify-content-between gap-2">
-                <h3 className="h5 mb-0">{item.goal}</h3>
-                <StatusBadge status={item.presentationStatus} />
-              </div>
-              <div><strong>Agent:</strong> {item.activeAgentId ?? "Unassigned"}</div>
-              {item.attemptStatus ? <div><strong>Attempt:</strong> {item.attemptStatus}</div> : null}
-              <div className="small text-body-secondary">Domain state: {item.domainStatus}</div>
-              <code className="small text-break">{item.id}</code>
-              <Link className="btn btn-primary align-self-start mt-auto" to={hrefFor(item.id)}>View WorkItem</Link>
-            </div>
-          </article>
-        </div>
-      ))}
-    </div>
+    <DataTable caption="Scheduled WorkItems" rows={items} rowKey={(item) => item.id} columns={[
+      { key: "goal", label: "Work item", render: (item) => <><Link aria-label={`View WorkItem ${item.id}`} className="fw-semibold" to={hrefFor(item.id)}><TextPreview text={item.goal} /></Link><div className="small text-body-secondary">{item.id}</div></> },
+      { key: "status", label: "Status", render: (item) => <StatusBadge status={item.presentationStatus} /> },
+      { key: "agent", label: "Agent", render: (item) => item.activeAgentId ?? "Unassigned" },
+      { key: "attempt", label: "Attempt", className: "d-none d-xl-table-cell text-nowrap", render: (item) => item.attemptStatus ?? "Not started" },
+      { key: "state", label: "Domain state", className: "d-none d-xl-table-cell text-nowrap", render: (item) => item.domainStatus },
+      { key: "updated", label: "Updated", render: (item) => <Timestamp value={item.lastProcessedAt} /> }
+    ]} />
   );
 }
 
-export function DependencyCards({ items, hrefFor }: {
+export function DependencyTable({ items, hrefFor }: {
   readonly items: readonly CoordinationDependency[];
   readonly hrefFor: (id: string) => string;
 }) {
   if (items.length === 0) return <div className="alert alert-info" role="status">No dependencies match this state.</div>;
   return (
-    <div aria-label="WorkItem dependencies" className="row g-3">
-      {items.map((item) => (
-        <div className="col-12 col-xl-6" key={item.id}>
-          <article className={`card h-100 card-outline ${item.blocking ? "card-warning" : "card-success"}`}>
-            <div className="card-body d-flex flex-column gap-2">
-              <div className="d-flex flex-wrap justify-content-between gap-2">
-                <h3 className="h5 mb-0">{item.dependencyKind.replaceAll("_", " ")}</h3>
-                <span className={`badge ${item.blocking ? "text-bg-warning" : "text-bg-success"}`}>
-                  {item.blocking ? "blocking" : "satisfied"}
-                </span>
-              </div>
-              <div><strong>Producer:</strong> <code className="text-break">{item.producerWorkItemId}</code></div>
-              <div><strong>Consumer:</strong> <code className="text-break">{item.consumerWorkItemId}</code></div>
-              <code className="small text-body-secondary text-break">{item.id}</code>
-              <Link className="btn btn-primary align-self-start mt-auto" to={hrefFor(item.id)}>View dependency</Link>
-            </div>
-          </article>
-        </div>
-      ))}
-    </div>
+    <DataTable caption="WorkItem dependencies" rows={items} rowKey={(item) => item.id} columns={[
+      { key: "kind", label: "Dependency", render: (item) => <><Link aria-label={`View dependency ${item.id}`} to={hrefFor(item.id)}>{item.dependencyKind.replaceAll("_", " ")}</Link><div className="small text-body-secondary">{item.id}</div></> },
+      { key: "state", label: "State", render: (item) => <span className={`badge ${item.blocking ? "text-bg-warning" : "text-bg-success"}`}>{item.blocking ? "blocking" : "satisfied"}</span> },
+      { key: "producer", label: "Producer", render: (item) => <span className="small">{item.producerWorkItemId}</span> },
+      { key: "consumer", label: "Consumer", render: (item) => <span className="small">{item.consumerWorkItemId}</span> },
+      { key: "updated", label: "Updated", render: (item) => <Timestamp value={item.lastProcessedAt} /> }
+    ]} />
   );
 }
 

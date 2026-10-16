@@ -341,7 +341,7 @@ module ProjectKnowledgeGraphqlSpec
         kind: "DOCUMENTATION",
         after: cursor
       )
-      malformed = execute(SKILLS_QUERY, projectRef: "not-a-project-ref", first: 20)
+      malformed = execute(SKILLS_QUERY, projectRef: " project:invalid", first: 20)
       outside = execute(ARTIFACT_QUERY, projectRef: other_project_ref, artifactId: PARENT_ID)
 
       expect(mismatched.dig("errors", 0, "extensions", "code")).to eq("INVALID_CURSOR")

@@ -1,7 +1,8 @@
+import { ContextLink as Link } from "../navigation.js";
 import { useEffect, useMemo, useRef, useState } from "react";
 import type { FormEvent } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { Link, useParams, useSearchParams } from "react-router-dom";
+import { useParams, useSearchParams } from "react-router-dom";
 import { LatestUpdateSortControl, latestUpdateSortParams, parseLatestUpdateSort } from "../latest-update-sort.js";
 import { fetchCommandReceipt, fetchCommandReceipts } from "./command-receipts-api.js";
 import {

@@ -1,4 +1,5 @@
-import { Link } from "react-router-dom";
+import { ContextLink as Link } from "../navigation.js";
+import { DataTable, Timestamp } from "../data-table.js";
 import { CopyIdentifier } from "../copy-identifier.js";
 import { RetryRefresh } from "../retry-refresh.js";
 import type { OperationBatch, OperationBatchPage } from "./operation-batches-model.js";
@@ -89,38 +90,15 @@ export function OperationBatchListView(props: OperationBatchListViewProps) {
           {props.loadingRequestedPage ? "Loading the requested page…" : "\u00a0"}
         </span>
       </div>
-      <div className="row row-cols-1 row-cols-xl-2 g-3">
-        {props.page.nodes.map((batch) => (
-          <div className="col" key={batch.id}>
-            <article className="card card-outline card-dark h-100">
-              <div className="card-header d-flex flex-wrap align-items-start justify-content-between gap-2">
-                <div>
-                  <h3 className="card-title fw-semibold mb-1">{humanizedOperation(batch.targetTool)}</h3>
-                  <div className="small text-body-secondary text-break"><code>{batch.id}</code></div>
-                </div>
-                <span className={`badge ${batchStatusClass(batch.status)}`}>{humanizedOperation(batch.status)}</span>
-              </div>
-              <div className="card-body vstack gap-3">
-                <div className="progress" aria-label={`${batch.succeeded} of ${batch.total} items succeeded`} role="progressbar" aria-valuemax={batch.total} aria-valuemin={0} aria-valuenow={batch.succeeded}>
-                  <div className="progress-bar" style={{ width: `${batch.total === 0 ? 0 : (batch.succeeded / batch.total) * 100}%` }} />
-                </div>
-                <div className="row row-cols-2 g-2 small">
-                  <div><strong>{batch.succeeded}</strong> succeeded</div>
-                  <div><strong>{batch.rejected}</strong> rejected</div>
-                  <div><strong>{batch.pending}</strong> pending</div>
-                  <div><strong>{batch.notRun}</strong> not run</div>
-                </div>
-                <div className="small text-body-secondary">Created <time dateTime={batch.createdAt}>{formattedTimestamp(batch.createdAt)}</time></div>
-              </div>
-              <div className="card-footer d-grid">
-                <Link className="btn btn-primary" to={props.batchHref(batch.id)}>
-                  Open batch <i aria-hidden="true" className="bi bi-arrow-right ms-1" />
-                </Link>
-              </div>
-            </article>
-          </div>
-        ))}
-      </div>
+      <DataTable caption="Operation batches" rows={props.page.nodes} rowKey={(batch) => batch.id} columns={[
+        { key: "operation", label: "Operation", render: (batch) => <><Link aria-label={`Open batch ${batch.id}`} className="fw-semibold" to={props.batchHref(batch.id)}>{humanizedOperation(batch.targetTool)}</Link><div className="small text-body-secondary">{batch.id}</div></> },
+        { key: "status", label: "Status", render: (batch) => <span className={`badge ${batchStatusClass(batch.status)}`}>{humanizedOperation(batch.status)}</span> },
+        { key: "total", label: "Items", render: (batch) => batch.total },
+        { key: "succeeded", label: "Succeeded", render: (batch) => batch.succeeded },
+        { key: "pending", label: "Pending", render: (batch) => batch.pending },
+        { key: "other", label: "Rejected / not run", render: (batch) => `${batch.rejected} / ${batch.notRun}` },
+        { key: "created", label: "Created", render: (batch) => <Timestamp value={batch.createdAt} /> }
+      ]} />
       <nav aria-label="Operation batch pagination" className="d-flex justify-content-between gap-3">
         <button className="btn btn-outline-secondary" disabled={!props.canGoBack} onClick={props.onPrevious} type="button">Previous page</button>
         <button className="btn btn-outline-primary" disabled={!props.page.pageInfo.hasNextPage} onClick={props.onNext} type="button">Next page</button>
@@ -211,21 +189,13 @@ export function OperationBatchDetailView(props: OperationBatchDetailViewProps) {
             {items.nodes.length === 0 ? (
               <p className="text-body-secondary mb-0">No item outcomes are available on this page.</p>
             ) : (
-              <div className="list-group">
-                {items.nodes.map((item) => (
-                  <article className="list-group-item" key={item.index}>
-                    <div className="d-flex flex-wrap align-items-start justify-content-between gap-2">
-                      <div><strong>Item {item.index}</strong> · {humanizedOperation(item.targetTool)}</div>
-                      <span className={`badge ${batchStatusClass(item.status)}`}>{humanizedOperation(item.status)}</span>
-                    </div>
-                    <div className="text-break"><code>{item.commandId}</code></div>
-                    <p className="mb-1 mt-2">{item.outcomeSummary ?? "No terminal outcome has been observed."}</p>
-                    <div className="small text-body-secondary">
-                      {item.outcomeCode ? `${item.outcomeCode} · ` : ""}{formattedTimestamp(item.finishedAt)}
-                    </div>
-                  </article>
-                ))}
-              </div>
+              <DataTable caption="Batch items" rows={items.nodes} rowKey={(item) => String(item.index)} columns={[
+                { key: "item", label: "Item", render: (item) => <><strong>Item {item.index}</strong><div className="small">{humanizedOperation(item.targetTool)}</div></> },
+                { key: "command", label: "Command ID", render: (item) => <code>{item.commandId}</code> },
+                { key: "status", label: "Status", render: (item) => <span className={`badge ${batchStatusClass(item.status)}`}>{humanizedOperation(item.status)}</span> },
+                { key: "outcome", label: "Outcome", render: (item) => <>{item.outcomeSummary ?? "No terminal outcome has been observed."}{item.outcomeCode ? <div className="small text-body-secondary">{item.outcomeCode}</div> : null}</> },
+                { key: "finished", label: "Finished", render: (item) => <Timestamp value={item.finishedAt} /> }
+              ]} />
             )}
             <nav aria-label="Operation batch item pagination" className="d-flex justify-content-between gap-3">
               <button className="btn btn-outline-secondary" disabled={!props.canGoBack} onClick={props.onPrevious} type="button">Previous page</button>

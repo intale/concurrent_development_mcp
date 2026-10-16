@@ -135,10 +135,7 @@ export function listLocation(pathname: string, params: URLSearchParams): string 
   return query ? `${pathname}?${query}` : pathname;
 }
 
-export function detailLocation(pathname: string, identity: string, returnTo: string): string {
-  const query = new URLSearchParams({ returnTo }).toString();
-  return `${pathname}/${encodeURIComponent(identity)}?${query}`;
-}
+export { detailPath as detailLocation } from "../navigation.js";
 
 export function safeGovernanceReturnTo(
   value: string | null,

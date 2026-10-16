@@ -23,7 +23,7 @@ const defaults: ProjectOverviewViewProps = {
   onPrevious: () => undefined,
   onRetry: () => undefined,
   pageNumber: 1,
-  projectRef: "opaque-project-reference",
+  projectRef: "project:concurrent_development_mcp",
   repositories: [repository],
   repositoryCount: 1
 };
@@ -37,13 +37,16 @@ function render(overrides: Partial<ProjectOverviewViewProps>) {
 test("renders useful summary actions and Repository details in the overview", () => {
   const markup = render({});
 
-  assert.match(markup, /fs-1 fw-semibold">1<\/div>/);
-  assert.match(markup, /Open coordination/);
-  assert.match(markup, /Inspect resources/);
+  assert.match(markup, /1 registered repository/);
+  assert.match(markup, /Project overview/);
+  assert.match(markup, />View work items<\/a>/);
+  assert.match(markup, />View resources<\/a>/);
   assert.match(markup, /Coordinator/);
   assert.match(markup, /\/workspace\/coordinator/);
-  assert.match(markup, /row row-cols-1 row-cols-lg-2/);
-  assert.match(markup, /aria-label="Copy Repository ID"/);
+  assert.match(markup, /<caption class="visually-hidden">Repository members<\/caption>/);
+  assert.match(markup, /<th scope="col">Repository<\/th>/);
+  assert.match(markup, /<th[^>]*scope="row"[^>]*>.*Coordinator/s);
+  assert.match(markup, /018f0f4d-4e45-7abc-8def-000000000031/);
 });
 
 test("renders bounded contextual loading, failure, and available-data refresh states", () => {

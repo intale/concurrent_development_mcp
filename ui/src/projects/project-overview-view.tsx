@@ -1,5 +1,5 @@
-import { Link } from "react-router-dom";
-import { CopyIdentifier } from "../copy-identifier.js";
+import { ContextLink as Link, projectPath } from "../navigation.js";
+import { DataTable, Timestamp } from "../data-table.js";
 import { RetryRefresh } from "../retry-refresh.js";
 
 export interface ProjectOverviewRepository {
@@ -67,29 +67,9 @@ export function ProjectOverviewView(props: ProjectOverviewViewProps) {
           </RetryRefresh>
         </div>
       ) : null}
-      <div className="row g-3">
-        <div className="col-12 col-lg-6">
-          <div className="small-box text-bg-primary h-100">
-            <div className="inner">
-              <div className="fs-1 fw-semibold">{props.repositoryCount}</div>
-              <p>Registered {props.repositoryCount === 1 ? "Repository member" : "Repository members"}</p>
-            </div>
-            <i aria-hidden="true" className="small-box-icon bi bi-git" />
-          </div>
-        </div>
-        <div className="col-12 col-lg-6">
-          <div className="card h-100">
-            <div className="card-header"><h3 className="card-title">Continue work</h3></div>
-            <div className="card-body d-grid d-sm-flex gap-2">
-              <Link className="btn btn-primary" to={`/projects/${props.projectRef}/coordination`}>
-                Open coordination
-              </Link>
-              <Link className="btn btn-outline-primary" to={`/projects/${props.projectRef}/resources`}>
-                Inspect resources
-              </Link>
-            </div>
-          </div>
-        </div>
+      <div className="d-flex flex-wrap align-items-center justify-content-between gap-3 my-3">
+        <div><h2 className="h3 mb-1">Project overview</h2><p className="mb-0 text-body-secondary">{props.repositoryCount} registered {props.repositoryCount === 1 ? "repository" : "repositories"}. Choose a section in the sidebar to inspect work or knowledge.</p></div>
+        <div className="d-flex flex-wrap gap-2"><Link className="btn btn-primary" to={`${projectPath(props.projectRef)}/work-items`}>View work items</Link><Link className="btn btn-outline-secondary" to={`${projectPath(props.projectRef)}/resources`}>View resources</Link></div>
       </div>
       <section aria-labelledby="repository-members-heading" className="vstack gap-3">
         <div className="d-flex flex-wrap justify-content-between align-items-center gap-2">
@@ -108,35 +88,12 @@ export function ProjectOverviewView(props: ProjectOverviewViewProps) {
         {props.repositories.length === 0 ? (
           <div className="card"><div className="card-body">No Repository members are available on this page.</div></div>
         ) : (
-          <div className="row row-cols-1 row-cols-lg-2 g-3">
-            {props.repositories.map((repository) => (
-              <div className="col" key={repository.id}>
-                <article className="card h-100">
-                  <div className="card-header"><h4 className="card-title fw-semibold">{repository.displayName}</h4></div>
-                  <div className="card-body vstack gap-3">
-                    <div>
-                      <div className="small fw-semibold text-uppercase text-body-secondary">Paths</div>
-                      {repository.paths.length > 0
-                        ? repository.paths.map((path) => <div className="text-break" key={path}>{path}</div>)
-                        : <span className="text-body-secondary">No projected paths</span>}
-                    </div>
-                    <div>
-                      <div className="small fw-semibold text-uppercase text-body-secondary">Remotes</div>
-                      {repository.remotes.length > 0
-                        ? repository.remotes.map((remote) => <div className="text-break" key={remote}>{remote}</div>)
-                        : <span className="text-body-secondary">No projected remotes</span>}
-                    </div>
-                    <div className="small text-body-secondary">
-                      Registered <time dateTime={repository.registeredAt}>{formatted(repository.registeredAt)}</time>
-                    </div>
-                  </div>
-                  <div className="card-footer">
-                    <CopyIdentifier label="Repository ID" value={repository.id} />
-                  </div>
-                </article>
-              </div>
-            ))}
-          </div>
+          <DataTable caption="Repository members" rows={props.repositories} rowKey={(repository) => repository.id} columns={[
+            { key: "name", label: "Repository", render: (repository) => <><span className="fw-semibold">{repository.displayName}</span><div className="small text-body-secondary">{repository.id}</div></> },
+            { key: "paths", label: "Paths", render: (repository) => repository.paths.join(", ") || "No projected paths" },
+            { key: "remotes", label: "Remotes", className: "d-none d-lg-table-cell", render: (repository) => repository.remotes.join(", ") || "No projected remotes" },
+            { key: "registered", label: "Registered", render: (repository) => <Timestamp value={repository.registeredAt} /> }
+          ]} />
         )}
         <nav aria-label="Repository member pagination" className="d-flex justify-content-between gap-3">
           <button className="btn btn-outline-secondary" disabled={!props.canGoBack} onClick={props.onPrevious} type="button">
@@ -149,8 +106,4 @@ export function ProjectOverviewView(props: ProjectOverviewViewProps) {
       </section>
     </>
   );
-}
-
-function formatted(value: string): string {
-  return new Date(value).toLocaleString();
 }

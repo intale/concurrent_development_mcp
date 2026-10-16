@@ -1,6 +1,7 @@
 import { useEffect, useRef } from "react";
 import type { RefObject } from "react";
-import { Link, NavLink } from "react-router-dom";
+import { ContextLink as Link } from "../navigation.js";
+import { DataTable, TextPreview, Timestamp } from "../data-table.js";
 import { CopyIdentifier } from "../copy-identifier.js";
 import { RetryRefresh } from "../retry-refresh.js";
 import type {
@@ -20,21 +21,6 @@ export function useResourceHeading(title: string, focusKey: string): RefObject<H
   return headingRef;
 }
 
-export function ResourceNavigation({ basePath }: { readonly basePath: string }) {
-  const navClassName = ({ isActive }: { readonly isActive: boolean }) => `nav-link${isActive ? " active" : ""}`;
-  return (
-    <nav aria-label="Resource views" className="mb-3">
-      <ul className="nav nav-pills flex-column flex-sm-row gap-2">
-        <li className="nav-item">
-          <NavLink className={navClassName} to={`${basePath}/inventory`}>Resource inventory</NavLink>
-        </li>
-        <li className="nav-item">
-          <NavLink className={navClassName} to={`${basePath}/work-intentions`}>Active work intentions</NavLink>
-        </li>
-      </ul>
-    </nav>
-  );
-}
 
 export function LoadingState({ label }: { readonly label: string }) {
   return (
@@ -105,70 +91,35 @@ export function PaginationControls({ canPrevious, nextCursor, onNext, onPrevious
   );
 }
 
-export function ResourceCards({ connection, hrefFor }: {
+export function ResourceTable({ connection, hrefFor }: {
   readonly connection: ProjectResourceConnection;
   readonly hrefFor: (id: string) => string;
 }) {
-  if (connection.nodes.length === 0) {
-    return <div className="alert alert-info" role="status">No Resources match these filters.</div>;
-  }
   return (
-    <div aria-label="Project resources" className="row g-3">
-      {connection.nodes.map((resource) => (
-        <div className="col-12 col-xl-6" key={resource.id}>
-          <article className="card card-outline card-primary h-100">
-            <div className="card-body d-flex flex-column gap-2">
-              <div className="d-flex flex-wrap justify-content-between gap-2">
-                <h3 className="h5 text-break mb-0"><code>{resource.path}</code></h3>
-                <span className={`badge ${lifecycleBadgeClass(resource.lifecycleStatus)}`}>
-                  {resource.lifecycleStatus.toLowerCase()}
-                </span>
-              </div>
-              <div>{resource.kind.toLowerCase()}</div>
-              {resource.unbindingReason ? <div><strong>Reason:</strong> {resource.unbindingReason}</div> : null}
-              <div className="small text-body-secondary text-break">Repository {resource.repositoryId}</div>
-              <Link className="btn btn-primary align-self-start mt-auto" to={hrefFor(resource.id)}>
-                View Resource
-              </Link>
-            </div>
-          </article>
-        </div>
-      ))}
-    </div>
+    <DataTable caption="Project resources" rows={connection.nodes} rowKey={(resource) => resource.id} emptyMessage="No Resources match these filters." columns={[
+      { key: "path", label: "Path", render: (resource) => <><Link to={hrefFor(resource.id)}><code>{resource.path}</code></Link><div className="small text-body-secondary">{resource.id}</div></> },
+      { key: "kind", label: "Kind", render: (resource) => resource.kind.toLowerCase() },
+      { key: "status", label: "Status", render: (resource) => <span className={`badge ${lifecycleBadgeClass(resource.lifecycleStatus)}`}>{resource.lifecycleStatus.toLowerCase()}</span> },
+      { key: "repository", label: "Repository", className: "d-none d-xl-table-cell", render: (resource) => <span className="small text-body-secondary">{resource.repositoryId}{resource.unbindingReason ? ` · ${resource.unbindingReason}` : ""}</span> },
+      { key: "transition", label: "Last transition", render: (resource) => <Timestamp value={resource.lastTransitionAt} /> }
+    ]} />
   );
 }
 
-export function WorkIntentionCards({ connection, hrefFor }: {
+export function WorkIntentionTable({ connection, hrefFor }: {
   readonly connection: ResourceWorkIntentionConnection;
   readonly hrefFor: (id: string) => string;
 }) {
-  if (connection.nodes.length === 0) {
-    return <div className="alert alert-info" role="status">No active work intentions match these filters.</div>;
-  }
   return (
-    <div aria-label="Active Resource work intentions" className="row g-3">
-      {connection.nodes.map((intention) => (
-        <div className="col-12 col-xl-6" key={intention.id}>
-          <article className={`card card-outline ${intention.mode === "EXCLUSIVE" ? "card-danger" : "card-info"} h-100`}>
-            <div className="card-body d-flex flex-column gap-2">
-              <div className="d-flex flex-wrap justify-content-between gap-2">
-                <h3 className="h5 text-break mb-0"><code>{intention.resourcePath}</code></h3>
-                <span className={`badge ${workIntentionBadgeClass(intention.status)}`}>
-                  {intention.status.toLowerCase()}
-                </span>
-              </div>
-              <div><strong>{intention.mode.toLowerCase()} intention:</strong> {intention.purpose}</div>
-              {intention.context ? <div><strong>Context:</strong> {intention.context}</div> : null}
-              <div><strong>Agent:</strong> {intention.agentId}</div>
-              <div><strong>WorkItem:</strong> <code className="text-break">{intention.workItemId}</code></div>
-              <div className="small text-body-secondary text-break">Attempt {intention.attemptId}</div>
-              <Link className="btn btn-outline-primary align-self-start mt-auto" to={hrefFor(intention.id)}>
-                View work intention
-              </Link>
-            </div>
-          </article>
-        </div>
-      ))}
+    <div>
+      <DataTable caption="Active Resource work intentions" rows={connection.nodes} rowKey={(intention) => intention.id} emptyMessage="No active work intentions match these filters." columns={[
+        { key: "resource", label: "Resource path", render: (intention) => <Link to={hrefFor(intention.id)}><code>{intention.resourcePath}</code></Link> },
+        { key: "mode", label: "Mode", render: (intention) => <><span className={`badge ${intention.mode === "EXCLUSIVE" ? "text-bg-danger" : "text-bg-info"}`}>{intention.mode.toLowerCase()}</span><div className={`small badge ${workIntentionBadgeClass(intention.status)}`}>{intention.status.toLowerCase()}</div></> },
+        { key: "agent", label: "Agent", render: (intention) => intention.agentId },
+        { key: "purpose", label: "Purpose", render: (intention) => <><TextPreview text={intention.purpose} />{intention.context ? <div className="small text-body-secondary"><TextPreview text={intention.context} /></div> : null}</> },
+        { key: "workItem", label: "Work item", render: (intention) => <><code>{intention.workItemId}</code><div className="small text-body-secondary">Attempt {intention.attemptId}</div></> },
+        { key: "expires", label: "Expires", render: (intention) => <Timestamp value={intention.expiresAt} /> }
+      ]} />
       <p className="small text-body-secondary mb-0">
         Active as of {formatted(connection.asOf)}. These are advisory intentions, not merge guarantees.
       </p>
@@ -239,10 +190,10 @@ export function WorkIntentionDetail({ intention, backTo, projectPath }: {
           ["ChangeSet", intention.changeSetId]
         ]} />
         <div className="d-flex flex-wrap gap-2">
-          <Link className="btn btn-outline-primary" to={`${projectPath}/coordination/work-items/${encodeURIComponent(intention.workItemId)}`}>
+          <Link className="btn btn-outline-primary" to={`${projectPath}/work-items/${encodeURIComponent(intention.workItemId)}`}>
             View WorkItem
           </Link>
-          <Link className="btn btn-outline-primary" to={`${projectPath}/resources/inventory/${encodeURIComponent(intention.resourceId)}`}>
+          <Link className="btn btn-outline-primary" to={`${projectPath}/resources/${encodeURIComponent(intention.resourceId)}`}>
             View Resource
           </Link>
         </div>

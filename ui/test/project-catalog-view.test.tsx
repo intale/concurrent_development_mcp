@@ -12,7 +12,7 @@ import { ProjectCatalogView } from "../src/projects/project-catalog-view.js";
 import type { ProjectCatalogViewProps } from "../src/projects/project-catalog-view.js";
 
 const project = {
-  projectRef: "eyJzY2hlbWEiOiJwcm9qZWN0LXJlZmVyZW5jZS92MSIsInNjb3BlIjoicHJvamVjdDpjYXRhbG9nIn0",
+  projectRef: "project:catalog",
   displayLabel: "Catalog",
   repositoryCount: 2,
   scope: "project:catalog",
@@ -60,16 +60,18 @@ test("renders loading, unrefined empty, refined empty, and retryable error state
   assert.match(error, /Retry/);
 });
 
-test("shows explicit Repository membership and one visible primary Project action", () => {
+test("shows Project identity and Repository membership in a semantic table", () => {
   const markup = render({ rows: [project] });
 
   assert.match(markup, /Catalog API/);
   assert.match(markup, /Catalog UI/);
-  assert.match(markup, /2 Repositories/);
-  assert.match(markup, /row row-cols-1 row-cols-xl-2/);
-  assert.match(markup, /card-footer d-grid/);
-  assert.match(markup, />Open project/);
-  assert.doesNotMatch(markup, />Coordination<\/a>.*>Resources<\/a>/);
+  assert.match(markup, /<caption class="visually-hidden">Projects<\/caption>/);
+  assert.match(markup, /<th scope="col">Repositories<\/th>/);
+  assert.match(markup, /<th[^>]*scope="col">Repository members<\/th>/);
+  assert.match(markup, /<th[^>]*scope="row"[^>]*><a[^>]*aria-label="Open project Catalog"[^>]*>Catalog<\/a><div class="small text-body-secondary d-md-none">project:catalog<\/div><\/th>/);
+  assert.match(markup, /class="d-none d-md-table-cell" scope="col">Scope<\/th>/);
+  assert.match(markup, /<td[^>]*>2<\/td>/);
+  assert.doesNotMatch(markup, /<article/);
   assert.match(markup, new RegExp(`/projects/${project.projectRef}`));
 });
 

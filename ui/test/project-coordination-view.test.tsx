@@ -17,10 +17,10 @@ import {
   safeReturnTo
 } from "../src/coordination/project-coordination-model.js";
 import {
-  ChangeSetCards,
-  CoordinationNavigation,
-  DependencyCards,
-  WorkItemCards,
+  ChangeSetTable,
+  DependencyTable,
+  PaginationControls,
+  WorkItemTable,
   WorkItemDetail
 } from "../src/coordination/project-coordination-view.js";
 
@@ -74,19 +74,28 @@ function render(node: ReactNode): string {
   return renderToStaticMarkup(<MemoryRouter>{node}</MemoryRouter>);
 }
 
-test("focused collection cards lead with meaning and one adjacent detail action", () => {
-  const changeSets = render(<ChangeSetCards hrefFor={(id) => `/change-sets/${id}`} items={[changeSet]} />);
-  const workItems = render(<WorkItemCards hrefFor={(id) => `/work-items/${id}`} items={[workItem]} />);
-  const dependencies = render(<DependencyCards hrefFor={(id) => `/dependencies/${id}`} items={[dependency]} />);
+test("coordination collections show semantic columns, row identities, and detail links", () => {
+  const changeSets = render(<ChangeSetTable hrefFor={(id) => `/change-sets/${id}`} items={[changeSet]} />);
+  const workItems = render(<WorkItemTable hrefFor={(id) => `/work-items/${id}`} items={[workItem]} />);
+  const dependencies = render(<DependencyTable hrefFor={(id) => `/dependencies/${id}`} items={[dependency]} />);
 
   assert.match(changeSets, /Keep two agents coordinated/);
-  assert.match(changeSets, /View ChangeSet/);
+  assert.match(changeSets, /<caption class="visually-hidden">ChangeSets<\/caption>/);
+  assert.match(changeSets, /<th scope="col">Status<\/th>/);
+  assert.match(changeSets, /scope="row"[^>]*><a aria-label="View ChangeSet CS-focused"/);
+  assert.match(changeSets, /href="\/change-sets\/CS-focused"/);
   assert.match(workItems, /Implement the focused list/);
   assert.match(workItems, /luna-one/);
   assert.match(workItems, /running/);
+  assert.match(workItems, /<caption class="visually-hidden">Scheduled WorkItems<\/caption>/);
+  assert.match(workItems, /<th[^>]*scope="col">Attempt<\/th>/);
+  assert.match(workItems, /href="\/work-items\/W-luna-one"/);
   assert.match(dependencies, /blocking/);
   assert.match(dependencies, /W-producer/);
-  assert.match(dependencies, /View dependency/);
+  assert.match(dependencies, /<caption class="visually-hidden">WorkItem dependencies<\/caption>/);
+  assert.match(dependencies, /<th scope="col">Consumer<\/th>/);
+  assert.match(dependencies, /href="\/dependencies\/D-producer-consumer"/);
+  assert.doesNotMatch(`${changeSets}${workItems}${dependencies}`, /<article/);
 });
 
 test("WorkItem detail keeps Attempt and checkpoint facts beside the selected record", () => {
@@ -143,28 +152,26 @@ test("applying exact WorkItem filters trims values and resets paging", () => {
   assert.deepEqual(next.getAll("trail"), []);
 });
 
-test("detail URLs retain a refresh-safe Back target inside the focused collection", () => {
-  const list = "/projects/project-ref/coordination/work-items?status=RUNNING&after=cursor-one";
-  const detail = detailLocation("/projects/project-ref/coordination/work-items", workItem.id, list);
-  const returnTo = new URL(detail, "https://coordinator.test").searchParams.get("returnTo");
+test("detail URLs keep identities readable and return context out of the URL", () => {
+  const list = "/projects/project:concurrent_development_mcp/work-items?status=RUNNING&after=cursor-one";
+  const detail = detailLocation("/projects/project:concurrent_development_mcp/work-items", workItem.id);
 
-  assert.equal(safeReturnTo(returnTo, "/projects/project-ref/coordination/work-items"), list);
+  assert.equal(detail, `/projects/project:concurrent_development_mcp/work-items/${workItem.id}`);
+  assert.equal(new URL(detail, "https://coordinator.test").search, "");
+  assert.equal(safeReturnTo(list, "/projects/project:concurrent_development_mcp/work-items"), list);
   assert.equal(
-    safeReturnTo("/projects/another-project/coordination/work-items", "/projects/project-ref/coordination/work-items"),
-    "/projects/project-ref/coordination/work-items"
+    safeReturnTo("/projects/project:another/work-items", "/projects/project:concurrent_development_mcp/work-items"),
+    "/projects/project:concurrent_development_mcp/work-items"
   );
   assert.equal(
-    safeReturnTo("/projects/project-ref/coordination/work-items-elsewhere", "/projects/project-ref/coordination/work-items"),
-    "/projects/project-ref/coordination/work-items"
+    safeReturnTo("/projects/project:concurrent_development_mcp/work-items-elsewhere", "/projects/project:concurrent_development_mcp/work-items"),
+    "/projects/project:concurrent_development_mcp/work-items"
   );
 });
 
-test("coordination navigation identifies the current focused collection", () => {
-  const markup = renderToStaticMarkup(
-    <MemoryRouter initialEntries={["/projects/project-ref/coordination/work-items"]}>
-      <CoordinationNavigation basePath="/projects/project-ref/coordination" />
-    </MemoryRouter>
-  );
-
-  assert.match(markup, /aria-current="page"[^>]*class="nav-link active"[^>]*>WorkItems/);
+test("pagination controls expose the enabled and disabled cursor actions", () => {
+  const markup = render(<PaginationControls canPrevious nextCursor="next" onNext={() => undefined} onPrevious={() => undefined} />);
+  assert.match(markup, /Previous/);
+  assert.match(markup, /Next/);
+  assert.match(markup, /aria-label="Collection pages"/);
 });

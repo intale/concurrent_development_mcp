@@ -343,7 +343,7 @@ module ProjectCoordinationGraphqlSpec
     end
 
     it "maps malformed Project references to a typed error" do
-      payload = execute(CHANGE_SETS_QUERY, projectRef: "not-a-project-reference", first: 20)
+      payload = execute(CHANGE_SETS_QUERY, projectRef: " project:invalid", first: 20)
 
       expect(payload.dig("errors", 0, "extensions", "code")).to eq("INVALID_PROJECT_REFERENCE")
     end

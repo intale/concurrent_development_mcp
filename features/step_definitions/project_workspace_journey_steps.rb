@@ -17,7 +17,9 @@ end
 When("the person pages and filters the live Project catalog") do
   browser_resize_to(1_440, 1_000)
   visit "/projects"
-  assert_selector("article", count: 20)
+  browser_assert_table!
+  assert_selector("table tbody tr", count: 20)
+  assert_selector("table tbody th[scope='row']", count: 20)
 
   click_button "Next page"
   assert_text(/Page 2 · \d+ Projects?/)
@@ -27,7 +29,7 @@ When("the person pages and filters the live Project catalog") do
   fill_in "Search", with: @browser_catalog_scope
   click_button "Apply search"
   assert_text "UI journey 21"
-  assert_selector("article", count: 1)
+  assert_selector("table tbody tr", text: "UI journey 21", count: 1)
 
   page.execute_script(<<~JAVASCRIPT)
     window.history.pushState({}, "", `${window.location.pathname}${window.location.search}&after=invalid-cursor`);
@@ -42,9 +44,12 @@ Then("a real cursor failure is bounded and Back restores the prior Project page"
   assert_text "UI journey 21"
 end
 
-Then("the selected Project opens without exposing its opaque route identity") do
-  click_link "Open project"
+Then("the selected Project opens at its readable exact-scope route") do
+  click_link "UI journey 21", exact: true
   @browser_project_path = page.current_path
+  route_scope = CGI.unescape(URI.parse(@browser_project_path).path.split("/")[2])
+  assert_acceptance_equal(@browser_catalog_scope, route_scope, "Readable exact-scope route")
+  assert_acceptance(!page.current_url.include?("returnTo="), "Project route added a returnTo query")
   assert_selector("h1", text: "UI journey 21", exact_text: true)
   assert_acceptance(
     browser_focused_text == "UI journey 21",
@@ -57,7 +62,7 @@ Then("browser Back and refresh preserve the selected Project context") do
   assert_acceptance_equal(@browser_catalog_scope, find_field("Search").value, "Restored Project search")
   assert_text "UI journey 21"
 
-  click_link "Open project"
+  click_link "UI journey 21", exact: true
   assert_acceptance(page.current_path == @browser_project_path, "Project route changed after Back")
   page.refresh
   assert_selector("h1", text: "UI journey 21", exact_text: true)
@@ -107,23 +112,23 @@ end
 
 When("the person follows the live Coordination routes") do
   browser_open_project(@coordination_dashboard_project_ref)
-  click_link "Coordination", exact: true
+  click_link "Change sets", exact: true
   assert_selector("h2", text: "ChangeSets", exact_text: true)
   browser_assert_latest_update_sort
 
-  browser_click_card("CS-detail", "View ChangeSet")
+  browser_click_row("CS-detail")
   @coordination_browser_details = [ browser_record_refreshable_detail("ChangeSet detail") ]
   click_link "Back to ChangeSets"
 
-  click_link "WorkItems", exact: true
-  browser_click_card("W-detail", "View WorkItem")
+  click_link "Work items", exact: true
+  browser_click_row("W-detail")
   @coordination_browser_details << browser_record_refreshable_detail("WorkItem detail")
   assert_text "CAND-detail"
   click_link "Back to WorkItems"
 
   click_link "Dependencies", exact: true
   browser_assert_latest_update_sort
-  browser_click_card("D-browser-detail", "View dependency")
+  browser_click_row("D-browser-detail")
   @coordination_browser_details << browser_record_refreshable_detail("Dependency detail")
 end
 
@@ -137,14 +142,14 @@ When("the person follows the live Resource routes") do
   assert_selector("h2", text: "Resource inventory", exact_text: true)
   browser_assert_latest_update_sort
 
-  browser_click_card("app/models/first.rb", "View Resource")
+  browser_click_row("app/models/first.rb")
   @resource_browser_details = [ browser_record_refreshable_detail("Resource detail") ]
   click_link "Back to Resource inventory"
   assert_selector("h2", text: "Resource inventory", exact_text: true, wait: 10)
 
-  click_link "Active work intentions", exact: true
+  click_link "Work intentions", exact: true
   browser_assert_latest_update_sort
-  browser_click_card("app/models/first.rb", "View work intention")
+  browser_click_row("app/models/first.rb")
   @resource_browser_details << browser_record_refreshable_detail("Resource work-intention detail")
 end
 
@@ -155,27 +160,30 @@ end
 
 When("the person follows the live Knowledge routes") do
   browser_open_project(@knowledge_browser_project_ref)
-  click_link "Knowledge", exact: true
+  click_link "Skills", exact: true
   assert_selector("h2", text: "Skills", exact_text: true)
   browser_assert_latest_update_sort
 
-  browser_click_card("event-modeling", "View Skill")
+  browser_click_row("event-modeling")
   @knowledge_browser_details = [ browser_record_refreshable_detail("Skill detail") ]
   assert_text "Current instructions"
   assert_no_text "Obsolete instructions"
 
-  find(".list-group-item", text: "references/current.md").click_link("View asset")
+  click_link "references/current.md", exact: true
   @knowledge_browser_details << browser_record_refreshable_detail("Skill asset")
   click_link "Back to Skill"
+  click_link "Back to Skills"
+  assert_selector("table tbody tr", text: "event-modeling", wait: 10)
+  assert_acceptance(!page.current_url.include?("returnTo="), "Skill Back route added a returnTo query")
 
-  click_link "Development Artifacts", exact: true
+  click_link "Development artifacts", exact: true
   browser_assert_latest_update_sort
-  browser_click_card("Parent README", "View Artifact")
+  browser_click_row("Parent README")
   @knowledge_browser_details << browser_record_refreshable_detail("Artifact detail")
   click_link "View 1 relationships"
   @knowledge_browser_details << browser_record_refreshable_detail("Artifact relationships")
   assert_text "Child guide"
-  click_link "View related Artifact"
+  click_link "Child guide", exact: true
   assert_selector("h2", text: "Artifact detail", exact_text: true)
 end
 
@@ -196,30 +204,30 @@ end
 
 When("the person follows the live Governance routes") do
   browser_open_project(@governance_browser_project_ref)
-  click_link "Governance", exact: true
+  click_link "Decisions", exact: true
   assert_selector("h2", text: "Decisions", exact_text: true)
   browser_assert_latest_update_sort
 
   @governance_browser_details = []
-  browser_click_card(governance_decision_id, "View Decision")
+  browser_click_row(governance_decision_id)
   @governance_browser_details << browser_record_refreshable_detail("Decision detail")
   click_link "Back to Decisions", match: :first
 
   click_link "Guidance", exact: true
   browser_assert_latest_update_sort
-  browser_click_card(governance_message_id, "View Guidance")
+  browser_click_row(governance_message_id)
   @governance_browser_details << browser_record_refreshable_detail("Guidance detail")
   click_link "Back to Guidance", match: :first
 
-  click_link "AgentChoices", exact: true
+  click_link "Agent choices", exact: true
   browser_assert_latest_update_sort
-  click_link "View AgentChoice", match: :first
+  browser_click_row(governance_choice_id)
   @governance_browser_details << browser_record_refreshable_detail("AgentChoice detail")
   click_link "Back to AgentChoices", match: :first
 
   click_link "Decision impacts", exact: true
   browser_assert_latest_update_sort
-  click_link "View impact", match: :first
+  browser_click_row(governance_impact_id)
   @governance_browser_details << browser_record_refreshable_detail("Decision impact detail")
 end
 
@@ -233,26 +241,26 @@ end
 
 When("the person follows the live Delivery routes") do
   browser_open_project(@delivery_project_ref)
-  click_link "Delivery", exact: true
+  click_link "Checkpoints", exact: true
   assert_selector("h2", text: "Candidate checkpoints", exact_text: true)
 
   @delivery_browser_details = []
-  click_link @delivery_detail_candidate.candidate_id, exact: true
+  browser_click_row(@delivery_detail_candidate.candidate_id)
   @delivery_browser_details << browser_record_refreshable_detail("Candidate checkpoint detail")
   click_link "Back to Candidates"
 
-  click_link "Obligations", exact: true
-  click_link @delivery_obligation.obligation_id, exact: true
+  click_link "Verification", exact: true
+  browser_click_row(@delivery_obligation.obligation_id)
   @delivery_browser_details << browser_record_refreshable_detail("Verification obligation detail")
   click_link "Back to Obligations"
 
   click_link "Merge snapshots", exact: true
-  click_link "MS-cucumber-delivery", exact: true
+  browser_click_row("MS-cucumber-delivery")
   @delivery_browser_details << browser_record_refreshable_detail("Merge snapshot detail")
   click_link "Back to Merge snapshots"
 
-  click_link "ReleaseSets", exact: true
-  click_link "RS-cucumber-delivery", exact: true
+  click_link "Release sets", exact: true
+  browser_click_row("RS-cucumber-delivery")
   @delivery_browser_details << browser_record_refreshable_detail("ReleaseSet detail")
 end
 
@@ -317,20 +325,20 @@ end
 When("the person follows the live global routes") do
   browser_resize_to(1_440, 1_000)
   visit "/projects"
-  click_link "Skills", exact: true
+  click_link "All skills", exact: true
   assert_selector("h1", text: "Skills", exact_text: true)
   browser_assert_latest_update_sort
   fill_in "Exact Project scope", with: @browser_skill.scope
   fill_in "Exact Skill name", with: @browser_skill.name
   click_button "Apply"
-  assert_selector("article", text: @browser_skill.name, count: 1)
+  assert_selector("table tbody tr", text: @browser_skill.name, count: 1)
   select "Oldest first", from: "Latest update"
   assert_current_path(/sort=OLDEST_FIRST/, ignore_query: false)
   page.refresh
-  assert_selector("article", text: @browser_skill.name, count: 1)
-  browser_click_card(@browser_skill.name, "View Skill")
+  assert_selector("table tbody tr", text: @browser_skill.name, count: 1)
+  browser_click_row(@browser_skill.name)
   @global_skill_details = [ browser_record_refreshable_detail("Skill detail", selector: "h1") ]
-  find(".list-group-item", text: "references/status.md").click_link("View asset")
+  click_link "references/status.md", exact: true
   @global_skill_details << browser_record_refreshable_detail("Skill asset", selector: "h1")
   @global_skill_gfm = {
     table: page.has_css?("table.table.table-striped"),
@@ -338,26 +346,35 @@ When("the person follows the live global routes") do
     deleted: page.has_css?("del", text: "obsolete"),
     script: page.has_css?("script", text: "unsafe", visible: :all)
   }
+  click_link "Back to Skill"
+  click_link "Back to Skills"
+  assert_selector("table tbody tr", text: @browser_skill.name, count: 1)
+  assert_acceptance(page.current_url.include?("sort=OLDEST_FIRST"), "Skill list filters were not preserved")
+  assert_acceptance(!page.current_url.include?("returnTo="), "Skill Back route added a returnTo query")
 
   click_link "Command receipts", exact: true
   assert_selector("h1", text: "Command receipts", exact_text: true)
-  @browser_receipt_card = find("article", text: @browser_command_id)
+  @browser_receipt_row = find("table tbody tr", text: @browser_command_id)
 
-  @browser_receipt_layout = page.evaluate_script(<<~JAVASCRIPT, @browser_receipt_card)
+  @browser_receipt_layout = page.evaluate_script(<<~JAVASCRIPT, @browser_receipt_row)
     (() => {
-      const card = arguments[0];
-      const header = card.querySelector(".card-header").getBoundingClientRect();
-      const identity = card.querySelector("code").getBoundingClientRect();
-      const badge = card.querySelector(".badge").getBoundingClientRect();
+      const row = arguments[0];
+      const firstCell = row.querySelector("th, td");
+      const statusBadge = row.querySelector(".badge");
+      const cell = firstCell.getBoundingClientRect();
+      const identityNode = firstCell.querySelector("a, code") || firstCell;
+      const identity = identityNode.getBoundingClientRect();
+      const badge = statusBadge.getBoundingClientRect();
       return {
-        identityWithinHeader: identity.left >= header.left && identity.right <= header.right,
-        identityBelowBadge: identity.top >= badge.bottom
+        identityWithinFirstCell: identity.left >= cell.left && identity.right <= cell.right,
+        statusInSeparateCell: statusBadge.parentElement !== firstCell,
+        identityDoesNotOverlapStatus: identity.right <= badge.left || badge.right <= identity.left || identity.bottom <= badge.top || badge.bottom <= identity.top
       };
     })()
   JAVASCRIPT
 
   @global_browser_details = []
-  @browser_receipt_card.click_link "Open receipt"
+  @browser_receipt_row.find("a", match: :first).click
   @browser_receipt_detail_layout = page.evaluate_script(<<~JAVASCRIPT)
     (() => {
       const header = document.querySelector("article .card-header").getBoundingClientRect();
@@ -375,7 +392,7 @@ When("the person follows the live global routes") do
 
   click_link "Operation batches", exact: true
   assert_selector("h1", text: "Operation batches", exact_text: true)
-  browser_click_card(@browser_batch.batch_id, "Open batch")
+  browser_click_row(@browser_batch.batch_id)
   @global_browser_details << browser_record_refreshable_detail("Operation batch", selector: "h1")
 end
 
@@ -388,8 +405,9 @@ Then("global Skills remain filterable and render safe GFM on focused pages") do
 end
 
 Then("the long command identity does not collide with its tool or status") do
-  assert_acceptance(@browser_receipt_layout.fetch("identityWithinHeader"), "Command identity escaped its card header")
-  assert_acceptance(@browser_receipt_layout.fetch("identityBelowBadge"), "Command identity collided with the status")
+  assert_acceptance(@browser_receipt_layout.fetch("identityWithinFirstCell"), "Command identity escaped its table identity cell")
+  assert_acceptance(@browser_receipt_layout.fetch("statusInSeparateCell"), "Command status was not displayed in a separate table cell")
+  assert_acceptance(@browser_receipt_layout.fetch("identityDoesNotOverlapStatus"), "Command identity collided with the status")
   assert_acceptance(@browser_receipt_detail_layout.fetch("identityWithinHeader"), "Detail identity escaped its card header")
   assert_acceptance(@browser_receipt_detail_layout.fetch("identityBelowBadge"), "Detail identity collided with the status")
   assert_acceptance(@browser_receipt_detail_layout.fetch("identityHasReadableWidth"), "Detail identity was squeezed below readable width")
@@ -402,16 +420,35 @@ end
 
 def browser_open_project(project_ref)
   browser_resize_to(1_440, 1_000)
-  visit "/projects/#{project_ref}"
+  visit "/projects/#{browser_route_segment(project_ref)}"
   assert_selector("h1", wait: 10)
+end
+
+def browser_route_segment(value)
+  ERB::Util.url_encode(value).gsub("+", "%20").gsub("%3A", ":")
 end
 
 def browser_resize_to(width, height)
   page.current_window.resize_to(width, height)
+  browser = page.driver.browser
+  browser.bidi.send_cmd(
+    "browsingContext.setViewport",
+    context: browser.window_handle,
+    viewport: { width:, height: }
+  )
+  assert_acceptance_equal(width, page.evaluate_script("window.innerWidth"), "Actual browser viewport width")
 end
 
-def browser_click_card(identity, action)
-  find("article", text: identity, match: :first, wait: 10).click_link(action)
+def browser_click_row(identity)
+  browser_assert_table!
+  row = find("table tbody tr", text: identity, match: :first, wait: 10)
+  row.find("a", match: :first).click
+end
+
+def browser_assert_table!
+  assert_selector("table thead tr th[scope='col']", minimum: 1, wait: 10)
+  assert_selector("table tbody tr th[scope='row']", minimum: 1, wait: 10)
+  assert_no_selector("main > article")
 end
 
 def browser_assert_latest_update_sort(value = "NEWEST_FIRST")

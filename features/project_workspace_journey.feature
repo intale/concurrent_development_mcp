@@ -10,7 +10,7 @@ Feature: Navigate the read-only coordination workspace in a real browser
       Given twenty one projected Projects are available for browser discovery
       When the person pages and filters the live Project catalog
       Then a real cursor failure is bounded and Back restores the prior Project page
-      And the selected Project opens without exposing its opaque route identity
+      And the selected Project opens at its readable exact-scope route
       And browser Back and refresh preserve the selected Project context
       And the Project remains operable at 390 and 320 pixels
 

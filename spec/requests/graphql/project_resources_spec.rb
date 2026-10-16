@@ -245,7 +245,7 @@ RSpec.describe "Project resource GraphQL", :read_model do
   end
 
   it "maps malformed Project references and Resource identifiers to typed errors" do
-    bad_project = execute(RESOURCES_QUERY, projectRef: "not-a-project", first: 20)
+    bad_project = execute(RESOURCES_QUERY, projectRef: " project:invalid", first: 20)
     bad_resource = execute(RESOURCE_QUERY, projectRef: project_ref, resourceId: "not-a-resource")
 
     expect(bad_project.dig("errors", 0, "extensions", "code")).to eq("INVALID_PROJECT_REFERENCE")

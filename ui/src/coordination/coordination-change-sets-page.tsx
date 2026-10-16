@@ -1,21 +1,21 @@
+import { projectPath, navigationReturnTo, ContextLink as Link } from "../navigation.js";
 import { useQuery } from "@tanstack/react-query";
-import { Link, useParams, useSearchParams } from "react-router-dom";
+import { useParams, useSearchParams, useLocation } from "react-router-dom";
 import { useProjectWorkspace } from "../projects/project-workspace-shell.js";
 import { LatestUpdateSortControl, latestUpdateSortParams, parseLatestUpdateSort } from "../latest-update-sort.js";
 import { fetchProjectChangeSet, fetchProjectChangeSets } from "./project-coordination-api.js";
 import type { ChangeSetStatus } from "./project-coordination-api.js";
 import {
   detailLocation,
-  listLocation,
   nextPageParams,
   previousPageParams,
   safeReturnTo
 } from "./project-coordination-model.js";
 import {
   AvailableStale,
-  ChangeSetCards,
+  ChangeSetTable,
   ChangeSetDetail,
-  CoordinationNavigation,
+
   InitialError,
   LoadingState,
   PaginationControls,
@@ -39,7 +39,7 @@ function ChangeSetListPage() {
     requestedStatus === "active" || requestedStatus === "completed"
     ? requestedStatus
     : undefined;
-  const basePath = `/projects/${projectRef}/coordination`;
+  const basePath = `${projectPath(projectRef)}`;
   const listPath = `${basePath}/change-sets`;
   const headingRef = useCoordinationHeading(`ChangeSets · ${project.displayLabel}`, after ?? "first");
   const query = useQuery({
@@ -52,7 +52,7 @@ function ChangeSetListPage() {
 
   return (
     <div className="vstack gap-3">
-      <CoordinationNavigation basePath={basePath} />
+
       <div><h2 className="h3 mb-1" ref={headingRef} tabIndex={-1}>ChangeSets</h2><p className="text-body-secondary mb-0">Goals and progress across every Repository member in this Project.</p></div>
       <form aria-label="ChangeSet filters" className="card card-body">
         <div className="row g-3 align-items-end">
@@ -86,8 +86,8 @@ function ChangeSetListPage() {
       {connection ? (
         <>
           {errorMessage ? <AvailableStale message={errorMessage} onRetry={() => { void query.refetch(); }} /> : null}
-          <ChangeSetCards
-            hrefFor={(id) => detailLocation(listPath, id, listLocation(listPath, searchParams))}
+          <ChangeSetTable
+            hrefFor={(id) => detailLocation(listPath, id)}
             items={connection.nodes}
           />
           <PaginationControls
@@ -104,10 +104,9 @@ function ChangeSetListPage() {
 
 function ChangeSetDetailPage({ changeSetId }: { readonly changeSetId: string }) {
   const { project, projectRef } = useProjectWorkspace();
-  const [searchParams] = useSearchParams();
-  const basePath = `/projects/${projectRef}/coordination`;
+  const basePath = `${projectPath(projectRef)}`;
   const listPath = `${basePath}/change-sets`;
-  const backTo = safeReturnTo(searchParams.get("returnTo"), listPath);
+  const backTo = safeReturnTo(navigationReturnTo(useLocation().state), listPath);
   const headingRef = useCoordinationHeading(`ChangeSet · ${project.displayLabel}`, changeSetId);
   const query = useQuery({
     queryKey: ["project-change-set", projectRef, changeSetId],
@@ -119,7 +118,7 @@ function ChangeSetDetailPage({ changeSetId }: { readonly changeSetId: string }) 
 
   return (
     <div className="vstack gap-3">
-      <CoordinationNavigation basePath={basePath} />
+
       <div><Link className="btn btn-outline-secondary mb-3" to={backTo}>← Back to ChangeSets</Link><h2 className="h3 mb-0" ref={headingRef} tabIndex={-1}>ChangeSet detail</h2></div>
       {query.isPending ? <LoadingState label="ChangeSet detail" /> : null}
       {errorMessage && !item ? <InitialError label="ChangeSet detail" message={errorMessage} onRetry={() => { void query.refetch(); }} /> : null}

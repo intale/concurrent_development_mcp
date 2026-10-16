@@ -1,6 +1,7 @@
+import { projectPath, navigationReturnTo, ContextLink as Link } from "../navigation.js";
 import { useEffect, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { Link, useParams, useSearchParams } from "react-router-dom";
+import { useParams, useSearchParams, useLocation } from "react-router-dom";
 import type { ResourceKind, ResourceLifecycleStatus, ResourceWorkIntentionMode } from "../gql/graphql.js";
 import { useProjectWorkspace } from "../projects/project-workspace-shell.js";
 import { LatestUpdateSortControl, latestUpdateSortParams, parseLatestUpdateSort } from "../latest-update-sort.js";
@@ -14,7 +15,6 @@ import type { ResourceFilters, WorkIntentionFilters } from "./project-resources-
 import {
   applyFilters,
   detailLocation,
-  listLocation,
   nextPageParams,
   preserveCollection,
   preserveDetail,
@@ -27,13 +27,13 @@ import {
 import {
   AvailableStale,
   InitialError,
-  WorkIntentionCards,
+  WorkIntentionTable,
   WorkIntentionDetail,
   LoadingState,
   PaginationControls,
-  ResourceCards,
+  ResourceTable,
   ResourceDetail,
-  ResourceNavigation,
+
   useResourceHeading
 } from "./project-resources-view.js";
 
@@ -59,8 +59,7 @@ export function ProjectResourceWorkIntentionsPage() {
 
 function ResourceInventoryPage({ projectRef }: { readonly projectRef: string }) {
   const [searchParams, setSearchParams] = useSearchParams();
-  const listPath = `/projects/${projectRef}/resources/inventory`;
-  const sectionPath = `/projects/${projectRef}/resources`;
+  const listPath = `${projectPath(projectRef)}/resources`;
   const path = searchParams.get("path") ?? "";
   const resourceKind = validResourceKind(searchParams.get("kind"));
   const lifecycle = validLifecycle(searchParams.get("lifecycle"));
@@ -106,7 +105,7 @@ function ResourceInventoryPage({ projectRef }: { readonly projectRef: string }) 
 
   return (
     <div className="vstack gap-3">
-      <ResourceNavigation basePath={sectionPath} />
+
       <div>
         <h2 className="h3 mb-1" ref={headingRef} tabIndex={-1}>Resource inventory</h2>
         <p className="text-body-secondary mb-0">Find files and directories across every Repository in this exact Project.</p>
@@ -148,9 +147,9 @@ function ResourceInventoryPage({ projectRef }: { readonly projectRef: string }) 
       {connection ? (
         <>
           {errorMessage ? <AvailableStale message={errorMessage} onRetry={() => { void query.refetch(); }} /> : null}
-          <ResourceCards
+          <ResourceTable
             connection={connection}
-            hrefFor={(id) => detailLocation(listPath, id, listLocation(listPath, searchParams))}
+            hrefFor={(id) => detailLocation(listPath, id)}
           />
           <PaginationControls
             canPrevious={searchParams.getAll("trail").length > 0}
@@ -168,9 +167,8 @@ function ResourceDetailPage({ projectRef, resourceId }: {
   readonly projectRef: string;
   readonly resourceId: string;
 }) {
-  const [searchParams] = useSearchParams();
-  const listPath = `/projects/${projectRef}/resources/inventory`;
-  const backTo = safeReturnTo(searchParams.get("returnTo"), listPath);
+  const listPath = `${projectPath(projectRef)}/resources`;
+  const backTo = safeReturnTo(navigationReturnTo(useLocation().state), listPath);
   const headingRef = useResourceHeading("Resource detail", resourceId);
   const query = useQuery({
     queryKey: ["project-resource", projectRef, resourceId],
@@ -188,7 +186,7 @@ function ResourceDetailPage({ projectRef, resourceId }: {
 
   return (
     <div className="vstack gap-3">
-      <ResourceNavigation basePath={`/projects/${projectRef}/resources`} />
+
       <div>
         <Link className="btn btn-outline-secondary mb-3" to={backTo}>← Back to Resource inventory</Link>
         <h2 className="h3 mt-2 mb-1" ref={headingRef} tabIndex={-1}>Resource detail</h2>
@@ -204,8 +202,7 @@ function ResourceDetailPage({ projectRef, resourceId }: {
 
 function ActiveWorkIntentionPage({ projectRef }: { readonly projectRef: string }) {
   const [searchParams, setSearchParams] = useSearchParams();
-  const listPath = `/projects/${projectRef}/resources/work-intentions`;
-  const sectionPath = `/projects/${projectRef}/resources`;
+  const listPath = `${projectPath(projectRef)}/work-intentions`;
   const current = {
     agent: searchParams.get("agent") ?? "",
     changeSet: searchParams.get("changeSet") ?? "",
@@ -247,7 +244,7 @@ function ActiveWorkIntentionPage({ projectRef }: { readonly projectRef: string }
 
   return (
     <div className="vstack gap-3">
-      <ResourceNavigation basePath={sectionPath} />
+
       <div>
         <h2 className="h3 mb-1" ref={headingRef} tabIndex={-1}>Active Resource work intentions</h2>
         <p className="text-body-secondary mb-0">See who intends to change a Resource, why, and whether overlap is shared or exclusive.</p>
@@ -294,9 +291,9 @@ function ActiveWorkIntentionPage({ projectRef }: { readonly projectRef: string }
       {connection ? (
         <>
           {errorMessage ? <AvailableStale message={errorMessage} onRetry={() => { void query.refetch(); }} /> : null}
-          <WorkIntentionCards
+          <WorkIntentionTable
             connection={connection}
-            hrefFor={(id) => detailLocation(listPath, id, listLocation(listPath, searchParams))}
+            hrefFor={(id) => detailLocation(listPath, id)}
           />
           <PaginationControls
             canPrevious={searchParams.getAll("trail").length > 0}
@@ -314,9 +311,8 @@ function WorkIntentionDetailPage({ projectRef, intentionId }: {
   readonly projectRef: string;
   readonly intentionId: string;
 }) {
-  const [searchParams] = useSearchParams();
-  const listPath = `/projects/${projectRef}/resources/work-intentions`;
-  const backTo = safeReturnTo(searchParams.get("returnTo"), listPath);
+  const listPath = `${projectPath(projectRef)}/work-intentions`;
+  const backTo = safeReturnTo(navigationReturnTo(useLocation().state), listPath);
   const headingRef = useResourceHeading("Resource work-intention detail", intentionId);
   const query = useQuery({
     queryKey: ["project-resource-work-intention", projectRef, intentionId],
@@ -334,7 +330,7 @@ function WorkIntentionDetailPage({ projectRef, intentionId }: {
 
   return (
     <div className="vstack gap-3">
-      <ResourceNavigation basePath={`/projects/${projectRef}/resources`} />
+
       <div>
         <Link className="btn btn-outline-secondary mb-3" to={backTo}>← Back to active work intentions</Link>
         <h2 className="h3 mt-2 mb-1" ref={headingRef} tabIndex={-1}>Resource work-intention detail</h2>
@@ -343,7 +339,7 @@ function WorkIntentionDetailPage({ projectRef, intentionId }: {
       {query.isPending ? <LoadingState label="Resource work-intention detail" /> : null}
       {errorMessage && !intention ? <InitialError label="Resource work-intention detail" message={errorMessage} onRetry={() => { void query.refetch(); }} /> : null}
       {!query.isPending && !errorMessage && !intention ? <div className="alert alert-info" role="status">This work intention is not available inside the Project.</div> : null}
-      {intention ? <>{errorMessage ? <AvailableStale message={errorMessage} onRetry={() => { void query.refetch(); }} /> : null}<WorkIntentionDetail backTo={backTo} intention={intention} projectPath={`/projects/${projectRef}`} /></> : null}
+      {intention ? <>{errorMessage ? <AvailableStale message={errorMessage} onRetry={() => { void query.refetch(); }} /> : null}<WorkIntentionDetail backTo={backTo} intention={intention} projectPath={projectPath(projectRef)} /></> : null}
     </div>
   );
 }

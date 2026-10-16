@@ -2,7 +2,8 @@ import { useEffect, useRef } from "react";
 import type { RefObject } from "react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
-import { Link, NavLink } from "react-router-dom";
+import { ContextLink as Link } from "../navigation.js";
+import { DataTable, TextPreview, Timestamp } from "../data-table.js";
 import { CopyIdentifier } from "../copy-identifier.js";
 import { RetryRefresh } from "../retry-refresh.js";
 import type {
@@ -27,17 +28,6 @@ export function useKnowledgeHeading(title: string, focusKey: string): RefObject<
   return headingRef;
 }
 
-export function KnowledgeNavigation({ basePath }: { readonly basePath: string }) {
-  const navClassName = ({ isActive }: { readonly isActive: boolean }) => `nav-link${isActive ? " active" : ""}`;
-  return (
-    <nav aria-label="Knowledge views" className="mb-3">
-      <ul className="nav nav-pills flex-column flex-sm-row gap-2">
-        <li className="nav-item"><NavLink className={navClassName} to={`${basePath}/skills`}>Skills</NavLink></li>
-        <li className="nav-item"><NavLink className={navClassName} to={`${basePath}/artifacts`}>Development Artifacts</NavLink></li>
-      </ul>
-    </nav>
-  );
-}
 
 export function LoadingState({ label }: { readonly label: string }) {
   return (
@@ -99,30 +89,18 @@ export function PaginationControls({ canPrevious, nextCursor, onNext, onPrevious
   );
 }
 
-export function SkillCards({ connection, hrefFor }: {
+export function SkillTable({ connection, hrefFor }: {
   readonly connection: SkillConnection | GlobalSkillConnection;
   readonly hrefFor: (skill: SkillConnection["nodes"][number]) => string;
 }) {
-  if (connection.nodes.length === 0) return <div className="alert alert-info" role="status">No Skills match this name.</div>;
   return (
-    <div aria-label="Project Skills" className="row g-3">
-      {connection.nodes.map((skill) => (
-        <div className="col-12 col-xl-6" key={skill.id}>
-          <article className="card card-outline card-primary h-100">
-            <div className="card-body d-flex flex-column gap-2">
-              <div className="d-flex flex-wrap justify-content-between gap-2">
-                <h3 className="h5 text-break mb-0">{skill.name}</h3>
-                <span className="badge text-bg-primary">revision {skill.revision}</span>
-              </div>
-              <p className="mb-0">{skill.description}</p>
-              <div className="small text-body-secondary">{skill.assetCount} assets · published {formatted(skill.publishedAt)}</div>
-              <div className="small text-body-secondary text-break">Shared in <code>{skill.scope}</code></div>
-              <Link className="btn btn-primary align-self-start mt-auto" to={hrefFor(skill)}>View Skill</Link>
-            </div>
-          </article>
-        </div>
-      ))}
-    </div>
+    <DataTable caption="Project Skills" rows={connection.nodes} rowKey={(skill) => skill.id} emptyMessage="No Skills match this name." columns={[
+      { key: "name", label: "Name", render: (skill) => <><Link to={hrefFor(skill)}>{skill.name}</Link><div className="small text-body-secondary"><TextPreview text={skill.description} /></div></> },
+      { key: "scope", label: "Scope", render: (skill) => <code>{skill.scope}</code> },
+      { key: "revision", label: "Revision", render: (skill) => skill.revision },
+      { key: "assets", label: "Assets", render: (skill) => skill.assetCount },
+      { key: "published", label: "Published", render: (skill) => <Timestamp value={skill.publishedAt} /> }
+    ]} />
   );
 }
 
@@ -141,18 +119,16 @@ export function SkillDetail({ detail, assetHref, backTo }: {
       <div className="card-body vstack gap-4">
         <CopyIdentifier label="Skill name" value={skill.name} />
         <div><h4 className="h6">Purpose</h4><p className="mb-0">{skill.description}</p></div>
-        <Content mediaType="text/markdown" text={skill.instructions} />
+        <Content assetLinks={new Map(skill.assets.map((asset) => [asset.path, assetHref(asset.path)]))} mediaType="text/markdown" text={skill.instructions} />
         <section aria-labelledby="skill-assets-heading">
           <h4 className="h6" id="skill-assets-heading">Assets</h4>
           {skill.assets.length === 0 ? <p className="text-body-secondary mb-0">This Skill has no assets.</p> : (
-            <div className="list-group">
-              {skill.assets.map((asset) => (
-                <div className="list-group-item d-flex flex-column flex-sm-row justify-content-between align-items-sm-center gap-2" key={asset.path}>
-                  <div className="text-break"><code>{asset.path}</code><div className="small text-body-secondary">{asset.mediaType} · {asset.byteSize} bytes</div></div>
-                  <Link className="btn btn-outline-primary align-self-start" to={assetHref(asset.path)}>View asset</Link>
-                </div>
-              ))}
-            </div>
+            <DataTable caption="Skill assets" rows={skill.assets} rowKey={(asset) => asset.path} columns={[
+              { key: "path", label: "Path", render: (asset) => <Link to={assetHref(asset.path)}><code>{asset.path}</code></Link> },
+              { key: "mediaType", label: "Media type", render: (asset) => asset.mediaType },
+              { key: "size", label: "Size", render: (asset) => `${asset.byteSize} bytes` },
+              { key: "executable", label: "Executable", render: (asset) => asset.executable ? "Yes" : "No" }
+            ]} />
           )}
         </section>
         <DetailEvidence rows={[["Scope", skill.scope], ["Digest", skill.contentDigest], ["Published", formatted(skill.publishedAt)]]} />
@@ -189,30 +165,18 @@ export function SkillAssetDetail({ detail, backTo }: {
   );
 }
 
-export function ArtifactCards({ connection, hrefFor }: {
+export function ArtifactTable({ connection, hrefFor }: {
   readonly connection: ArtifactConnection;
   readonly hrefFor: (artifactId: string) => string;
 }) {
-  if (connection.nodes.length === 0) return <div className="alert alert-info" role="status">No Development Artifacts match these filters.</div>;
   return (
-    <div aria-label="Development Artifacts" className="row g-3">
-      {connection.nodes.map((artifact) => (
-        <div className="col-12 col-xl-6" key={artifact.id}>
-          <article className="card card-outline card-info h-100">
-            <div className="card-body d-flex flex-column gap-2">
-              <div className="d-flex flex-wrap justify-content-between gap-2">
-                <h3 className="h5 text-break mb-0">{artifact.title}</h3>
-                <span className="badge text-bg-info">{humanized(artifact.kind)}</span>
-              </div>
-              <div className="text-break"><strong>Source:</strong> <code>{artifact.source.locator}</code></div>
-              <div className="small text-body-secondary">{artifact.labels.join(", ") || "No labels"} · {artifact.relationshipCount} relationships</div>
-              <div className="small text-body-secondary">Observed {formatted(artifact.observedAt)}</div>
-              <Link className="btn btn-info align-self-start mt-auto" to={hrefFor(artifact.id)}>View Artifact</Link>
-            </div>
-          </article>
-        </div>
-      ))}
-    </div>
+    <DataTable caption="Development Artifacts" rows={connection.nodes} rowKey={(artifact) => artifact.id} emptyMessage="No Development Artifacts match these filters." columns={[
+      { key: "title", label: "Title", render: (artifact) => <><Link to={hrefFor(artifact.id)}>{artifact.title}</Link><div className="small text-body-secondary"><code>{artifact.source.locator}</code></div></> },
+      { key: "kind", label: "Kind", render: (artifact) => humanized(artifact.kind) },
+      { key: "labels", label: "Labels", render: (artifact) => <>{artifact.labels.join(", ") || "No labels"}<div className="small text-body-secondary">{artifact.relationshipCount} relationships</div></> },
+      { key: "size", label: "Size / media type", render: (artifact) => `${artifact.byteSize} bytes · ${artifact.mediaType}` },
+      { key: "captured", label: "Captured", render: (artifact) => <Timestamp value={artifact.capturedAt} /> }
+    ]} />
   );
 }
 
@@ -252,31 +216,22 @@ export function ArtifactDetail({ detail, relationshipsHref, backTo }: {
   );
 }
 
-export function RelationshipCards({ detail, peerHref }: {
+export function RelationshipTable({ detail, peerHref }: {
   readonly detail: ProjectArtifactRelationships;
   readonly peerHref: (artifactId: string) => string;
 }) {
-  if (detail.relationships.nodes.length === 0) return <div className="alert alert-info" role="status">No active relationships match these filters.</div>;
   return (
-    <div aria-label="Artifact relationships" className="row g-3">
-      {detail.relationships.nodes.map((relationship) => (
-        <div className="col-12 col-xl-6" key={`${relationship.direction}:${relationship.id}`}>
-          <article className="card h-100">
-            <div className="card-body d-flex flex-column gap-2">
-              <div className="d-flex flex-wrap justify-content-between gap-2"><h3 className="h5 mb-0">{humanized(relationship.displayRelation)}</h3><span className="badge text-bg-secondary">{humanized(relationship.direction)}</span></div>
-              <div className="fw-semibold text-break">{relationship.peerArtifact?.title ?? relationship.targetName ?? relationship.peerId}</div>
-              <div className="text-break"><code>{relationship.peerArtifact?.source.locator ?? relationship.normalizedLocator ?? relationship.path ?? relationship.peerId}</code></div>
-              <div className="small text-body-secondary">Declared {formatted(relationship.declaredAt)} · {relationship.status}</div>
-              {relationship.peerArtifact ? <Link className="btn btn-outline-info align-self-start mt-auto" to={peerHref(relationship.peerId)}>View related Artifact</Link> : null}
-            </div>
-          </article>
-        </div>
-      ))}
-    </div>
+    <DataTable caption="Artifact relationships" rows={detail.relationships.nodes} rowKey={(relationship) => `${relationship.direction}:${relationship.id}`} emptyMessage="No active relationships match these filters." columns={[
+      { key: "relation", label: "Relation", render: (relationship) => humanized(relationship.displayRelation) },
+      { key: "direction", label: "Direction", render: (relationship) => humanized(relationship.direction) },
+      { key: "peer", label: "Related artifact", render: (relationship) => <>{relationship.peerArtifact ? <Link to={peerHref(relationship.peerId)}>{relationship.peerArtifact.title}</Link> : relationship.targetName ?? relationship.peerId}<div className="small"><code>{relationship.peerArtifact?.source.locator ?? relationship.normalizedLocator ?? relationship.path ?? relationship.peerId}</code></div></> },
+      { key: "evidence", label: "Evidence", render: (relationship) => <>Declared <Timestamp value={relationship.declaredAt} /> · {relationship.status}</> }
+    ]} />
   );
 }
 
-function Content({ base64, mediaType, text }: {
+function Content({ assetLinks, base64, mediaType, text }: {
+  readonly assetLinks?: ReadonlyMap<string, string>;
   readonly base64?: string | null;
   readonly mediaType?: string | null;
   readonly text?: string | null;
@@ -286,6 +241,10 @@ function Content({ base64, mediaType, text }: {
       <div className="border rounded bg-body-tertiary p-3 overflow-auto">
         <ReactMarkdown
           components={{
+            a: ({ children, href, title }) => {
+              const target = href && assetLinks ? skillAssetTarget(href, assetLinks) : null;
+              return target ? <Link title={title} to={target}>{children}</Link> : <a href={href} title={title}>{children}</a>;
+            },
             table: ({ children }) => <table className="table table-striped table-bordered">{children}</table>,
             input: ({ checked, ...properties }) => <input checked={checked} className="form-check-input me-2" disabled {...properties} />
           }}
@@ -300,6 +259,18 @@ function Content({ base64, mediaType, text }: {
   if (text !== null && text !== undefined) return <pre className="border rounded bg-body-tertiary p-3 mb-0 text-wrap overflow-auto">{text}</pre>;
   if (base64) return <div className="alert alert-secondary mb-0">Binary content is available through the GraphQL boundary; this browser does not render or transform it.</div>;
   return <div className="text-body-secondary">No content is available in this projection.</div>;
+}
+
+export function skillAssetTarget(href: string, assets: ReadonlyMap<string, string>): string | null {
+  try {
+    const url = new URL(href, "https://skill-assets.invalid/");
+    if (url.origin !== "https://skill-assets.invalid") return null;
+    const path = decodeURIComponent(url.pathname.slice(1));
+    const target = assets.get(path);
+    return target ? `${target}${url.hash}` : null;
+  } catch {
+    return null;
+  }
 }
 
 function markdownMediaType(mediaType: string | null | undefined): boolean {

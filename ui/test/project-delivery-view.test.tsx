@@ -23,22 +23,21 @@ import {
 } from "../src/delivery/project-delivery-model.js";
 import {
   AvailableStale,
-  CandidateCards,
+  CandidateTable,
   CandidateDetailCard,
-  DeliveryNavigation,
   InitialError,
   LoadingState,
-  MergeCards,
+  MergeTable,
   MergeDetailCard,
-  ObligationCards,
+  ObligationTable,
   PaginationControls,
-  ReleaseCards,
+  ReleaseTable,
   ReleaseDetailCard,
   VerificationDetailCard
 } from "../src/delivery/project-delivery-view.js";
 
 const timestamp = "2026-09-01T08:30:00.000000Z";
-const projectRef = "project-reference";
+const projectRef = "project:concurrent_development_mcp";
 const repositoryId = "018f0f4d-4e45-7abc-8def-000000000091";
 const checkpoint = {
   id: "candidate-ui-10",
@@ -148,16 +147,22 @@ function render(node: React.ReactNode): string {
   return renderToStaticMarkup(<MemoryRouter>{node}</MemoryRouter>);
 }
 
-test("renders four focused mobile-friendly collection views with page-slice labels", () => {
-  const markup = render(<><DeliveryNavigation basePath={`/projects/${projectRef}/delivery`} /><CandidateCards connection={candidates} hrefFor={(id) => `/candidates/${id}`} /><ObligationCards connection={obligations} hrefFor={(id) => `/obligations/${id}`} /><MergeCards connection={merges} hrefFor={(id) => `/merges/${id}`} /><ReleaseCards connection={releases} hrefFor={(id) => `/releases/${id}`} /></>);
+test("renders delivery collections as accessible tables with linked identifiers", () => {
+  const markup = render(<><CandidateTable connection={candidates} hrefFor={(id) => `/candidates/${id}`} /><ObligationTable connection={obligations} hrefFor={(id) => `/obligations/${id}`} /><MergeTable connection={merges} hrefFor={(id) => `/merges/${id}`} /><ReleaseTable connection={releases} hrefFor={(id) => `/releases/${id}`} /></>);
   assert.match(markup, /candidate-ui-10/);
   assert.match(markup, /obligation-ui-10/);
   assert.match(markup, /merge-ui-10/);
   assert.match(markup, /release-ui-10/);
-  assert.match(markup, /1 on this page/);
-  assert.match(markup, /delivery\/merge-snapshots/);
-  assert.doesNotMatch(markup, /<table/);
+  assert.match(markup, /<table/);
+  assert.match(markup, /<th scope="col">Head commit<\/th>/);
+  assert.match(markup, /<th scope="col">Verification status<\/th>/);
+  assert.match(markup, /<th scope="col">Evidence\/missing<\/th>/);
+  assert.match(markup, /href="\/candidates\/candidate-ui-10"/);
+  assert.match(markup, /<th scope="col">Submitted<\/th>/);
+  assert.match(markup, /<caption class="visually-hidden">Merge snapshots<\/caption>/);
+  assert.doesNotMatch(markup, /<article class="card h-100 border"/);
   assert.doesNotMatch(markup, /operation batches/i);
+  assert.match(render(<CandidateTable connection={{ ...candidates, nodes: [] }} hrefFor={() => "/candidate"} />), /No Candidate checkpoints match these filters/);
 });
 
 test("renders focused details and bounded nested evidence without hidden bottom panels", () => {
@@ -179,17 +184,19 @@ test("renders isolated availability, stale-refresh, and pagination states", () =
   assert.match(markup, /Next page/);
 });
 
-test("keeps filters, cursor trails, Back targets, and placeholders URL-bound", () => {
+test("keeps filters and cursor trails URL-bound while rejecting external Back targets", () => {
   const filtered = applyFilters(new URLSearchParams("after=old&trail=older"), { sort: "NEWEST_FIRST", status: "OPEN" });
   assert.equal(filtered.get("after"), null);
   assert.deepEqual(filtered.getAll("trail"), []);
   const next = nextPageParams(filtered, "cursor-2");
   assert.equal(next.get("after"), "cursor-2");
   assert.equal(previousPageParams(next).get("after"), null);
-  const list = `/projects/${projectRef}/delivery/candidates?sort=NEWEST_FIRST`;
-  assert.match(detailLocation(`/projects/${projectRef}/delivery/candidates`, checkpoint.id, list), /returnTo=/);
-  assert.equal(safeDeliveryReturnTo(list, "/fallback", `/projects/${projectRef}/delivery`), list);
-  assert.equal(safeDeliveryReturnTo("https://evil.invalid/", "/fallback", `/projects/${projectRef}/delivery`), "/fallback");
+  const list = `/projects/${projectRef}/candidates?sort=NEWEST_FIRST`;
+  const detail = detailLocation(`/projects/${projectRef}/candidates`, checkpoint.id);
+  assert.equal(detail, `/projects/${projectRef}/candidates/${checkpoint.id}`);
+  assert.equal(new URL(detail, "https://coordinator.test").search, "");
+  assert.equal(safeDeliveryReturnTo(list, "/fallback", `/projects/${projectRef}`), list);
+  assert.equal(safeDeliveryReturnTo("https://evil.invalid/", "/fallback", `/projects/${projectRef}`), "/fallback");
   const data: ProjectDeliveryCandidatesQuery = { projectCandidateCheckpoints: candidates };
   assert.equal(preserveCollection(data, ["candidates", projectRef, "filters"], projectRef, "filters"), data);
   assert.equal(preserveCollection(data, ["candidates", "other", "filters"], projectRef, "filters"), undefined);

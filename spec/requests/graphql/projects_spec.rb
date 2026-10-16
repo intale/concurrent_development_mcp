@@ -67,7 +67,7 @@ module ProjectCatalogGraphqlSpec
         "repositoryCount" => 3
       )
       expect(project_reference.decode(project.fetch("projectRef"))).to eq("project:alpha")
-      expect(project.fetch("projectRef")).not_to include("project:alpha")
+      expect(project.fetch("projectRef")).to eq("project:alpha")
       expect(project.dig("repositories", "nodes").map { _1.fetch("id") }).to eq(REPOSITORY_IDS.first(2))
       expect(project.fetch("repositories")).to include("totalCount" => 3)
       expect(project.dig("repositories", "pageInfo", "hasNextPage")).to be(true)
@@ -93,7 +93,7 @@ module ProjectCatalogGraphqlSpec
       expect(mismatch.dig("errors", 0, "extensions", "code")).to eq("INVALID_CURSOR")
     end
 
-    it "resolves an opaque Project reference and pages its explicit Repository members" do
+    it "resolves an exact readable Project scope and pages its explicit Repository members" do
       project_ref = project_reference.encode(scope: "project:alpha")
       first = execute_project(project_ref:, first: 2).dig("data", "project")
       second = execute_project(
@@ -113,7 +113,7 @@ module ProjectCatalogGraphqlSpec
     end
 
     it "maps invalid references and input to typed errors while unknown Projects remain recoverable" do
-      invalid = execute_project(project_ref: "not-a-reference", first: 20)
+      invalid = execute_project(project_ref: " project:invalid", first: 20)
       invalid_limit = execute_projects(first: 101)
       missing = execute_project(
         project_ref: project_reference.encode(scope: "project:missing"),

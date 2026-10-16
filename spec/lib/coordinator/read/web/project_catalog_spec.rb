@@ -110,7 +110,7 @@ RSpec.describe Coordinator::Read::Web::Queries::ProjectCatalog, :read_model do
       .to raise_error(Coordinator::Read::Web::ProjectCatalogQueryError) do |error|
         expect(error.details).to have_key(:search)
       end
-    expect { catalog.overview(project_ref: "not-a-project-reference") }
+      expect { catalog.overview(project_ref: " project:invalid") }
       .to raise_error(Coordinator::Read::Web::ProjectReference::InvalidReference)
     expect do
       catalog.overview(

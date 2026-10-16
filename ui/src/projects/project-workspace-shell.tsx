@@ -1,6 +1,7 @@
 import { createContext, useContext, useEffect, useRef } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { Link, NavLink, Outlet, useLocation, useParams } from "react-router-dom";
+import { Link, Outlet, useLocation, useParams } from "react-router-dom";
+import { PROJECT_NAVIGATION, projectPath } from "../navigation.js";
 import type { ProjectWorkspaceQuery } from "../gql/graphql.js";
 import {
   fetchProjectWorkspace,
@@ -29,7 +30,9 @@ export function ProjectWorkspaceShell() {
   const { projectRef = "" } = useParams<{ projectRef: string }>();
   const location = useLocation();
   const headingRef = useRef<HTMLHeadingElement>(null);
-  const basePath = `/projects/${projectRef}`;
+  const basePath = projectPath(projectRef);
+  const sectionPath = `/${location.pathname.slice(basePath.length + 1).split("/")[0] ?? ""}`;
+  const section = PROJECT_NAVIGATION.flatMap((group) => group.items).find((item) => item.path === sectionPath);
   const workspace = useQuery({
     queryKey: projectWorkspaceQueryKey(projectRef, PROJECT_REPOSITORY_PREVIEW_SIZE, null),
     queryFn: ({ signal }) => fetchProjectWorkspace(
@@ -73,7 +76,7 @@ export function ProjectWorkspaceShell() {
           <div className="alert alert-warning" role="alert">
             <h1 className="h4">Project is unavailable</h1>
             <p>
-              {message ?? "No latest available Project matches this server-issued reference."}
+              {message ?? "No available project matches this exact scope."}
             </p>
             <div className="d-flex flex-wrap gap-2">
               {message ? (
@@ -102,44 +105,25 @@ export function ProjectWorkspaceShell() {
           <nav aria-label="Breadcrumb">
             <ol className="breadcrumb mb-2">
               <li className="breadcrumb-item"><Link to="/projects">Projects</Link></li>
-              <li aria-current="page" className="breadcrumb-item active">{project.displayLabel}</li>
+              {section ? <><li className="breadcrumb-item"><Link to={basePath}>{project.displayLabel}</Link></li><li aria-current="page" className="breadcrumb-item active">{section.label}</li></> : <li aria-current="page" className="breadcrumb-item active">{project.displayLabel}</li>}
             </ol>
           </nav>
           <div className="d-flex flex-column flex-lg-row align-items-lg-start justify-content-between gap-3">
             <div>
-              <h1 className="mb-1" ref={headingRef} tabIndex={-1}>{project.displayLabel}</h1>
-              <div className="text-body-secondary text-break"><code>{project.scope}</code></div>
+              <h1 className="h4 mb-1 d-inline-block" ref={headingRef} tabIndex={-1}>{project.displayLabel}</h1>
+              <div className="small text-body-secondary text-break">Scope: {project.scope}</div>
             </div>
             <div className="text-lg-end">
               <span className="badge text-bg-secondary">
                 {project.repositoryCount} {project.repositoryCount === 1 ? "Repository" : "Repositories"}
               </span>
-              <div className="small text-body-secondary mt-1">
-                Latest available projection
-              </div>
             </div>
-          </div>
-          <div className="small text-body-secondary mt-2">
-            Members: {project.repositories.nodes.map((repository) => (
-              repository.displayName ?? repository.paths[0] ?? repository.id
-            )).join(", ")}
-            {project.repositories.pageInfo.hasNextPage ? ", …" : ""}
           </div>
           {workspace.error ? (
             <div className="alert alert-warning mt-3 mb-0" role="alert">
               The last available Project identity remains visible while refresh is retried.
             </div>
           ) : null}
-          <nav aria-label="Project sections" className="mt-3 overflow-x-auto">
-            <ul className="nav nav-tabs flex-nowrap">
-              <ProjectNavigationItem end label="Overview" to={basePath} />
-              <ProjectNavigationItem label="Coordination" to={`${basePath}/coordination`} />
-              <ProjectNavigationItem label="Resources" to={`${basePath}/resources`} />
-              <ProjectNavigationItem label="Knowledge" to={`${basePath}/knowledge`} />
-              <ProjectNavigationItem label="Governance" to={`${basePath}/governance`} />
-              <ProjectNavigationItem label="Delivery" to={`${basePath}/delivery`} />
-            </ul>
-          </nav>
         </div>
       </div>
       <div className="app-content pt-3">
@@ -151,18 +135,4 @@ export function ProjectWorkspaceShell() {
 
 export function projectHeadingOwnsFocus(pathname: string, basePath: string): boolean {
   return pathname === basePath;
-}
-
-interface ProjectNavigationItemProps {
-  readonly end?: boolean;
-  readonly label: string;
-  readonly to: string;
-}
-
-function ProjectNavigationItem({ end = false, label, to }: ProjectNavigationItemProps) {
-  return (
-    <li className="nav-item">
-      <NavLink className="nav-link text-nowrap" end={end} to={to}>{label}</NavLink>
-    </li>
-  );
 }

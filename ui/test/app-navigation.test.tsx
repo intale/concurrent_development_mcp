@@ -34,7 +34,8 @@ test("renders a discoverable accessible application shell without requiring an e
   assert.match(markup, /aria-current="page"[^>]*>\s*<i[^>]*><\/i>\s*<p>Projects<\/p>/);
   assert.match(markup, /aria-label="Close navigation"/);
   assert.match(markup, /id="main-content"/);
-  assert.match(markup, /Latest available projections/);
+  assert.match(markup, /Development coordinator/);
+  assert.match(markup, /Read-only/);
   assert.match(markup, /<h1[^>]*>Projects<\/h1>/);
   assert.match(markup, /Scope, Repository name, or path/);
   assert.doesNotMatch(markup, /Exact project scope/);
@@ -57,14 +58,14 @@ test("contains keyboard focus inside an open compact navigation", () => {
 });
 
 test("lets a nested Project route own focus after a deep-link refresh", () => {
-  const basePath = "/projects/opaque-project-reference";
+  const basePath = "/projects/project:concurrent_development_mcp";
 
   assert.equal(projectHeadingOwnsFocus(basePath, basePath), true);
-  assert.equal(projectHeadingOwnsFocus(`${basePath}/delivery/candidates/CAN-1`, basePath), false);
+  assert.equal(projectHeadingOwnsFocus(`${basePath}/candidates/CAN-1`, basePath), false);
 });
 
-test("renders Project identity and persistent section navigation from an opaque Project route", () => {
-  const projectRef = "opaque-project-reference";
+test("renders Project identity and persistent section navigation from a readable Project route", () => {
+  const projectRef = "project:concurrent_development_mcp";
   const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   queryClient.setQueryData(
     projectWorkspaceQueryKey(projectRef, PROJECT_REPOSITORY_PREVIEW_SIZE, null),
@@ -95,11 +96,14 @@ test("renders Project identity and persistent section navigation from an opaque 
 
   assert.match(markup, /Concurrent Development MCP/);
   assert.match(markup, /project:concurrent_development_mcp/);
-  assert.match(markup, /2 Repositories/);
-  assert.match(markup, /aria-label="Project sections"/);
   assert.match(markup, /tabindex="-1"[^>]*>Concurrent Development MCP/);
-  for (const section of ["Overview", "Coordination", "Resources", "Knowledge", "Governance", "Delivery"]) {
+  for (const section of ["Overview", "Work items", "Change sets", "Resources", "Work intentions", "Skills", "Development artifacts", "Decisions", "Guidance", "Agent choices", "Decision impacts", "Checkpoints", "Verification", "Merge snapshots", "Release sets"]) {
     assert.match(markup, new RegExp(`>${section}<`));
   }
-  assert.match(markup, /aria-current="page"[^>]*>Overview/);
+  assert.match(markup, /<a[^>]*class="nav-link active"[^>]*href="\/projects\/project:concurrent_development_mcp"/);
+  assert.match(markup, /aria-label="Primary navigation"/);
+  assert.doesNotMatch(markup, /Project sections|\/coordination|\/knowledge|\/governance|\/delivery/);
+  assert.doesNotMatch(markup, /<li class="nav-item"><(?:div|ul)/);
+  const workItemsMarkup = renderApp(`/projects/${projectRef}/work-items`, queryClient);
+  assert.match(workItemsMarkup, /<li class="nav-item"><a[^>]*class="nav-link active"[^>]*href="\/projects\/project:concurrent_development_mcp\/work-items"/);
 });

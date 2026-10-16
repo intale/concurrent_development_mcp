@@ -1,6 +1,7 @@
+import { ContextLink as Link } from "../navigation.js";
 import { useEffect, useMemo, useRef } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { Link, useParams, useSearchParams } from "react-router-dom";
+import { useParams, useSearchParams } from "react-router-dom";
 import { fetchOperationBatch, fetchOperationBatches } from "./operation-batches-api.js";
 import {
   nextBatchPageParameters,

@@ -1,12 +1,12 @@
+import { navigationReturnTo, ContextLink as Link } from "../navigation.js";
 import { useEffect, useRef, useState } from "react";
 import type { RefObject } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { Link, useLocation, useParams, useSearchParams } from "react-router-dom";
+import { useLocation, useParams, useSearchParams } from "react-router-dom";
 import { fetchSkill, fetchSkillAsset, fetchSkills } from "./project-knowledge-api.js";
 import { LatestUpdateSortControl, latestUpdateSortParams, parseLatestUpdateSort } from "../latest-update-sort.js";
 import {
   applyFilters,
-  listLocation,
   nextPageParams,
   previousPageParams
 } from "./project-knowledge-model.js";
@@ -16,7 +16,7 @@ import {
   LoadingState,
   PaginationControls,
   SkillAssetDetail,
-  SkillCards,
+  SkillTable,
   SkillDetail,
   useKnowledgeHeading
 } from "./project-knowledge-view.js";
@@ -111,9 +111,9 @@ function GlobalSkillListPage() {
           {connection ? (
             <>
               {errorMessage ? <AvailableStale message={errorMessage} onRetry={() => { void query.refetch(); }} /> : null}
-              <SkillCards
+              <SkillTable
                 connection={connection}
-                hrefFor={(skill) => `${LIST_PATH}/${encodeURIComponent(skill.id)}?${new URLSearchParams({ returnTo: listLocation(LIST_PATH, searchParams) })}`}
+                hrefFor={(skill) => `${LIST_PATH}/${encodeURIComponent(skill.id)}`}
               />
               <PaginationControls
                 canPrevious={searchParams.getAll("trail").length > 0}
@@ -130,9 +130,8 @@ function GlobalSkillListPage() {
 }
 
 function GlobalSkillPage({ skillId }: { readonly skillId: string }) {
-  const [searchParams] = useSearchParams();
   const location = useLocation();
-  const backTo = safeGlobalReturnTo(searchParams.get("returnTo"), LIST_PATH);
+  const backTo = safeGlobalReturnTo(navigationReturnTo(useLocation().state), LIST_PATH);
   const headingRef = useKnowledgeHeading("Skill detail", skillId);
   const query = useQuery({
     queryKey: ["skill", skillId],
@@ -141,7 +140,6 @@ function GlobalSkillPage({ skillId }: { readonly skillId: string }) {
   });
   const detail = query.data?.skill ?? null;
   const errorMessage = query.error instanceof Error ? query.error.message : null;
-  const currentLocation = `${location.pathname}${location.search}`;
 
   return (
     <>
@@ -150,7 +148,7 @@ function GlobalSkillPage({ skillId }: { readonly skillId: string }) {
         {query.isPending ? <LoadingState label="Skill detail" /> : null}
         {errorMessage && !detail ? <InitialError label="Skill detail" message={errorMessage} onRetry={() => { void query.refetch(); }} /> : null}
         {!query.isPending && !errorMessage && !detail ? <div className="alert alert-info" role="status">This Skill is not available in the latest projection.</div> : null}
-        {detail ? <>{errorMessage ? <AvailableStale message={errorMessage} onRetry={() => { void query.refetch(); }} /> : null}<SkillDetail assetHref={(path) => `${location.pathname}/assets/${encodeAssetPath(path)}?${new URLSearchParams({ returnTo: currentLocation })}`} backTo={backTo} detail={detail} /></> : null}
+        {detail ? <>{errorMessage ? <AvailableStale message={errorMessage} onRetry={() => { void query.refetch(); }} /> : null}<SkillDetail assetHref={(path) => `${location.pathname}/assets/${encodeAssetPath(path)}`} backTo={backTo} detail={detail} /></> : null}
       </div></div>
     </>
   );
@@ -160,9 +158,8 @@ function GlobalSkillAssetPage({ skillId, assetPath }: {
   readonly skillId: string;
   readonly assetPath: string;
 }) {
-  const [searchParams] = useSearchParams();
   const skillPath = `${LIST_PATH}/${encodeURIComponent(skillId)}`;
-  const backTo = safeGlobalReturnTo(searchParams.get("returnTo"), skillPath);
+  const backTo = safeGlobalReturnTo(navigationReturnTo(useLocation().state), skillPath);
   const headingRef = useKnowledgeHeading("Skill asset", `${skillId}:${assetPath}`);
   const query = useQuery({
     queryKey: ["skill-asset", skillId, assetPath],

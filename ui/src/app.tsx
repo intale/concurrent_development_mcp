@@ -1,5 +1,6 @@
-import { useEffect, useRef, useState } from "react";
-import { Link, Navigate, NavLink, Route, Routes, useLocation } from "react-router-dom";
+import { Fragment, useEffect, useRef, useState } from "react";
+import { Link, Navigate, NavLink, Route, Routes, useLocation, useMatch } from "react-router-dom";
+import { PROJECT_NAVIGATION, projectPath } from "./navigation.js";
 import { CommandReceiptsPage } from "./audit/command-receipts-page.js";
 import { CoordinationChangeSetsPage } from "./coordination/coordination-change-sets-page.js";
 import { CoordinationDependenciesPage } from "./coordination/coordination-dependencies-page.js";
@@ -71,6 +72,8 @@ function compactNavigationMatches(): boolean {
 
 export function App() {
   const location = useLocation();
+  const projectMatch = useMatch("/projects/:projectRef/*");
+  const activeProjectPath = projectMatch ? projectPath(projectMatch.params.projectRef ?? "") : null;
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [compactNavigation, setCompactNavigation] = useState(compactNavigationMatches);
@@ -206,7 +209,7 @@ export function App() {
               </button>
             </li>
           </ul>
-          <span className="navbar-text small text-body-secondary">Latest available projections</span>
+          <span className="navbar-text"><span className="fw-semibold me-3">Development coordinator</span><span className="badge text-bg-light border">Read-only</span></span>
         </div>
       </nav>
 
@@ -225,24 +228,37 @@ export function App() {
         <div className="sidebar-wrapper">
           <nav aria-label="Primary navigation" className="mt-2">
             <ul className="nav sidebar-menu flex-column">
-              <li className="nav-header">Coordination</li>
+              <li className="nav-header">Workspace</li>
               <li className="nav-item">
                 <NavLink
                   className={({ isActive }) => `nav-link ${isActive ? "active" : ""}`}
+                  end
                   to="/projects"
                 >
                   <i aria-hidden="true" className="nav-icon bi bi-folder2-open" />
                   <p>Projects</p>
                 </NavLink>
               </li>
-              <li className="nav-header">Global views</li>
+              {activeProjectPath ? PROJECT_NAVIGATION.map((group) => (
+                <Fragment key={group.label}>
+                  <li className="nav-header">{group.label}</li>
+                  {group.items.map((item) => (
+                    <li className="nav-item" key={item.path}>
+                      <NavLink className={({ isActive }) => `nav-link ${isActive ? "active" : ""}`} end={item.path === ""} to={`${activeProjectPath}${item.path}`}>
+                        <i aria-hidden="true" className={`nav-icon bi ${item.icon}`} /><p>{item.label}</p>
+                      </NavLink>
+                    </li>
+                  ))}
+                </Fragment>
+              )) : null}
+              <li className="nav-header">All projects</li>
               <li className="nav-item">
                 <NavLink
                   className={({ isActive }) => `nav-link ${isActive ? "active" : ""}`}
                   to="/skills"
                 >
                   <i aria-hidden="true" className="nav-icon bi bi-journal-code" />
-                  <p>Skills</p>
+                  <p>All skills</p>
                 </NavLink>
               </li>
               <li className="nav-item">
@@ -280,50 +296,45 @@ export function App() {
           <Route path="/operations/batches/:batchId" element={<OperationBatchesPage />} />
           <Route path="/projects/:projectRef" element={<ProjectWorkspaceShell />}>
             <Route index element={<ProjectOverviewPage />} />
-            <Route path="coordination" element={<Navigate replace to="change-sets" />} />
-            <Route path="coordination/change-sets" element={<CoordinationChangeSetsPage />} />
-            <Route path="coordination/change-sets/:changeSetId" element={<CoordinationChangeSetsPage />} />
-            <Route path="coordination/work-items" element={<CoordinationWorkItemsPage />} />
-            <Route path="coordination/work-items/:workItemId" element={<CoordinationWorkItemsPage />} />
-            <Route path="coordination/dependencies" element={<CoordinationDependenciesPage />} />
-            <Route path="coordination/dependencies/:dependencyId" element={<CoordinationDependenciesPage />} />
-            <Route path="resources" element={<Navigate replace to="inventory" />} />
-            <Route path="resources/inventory" element={<ProjectResourceInventoryPage />} />
-            <Route path="resources/inventory/:resourceId" element={<ProjectResourceInventoryPage />} />
-            <Route path="resources/work-intentions" element={<ProjectResourceWorkIntentionsPage />} />
-            <Route path="resources/work-intentions/:intentionId" element={<ProjectResourceWorkIntentionsPage />} />
-            <Route path="knowledge" element={<Navigate replace to="skills" />} />
-            <Route path="knowledge/skills" element={<ProjectSkillsPage />} />
-            <Route path="knowledge/skills/:skillName" element={<ProjectSkillsPage />} />
-            <Route path="knowledge/skills/:skillName/assets/*" element={<ProjectSkillsPage />} />
-            <Route path="knowledge/artifacts" element={<ProjectArtifactsPage />} />
-            <Route path="knowledge/artifacts/:artifactId" element={<ProjectArtifactsPage />} />
-            <Route path="knowledge/artifacts/:artifactId/relationships" element={<ProjectArtifactRelationshipsPage />} />
-            <Route path="governance" element={<Navigate replace to="decisions" />} />
-            <Route path="governance/decisions" element={<ProjectGovernanceDecisionsPage />} />
-            <Route path="governance/decisions/:decisionId" element={<ProjectGovernanceDecisionsPage />} />
-            <Route path="governance/guidance" element={<ProjectGovernanceGuidancePage />} />
-            <Route path="governance/guidance/:messageId" element={<ProjectGovernanceGuidancePage />} />
-            <Route path="governance/choices" element={<ProjectGovernanceChoicesPage />} />
-            <Route path="governance/choices/:choiceId" element={<ProjectGovernanceChoicesPage />} />
-            <Route path="governance/impacts" element={<ProjectGovernanceImpactsPage />} />
-            <Route path="governance/impacts/:assessmentId" element={<ProjectGovernanceImpactsPage />} />
-            <Route path="delivery" element={<Navigate replace to="candidates" />} />
-            <Route path="delivery/candidates" element={<ProjectDeliveryCandidatesPage />} />
-            <Route path="delivery/candidates/:candidateId" element={<ProjectDeliveryCandidatesPage />} />
-            <Route path="delivery/obligations" element={<ProjectDeliveryObligationsPage />} />
-            <Route path="delivery/obligations/:obligationId" element={<ProjectDeliveryObligationsPage />} />
-            <Route path="delivery/merge-snapshots" element={<ProjectDeliveryMergesPage />} />
-            <Route path="delivery/merge-snapshots/:mergeSnapshotId" element={<ProjectDeliveryMergesPage />} />
-            <Route path="delivery/release-sets" element={<ProjectDeliveryReleasesPage />} />
-            <Route path="delivery/release-sets/:releaseSetId" element={<ProjectDeliveryReleasesPage />} />
+            <Route path="change-sets" element={<CoordinationChangeSetsPage />} />
+            <Route path="change-sets/:changeSetId" element={<CoordinationChangeSetsPage />} />
+            <Route path="work-items" element={<CoordinationWorkItemsPage />} />
+            <Route path="work-items/:workItemId" element={<CoordinationWorkItemsPage />} />
+            <Route path="dependencies" element={<CoordinationDependenciesPage />} />
+            <Route path="dependencies/:dependencyId" element={<CoordinationDependenciesPage />} />
+            <Route path="resources" element={<ProjectResourceInventoryPage />} />
+            <Route path="resources/:resourceId" element={<ProjectResourceInventoryPage />} />
+            <Route path="work-intentions" element={<ProjectResourceWorkIntentionsPage />} />
+            <Route path="work-intentions/:intentionId" element={<ProjectResourceWorkIntentionsPage />} />
+            <Route path="skills" element={<ProjectSkillsPage />} />
+            <Route path="skills/:skillName" element={<ProjectSkillsPage />} />
+            <Route path="skills/:skillName/assets/*" element={<ProjectSkillsPage />} />
+            <Route path="artifacts" element={<ProjectArtifactsPage />} />
+            <Route path="artifacts/:artifactId" element={<ProjectArtifactsPage />} />
+            <Route path="artifacts/:artifactId/relationships" element={<ProjectArtifactRelationshipsPage />} />
+            <Route path="decisions" element={<ProjectGovernanceDecisionsPage />} />
+            <Route path="decisions/:decisionId" element={<ProjectGovernanceDecisionsPage />} />
+            <Route path="guidance" element={<ProjectGovernanceGuidancePage />} />
+            <Route path="guidance/:messageId" element={<ProjectGovernanceGuidancePage />} />
+            <Route path="choices" element={<ProjectGovernanceChoicesPage />} />
+            <Route path="choices/:choiceId" element={<ProjectGovernanceChoicesPage />} />
+            <Route path="impacts" element={<ProjectGovernanceImpactsPage />} />
+            <Route path="impacts/:assessmentId" element={<ProjectGovernanceImpactsPage />} />
+            <Route path="candidates" element={<ProjectDeliveryCandidatesPage />} />
+            <Route path="candidates/:candidateId" element={<ProjectDeliveryCandidatesPage />} />
+            <Route path="obligations" element={<ProjectDeliveryObligationsPage />} />
+            <Route path="obligations/:obligationId" element={<ProjectDeliveryObligationsPage />} />
+            <Route path="merge-snapshots" element={<ProjectDeliveryMergesPage />} />
+            <Route path="merge-snapshots/:mergeSnapshotId" element={<ProjectDeliveryMergesPage />} />
+            <Route path="release-sets" element={<ProjectDeliveryReleasesPage />} />
+            <Route path="release-sets/:releaseSetId" element={<ProjectDeliveryReleasesPage />} />
           </Route>
           <Route path="*" element={<Navigate replace to="/projects" />} />
         </Routes>
       </main>
 
       <footer className="app-footer" ref={footerRef}>
-        <strong>Coordinator</strong> read-only projection browser
+        <strong>Coordinator</strong> · Read-only. Updates appear as events are processed.
       </footer>
       <button
         aria-label="Close navigation"

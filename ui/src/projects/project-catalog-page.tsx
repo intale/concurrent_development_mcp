@@ -91,7 +91,7 @@ export function ProjectCatalogPage() {
         <div className="container-fluid">
           <div className="row align-items-center">
             <div className="col-sm-6">
-              <h1 className="mb-0" ref={headingRef} tabIndex={-1}>Projects</h1>
+              <h1 className="mb-0 d-inline-block" ref={headingRef} tabIndex={-1}>Projects</h1>
             </div>
             <div className="col-sm-6">
               <nav aria-label="Breadcrumb">
@@ -105,12 +105,8 @@ export function ProjectCatalogPage() {
       </div>
       <div className="app-content">
         <div className="container-fluid vstack gap-4">
-          <p className="text-body-secondary mb-0">
-            Discover exact coordination scopes from the latest available Repository projections.
-            Available data remains usable while projections catch up.
-          </p>
-          <form className="card card-outline card-primary" onSubmit={submitSearch}>
-            <div className="card-header"><h2 className="card-title">Refine projects</h2></div>
+          <p className="text-body-secondary mb-0">Choose a project to inspect its work, resources, decisions, and development knowledge.</p>
+          <form aria-label="Project filters" className="card border shadow-none" onSubmit={submitSearch}>
             <div className="card-body row g-3 align-items-end">
               <div className="col-12 col-lg">
                 <label className="form-label" htmlFor="project-search">Search</label>
