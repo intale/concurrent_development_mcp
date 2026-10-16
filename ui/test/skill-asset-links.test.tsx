@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { skillAssetTarget } from "../src/knowledge/project-knowledge-view.js";
+import { skillAssetTarget } from "../src/markdown/markdown-document.js";
 
 test("relative Markdown references resolve only to assets in the current Skill manifest", () => {
   const assets = new Map([

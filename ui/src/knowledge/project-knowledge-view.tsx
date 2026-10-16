@@ -1,7 +1,6 @@
 import { useEffect, useRef } from "react";
 import type { RefObject } from "react";
-import ReactMarkdown from "react-markdown";
-import remarkGfm from "remark-gfm";
+import { MarkdownPreview } from "../markdown/markdown-preview.js";
 import { ContextLink as Link } from "../navigation.js";
 import { DataTable, TextPreview, Timestamp } from "../data-table.js";
 import { CopyIdentifier } from "../copy-identifier.js";
@@ -237,40 +236,11 @@ function Content({ assetLinks, base64, mediaType, text }: {
   readonly text?: string | null;
 }) {
   if (text !== null && text !== undefined && markdownMediaType(mediaType)) {
-    return (
-      <div className="border rounded bg-body-tertiary p-3 overflow-auto">
-        <ReactMarkdown
-          components={{
-            a: ({ children, href, title }) => {
-              const target = href && assetLinks ? skillAssetTarget(href, assetLinks) : null;
-              return target ? <Link title={title} to={target}>{children}</Link> : <a href={href} title={title}>{children}</a>;
-            },
-            table: ({ children }) => <table className="table table-striped table-bordered">{children}</table>,
-            input: ({ checked, ...properties }) => <input checked={checked} className="form-check-input me-2" disabled {...properties} />
-          }}
-          remarkPlugins={[remarkGfm]}
-          skipHtml
-        >
-          {text}
-        </ReactMarkdown>
-      </div>
-    );
+    return <MarkdownPreview assetLinks={assetLinks} text={text} />;
   }
   if (text !== null && text !== undefined) return <pre className="border rounded bg-body-tertiary p-3 mb-0 text-wrap overflow-auto">{text}</pre>;
   if (base64) return <div className="alert alert-secondary mb-0">Binary content is available through the GraphQL boundary; this browser does not render or transform it.</div>;
   return <div className="text-body-secondary">No content is available in this projection.</div>;
-}
-
-export function skillAssetTarget(href: string, assets: ReadonlyMap<string, string>): string | null {
-  try {
-    const url = new URL(href, "https://skill-assets.invalid/");
-    if (url.origin !== "https://skill-assets.invalid") return null;
-    const path = decodeURIComponent(url.pathname.slice(1));
-    const target = assets.get(path);
-    return target ? `${target}${url.hash}` : null;
-  } catch {
-    return null;
-  }
 }
 
 function markdownMediaType(mediaType: string | null | undefined): boolean {

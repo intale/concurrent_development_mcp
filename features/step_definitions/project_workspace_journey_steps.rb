@@ -340,12 +340,18 @@ When("the person follows the live global routes") do
   @global_skill_details = [ browser_record_refreshable_detail("Skill detail", selector: "h1") ]
   click_link "references/status.md", exact: true
   @global_skill_details << browser_record_refreshable_detail("Skill asset", selector: "h1")
-  @global_skill_gfm = {
-    table: page.has_css?("table.table.table-striped"),
-    task: page.has_css?("input[type='checkbox'][checked][disabled]"),
-    deleted: page.has_css?("del", text: "obsolete"),
-    script: page.has_css?("script", text: "unsafe", visible: :all)
-  }
+  preview = find("[data-markdown-preview]", wait: 10)
+  @global_skill_gfm = page.evaluate_script(<<~JAVASCRIPT, preview).transform_keys(&:to_sym)
+    (() => {
+      const root = arguments[0].shadowRoot;
+      return {
+        table: Boolean(root.querySelector("table tbody")?.textContent.includes("ready")),
+        task: Boolean(root.querySelector("input[type='checkbox'][checked][disabled]")),
+        deleted: root.querySelector("del")?.textContent === "obsolete",
+        script: Boolean(root.querySelector("script"))
+      };
+    })()
+  JAVASCRIPT
   click_link "Back to Skill"
   click_link "Back to Skills"
   assert_selector("table tbody tr", text: @browser_skill.name, count: 1)

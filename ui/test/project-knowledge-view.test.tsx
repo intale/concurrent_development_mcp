@@ -159,15 +159,15 @@ test("Skill, asset, Artifact, and relationship details stay on focused pages", (
   const artifactMarkup = render(<ArtifactDetail backTo="/artifacts?kind=docs" detail={artifact} relationshipsHref="/artifact/relationships" />);
   const relationshipMarkup = render(<RelationshipTable detail={relationships} peerHref={(id) => `/artifacts/${id}`} />);
 
-  assert.match(skillMarkup, /Given facts/);
+  assert.match(skillMarkup, /data-markdown-preview=""/);
   assert.match(skillMarkup, /href="\/asset\/references\/example\.md"/);
   assert.match(skillMarkup, /<caption class="visually-hidden">Skill assets<\/caption>/);
   assert.match(skillMarkup, /<th scope="col">Executable<\/th>/);
   assert.match(skillMarkup, /Back to Skills/);
-  assert.match(assetMarkup, /Example content/);
+  assert.match(assetMarkup, /data-markdown-preview=""/);
   assert.match(assetMarkup, /Back to Skill/);
   assert.match(artifactMarkup, /View 1 relationships/);
-  assert.match(artifactMarkup, /<h1>Parent README<\/h1>/);
+  assert.match(artifactMarkup, /data-markdown-preview=""/);
   assert.doesNotMatch(artifactMarkup, /Child guide/);
   assert.match(relationshipMarkup, /Child guide/);
   assert.match(relationshipMarkup, /<caption class="visually-hidden">Artifact relationships<\/caption>/);
@@ -176,7 +176,7 @@ test("Skill, asset, Artifact, and relationship details stay on focused pages", (
   assert.doesNotMatch(relationshipMarkup, /<article/);
 });
 
-test("Markdown content renders GFM without executing embedded HTML or unsafe links", () => {
+test("Markdown assets use the shared isolated preview rather than light-DOM rendering", () => {
   const markdownAsset = {
     asset: {
       ...asset.asset,
@@ -185,9 +185,9 @@ test("Markdown content renders GFM without executing embedded HTML or unsafe lin
   } satisfies ProjectSkillAsset;
   const markup = render(<SkillAssetDetail backTo="/skills/event-modeling" detail={markdownAsset} />);
 
-  assert.match(markup, /class="table table-striped table-bordered"/);
-  assert.match(markup, /type="checkbox"/);
-  assert.match(markup, /<del>obsolete<\/del>/);
+  assert.match(markup, /data-markdown-preview=""/);
+  assert.match(markup, /aria-label="Markdown preview"/);
+  assert.doesNotMatch(markup, /table-striped table-bordered|form-check-input/);
   assert.doesNotMatch(markup, /<script>/);
   assert.doesNotMatch(markup, /javascript:/);
 });
