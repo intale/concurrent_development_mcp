@@ -19,13 +19,11 @@ Rails.application.configure do
   # Enable server timing.
   config.server_timing = true
 
-  # Enable/disable Action Controller caching. By default Action Controller caching is disabled.
-  # Run rails dev:cache to toggle Action Controller caching.
-  if Rails.root.join("tmp/caching-dev.txt").exist?
-    config.public_file_server.headers = { "cache-control" => "public, max-age=#{2.days.to_i}" }
-  else
-    config.action_controller.perform_caching = false
-  end
+  # Stable frontend filenames are overwritten on rebuild, so never cache development assets.
+  config.public_file_server.headers = { "cache-control" => "no-store" }
+
+  # Run rails dev:cache to toggle controller caching without changing browser asset caching.
+  config.action_controller.perform_caching = Rails.root.join("tmp/caching-dev.txt").exist?
 
   # Change to :null_store to avoid any caching.
   config.cache_store = :memory_store
