@@ -3,6 +3,7 @@
 module Coordinator::Mcp
   module Tasks
     class Extension
+      CAPABILITIES = { "io.modelcontextprotocol/tasks" => {}.freeze }.freeze
       GET_METHOD = "tasks/get"
       UPDATE_METHOD = "tasks/update"
       CANCEL_METHOD = "tasks/cancel"
@@ -39,7 +40,6 @@ module Coordinator::Mcp
       private
 
       def get_task(params, server_context:)
-        require_capability!(server_context, params)
         attributes = validate(@get_contract, params)
         state = operation_value(
           @get_task.call(task_id: attributes.fetch(:taskId)),
@@ -52,7 +52,6 @@ module Coordinator::Mcp
       end
 
       def update_task(params, server_context:)
-        require_capability!(server_context, params)
         attributes = validate(@update_contract, params)
         operation_value(
           @acknowledge_task_input.call(task_id: attributes.fetch(:taskId)),
@@ -63,7 +62,6 @@ module Coordinator::Mcp
       end
 
       def cancel_task(params, server_context:)
-        require_capability!(server_context, params)
         attributes = validate(@cancel_contract, params)
         operation_value(
           @cancel_task.call(task_id: attributes.fetch(:taskId)),
@@ -71,14 +69,6 @@ module Coordinator::Mcp
         )
 
         @result_mapper.acknowledgement.to_h
-      end
-
-      def require_capability!(server_context, request)
-        Capability.require!(
-          server_context.client_capabilities,
-          modern: server_context.modern?,
-          request:
-        )
       end
 
       def validate(contract, params)

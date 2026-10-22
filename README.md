@@ -15,6 +15,22 @@ multiple agents, projects, and locations.
 
 ## Usage
 
+### MCP clients and asynchronous commands
+
+Clients do not need to advertise the Tasks extension to use this server. Discover
+the available tools and server capabilities normally. Read tools return the
+latest available projections; mutations always return durable asynchronous Task
+handles, including for clients that have not declared Tasks support.
+
+Persist each returned `taskId` and poll `tasks/get` at `pollIntervalMs` until it
+is terminal. Initial acceptance confirms submission, not command completion.
+Inspect the terminal result's `isError` and `structuredContent.completion` for
+the outcome and committed effects. Successful completion does not require an
+entity read-back, and projections may still lag. `tasks/update` and cooperative
+`tasks/cancel` are available without a Tasks capability declaration as well.
+The supported MCP protocol, envelope, transport and host checks still apply;
+there is no synchronous mutation fallback.
+
 ### Environment setup
 
 Steps to set up the development environment:

@@ -5,13 +5,7 @@ module McpAcceptanceWorld
   TASKS_EXTENSION = "io.modelcontextprotocol/tasks"
   IMPACT_POLICY_VERSION = "agent-choice-decision-impact/v1"
 
-  def tasks_capable=(value)
-    @tasks_capable = value
-  end
-
-  def tasks_capable?
-    @tasks_capable != false
-  end
+  attr_writer :client_capabilities
 
   def call_tool(name, arguments, expected_status: 200, client_id: "default")
     response = mcp_request(
@@ -1057,11 +1051,10 @@ module McpAcceptanceWorld
   end
 
   def modern_params(params, client_id:)
-    extensions = tasks_capable? ? { TASKS_EXTENSION => {} } : {}
     params.merge(
       _meta: {
         "io.modelcontextprotocol/protocolVersion": PROTOCOL_VERSION,
-        "io.modelcontextprotocol/clientCapabilities": { extensions: },
+        "io.modelcontextprotocol/clientCapabilities": @client_capabilities || {},
         "io.modelcontextprotocol/clientInfo": { name: "cucumber/#{client_id}", version: "1.0" }
       }
     )

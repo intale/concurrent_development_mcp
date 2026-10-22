@@ -81,7 +81,7 @@ RSpec.describe "VER-03 MCP verification-obligation waiver", :event_store do
     )
   end
 
-  it "requires Tasks and validates user attribution before allocating one" do
+  it "validates user attribution before Task allocation with or without advertised Tasks" do
     arguments = {
       command_id: "cmd-mcp-waiver-invalid",
       actor: { kind: "user", id: "user-label" },
@@ -89,16 +89,10 @@ RSpec.describe "VER-03 MCP verification-obligation waiver", :event_store do
       obligation_validity_input_digest: "sha256:#{"a" * 64}",
       reason: { code: "accepted_risk", summary: "Accept exact risk." }
     }
-    missing_capability = call_tool(arguments, id: 1, capable: false)
-    invalid = call_tool(
-      arguments.merge(actor: { kind: "agent", id: "agent-a" }),
-      id: 2
-    )
-
-    expect(missing_capability.dig("error", "code")).to eq(-32_003)
-    expect(missing_capability.dig("error", "data", "requiredCapabilities", "extensions"))
-      .to eq(tasks_extension => {})
-    expect(invalid.dig("result", "isError")).to be(true)
+    [ false, true ].each_with_index do |capable, id|
+      invalid = call_tool(arguments.merge(actor: { kind: "agent", id: "agent-a" }), id:, capable:)
+      expect(invalid.dig("result", "isError")).to be(true)
+    end
     expect(task_events_for_command(arguments.fetch(:command_id))).to be_empty
   end
 

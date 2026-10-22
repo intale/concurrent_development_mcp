@@ -13,7 +13,7 @@ module McpWalkingSliceSpec
     end
   end
 
-  it "advertises mandatory Tasks and lists only the accepted application tools" do
+  it "advertises server Tasks support and lists tools without requiring client opt-in" do
     discovered = mcp_request(
       id: 1,
       method: "server/discover",
@@ -26,13 +26,14 @@ module McpWalkingSliceSpec
       discovered.dig("result", "capabilities", "extensions", TASKS_EXTENSION)
     ).to eq({})
     instructions = discovered.dig("result", "instructions")
+    expect(instructions).to include("Clients need not advertise Tasks support")
     expect(instructions).to include("skill_asset_get returns text for UTF-8 assets")
     expect(instructions).to include("canonical Base64 only for binary assets")
     expect(instructions).to include("intention IDs, Resource IDs, fencing tokens")
     expect(instructions).not_to include("resource hashes")
     expect(instructions).not_to include("passive Base64 content")
 
-    listed = mcp_request(id: 2, method: "tools/list", params: {})
+    listed = mcp_request(id: 2, method: "tools/list", params: {}, capable: false)
     tools = listed.dig("result", "tools")
     expect(tools.map { _1.fetch("name") }).to contain_exactly(
       "coord_context",
@@ -240,7 +241,7 @@ module McpWalkingSliceSpec
     expect(task_events_for_command("cmd-mcp-repository-invalid")).to be_empty
   end
 
-  it "serves an available repository projection without freshness gating", :read_model do
+  it "serves an available repository projection without freshness or client-capability gating", :read_model do
     repository = create(
       :coordinator_read_repository,
       scope: "project:payments/workspace:primary",
@@ -253,7 +254,8 @@ module McpWalkingSliceSpec
     projected = call_tool(
       "repository_list",
       { scope: repository.scope, repository_key: "payments", limit: 20 },
-      id: 8
+      id: 8,
+      capable: false
     ).dig("result", "structuredContent")
 
     expect(projected).to include("status" => "ok")
@@ -642,7 +644,8 @@ module McpWalkingSliceSpec
         goal: "Cancel before execution",
         acceptance_criteria: [ "No target facts are written" ]
       },
-      id: 1
+      id: 1,
+      capable: false
     )
     task_id = created.dig("result", "taskId")
 
@@ -650,13 +653,14 @@ module McpWalkingSliceSpec
       "tasks/update",
       task_id:,
       id: 2,
-      params: { inputResponses: { ignored: { action: "accept" } } }
+      params: { inputResponses: { ignored: { action: "accept" } } },
+      capable: false
     )
-    cancelled = task_request("tasks/cancel", task_id:, id: 3)
+    cancelled = task_request("tasks/cancel", task_id:, id: 3, capable: false)
     expect(updated.fetch("result")).to eq("resultType" => "complete")
     expect(cancelled.fetch("result")).to eq("resultType" => "complete")
 
-    state = task_request("tasks/get", task_id:, id: 4)
+    state = task_request("tasks/get", task_id:, id: 4, capable: false)
     expect(state.fetch("result")).to include(
       "status" => "cancelled",
       "statusMessage" => a_string_including("Cancelled before execution", "does not roll back")
@@ -667,60 +671,89 @@ module McpWalkingSliceSpec
     expect(change_set_events("CS-task-cancel")).to be_empty
   end
 
-  it "rejects clients without Tasks and validates Task handles and routing headers", :event_store do
+  it "submits and recovers a durable Task without a client Tasks declaration", :event_store do
     arguments = {
       command_id: "cmd-task-capability",
       actor: { kind: "agent", id: "planner-1" },
       change_set_id: "CS-task-capability",
-      goal: "Require Tasks",
+      goal: "Discover and use asynchronous commands without opting in",
       acceptance_criteria: [ "No synchronous fallback exists" ]
     }
-    missing = call_tool(
+    created = call_tool(
       "change_set_create",
       arguments,
       id: 1,
       capable: false
     )
 
-    expect(missing.dig("error", "code")).to eq(-32_003)
-    expect(missing.dig("error", "data", "requiredCapabilities", "extensions")).to eq(
-      TASKS_EXTENSION => {}
-    )
-    expect(task_events_for_command(arguments.fetch(:command_id))).to be_empty
+    task_id = created.dig("result", "taskId")
+    expect(task_id).to match(Coordinator::Shared::Types::UUID_V7_PATTERN)
+    expect(created.dig("result", "resultType")).to eq("task")
+    expect(task_request("tasks/get", task_id:, id: 2, capable: false).dig("result", "status"))
+      .to eq("working")
+    expect(change_set_events(arguments.fetch(:change_set_id))).to be_empty
 
-    query_without_tasks = call_tool(
-      "operation_get",
-      { command_id: arguments.fetch(:command_id) },
-      id: 9,
-      capable: false
+    execute_task(task_id)
+    completed = task_request("tasks/get", task_id:, id: 3, capable: false)
+    expect(completed.dig("result", "status")).to eq("completed")
+    expect(completed.dig("result", "result", "isError")).to be(false)
+    expect(completed.dig("result", "result", "structuredContent", "completion")).to include(
+      "effects" => "committed", "read_back_required" => false
     )
-    expect(query_without_tasks.dig("error", "code")).to eq(-32_003)
 
+    replay = call_tool("change_set_create", arguments, id: 4, capable: false)
+    expect(replay.dig("result", "taskId")).to eq(task_id)
+    expect(task_events(task_id).count { _1.type == "CoordinationTaskSubmitted" }).to eq(1)
+  end
+
+  it "validates Task handles and routing headers without a client Tasks declaration", :event_store do
     unknown_id = "02919191-9191-7191-8191-919191919191"
     unknown = task_request(
       "tasks/get",
       task_id: unknown_id,
       id: 2,
+      capable: false,
       expected_status: 400
     )
     expect(unknown.dig("error", "code")).to eq(-32_602)
-
-    task_capability = task_request(
-      "tasks/get",
-      task_id: unknown_id,
-      id: 3,
-      capable: false
-    )
-    expect(task_capability.dig("error", "code")).to eq(-32_003)
 
     missing_name = task_request(
       "tasks/get",
       task_id: unknown_id,
       id: 4,
+      capable: false,
       include_name: false,
       expected_status: 400
     )
     expect(missing_name.dig("error", "code")).to eq(-32_020)
+  end
+
+  it "allows a conventional client with no modern metadata to submit and poll Tasks", :event_store do
+    initialized = conventional_request(
+      "initialize",
+      { protocolVersion: "2025-11-25", capabilities: {}, clientInfo: { name: "ordinary-client", version: "1" } },
+      id: 1
+    )
+    expect(initialized.dig("result", "protocolVersion")).to eq("2025-11-25")
+    listed = conventional_request("tools/list", {}, id: 2)
+    expect(listed.dig("result", "tools").map { _1.fetch("name") }).to include("change_set_create")
+
+    created = conventional_request(
+      "tools/call",
+      { name: "change_set_create", arguments: {
+        command_id: "cmd-conventional-task", actor: { kind: "agent", id: "ordinary-client" },
+        change_set_id: "CS-conventional-task", goal: "Use discovered Tasks", acceptance_criteria: [ "Durable submission" ]
+      } },
+      id: 3
+    )
+    task_id = created.dig("result", "taskId")
+    expect(task_id).to match(Coordinator::Shared::Types::UUID_V7_PATTERN)
+    pending = conventional_request("tasks/get", { taskId: task_id }, id: 4)
+    expect(pending.dig("result", "status")).to eq("working")
+    execute_task(task_id)
+    completed = conventional_request("tasks/get", { taskId: task_id }, id: 5)
+    expect(completed.dig("result", "status")).to eq("completed")
+    expect(completed.dig("result", "result", "isError")).to be(false)
   end
 
   it "retains MCP host protection" do
@@ -797,6 +830,20 @@ module McpWalkingSliceSpec
         "io.modelcontextprotocol/clientInfo": { name: "rspec", version: "1.0" }
       }
     )
+  end
+
+  def conventional_request(method, params, id:)
+    session.post(
+      "/mcp",
+      params: JSON.generate(jsonrpc: "2.0", id:, method:, params:),
+      headers: {
+        "Content-Type" => "application/json",
+        "Accept" => "application/json, text/event-stream",
+        "MCP-Protocol-Version" => "2025-11-25"
+      }
+    )
+    expect(session.response.status).to eq(200), session.response.body
+    JSON.parse(session.response.body)
   end
 
   def request_headers(method:, name: nil)

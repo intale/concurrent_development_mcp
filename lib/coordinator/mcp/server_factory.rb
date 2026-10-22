@@ -8,13 +8,14 @@ module Coordinator
         prompts: { listChanged: true },
         resources: { listChanged: true },
         logging: {},
-        extensions: Tasks::Capability::EXTENSIONS
+        extensions: Tasks::Extension::CAPABILITIES
       }.freeze
 
       INSTRUCTIONS = <<~TEXT.freeze
         Coordinate checkpointed concurrent development across repositories.
         Actor fields are attribution labels, not authenticated identities.
-        Every application request requires the io.modelcontextprotocol/tasks capability.
+        Clients need not advertise Tasks support. Discover available tools and server Tasks support
+        normally; application tools and tasks/get, tasks/update and tasks/cancel require no Tasks opt-in.
         Mutations return durable Task handles: persist each taskId, poll tasks/get at
         pollIntervalMs, and use tasks/cancel for cooperative cancellation. Initial acceptance
         confirms only that the request is durable. Terminal results describe exactly which

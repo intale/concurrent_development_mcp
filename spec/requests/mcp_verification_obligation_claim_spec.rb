@@ -83,20 +83,16 @@ RSpec.describe "VER-01 MCP verification-obligation claims", :event_store do
     )
   end
 
-  it "requires Tasks and rejects an invalid duration before allocating one" do
+  it "rejects an invalid duration before Task allocation with or without advertised Tasks" do
     arguments = claim_arguments(
       obligation_id: "obl-input-gate",
       command_id: "cmd-mcp-claim-invalid",
       agent_id: "agent-blue"
     )
-    missing_capability = call_tool(arguments, id: 1, capable: false)
-    invalid = call_tool(arguments.merge(claim_duration_seconds: 29), id: 2)
-
-    expect(missing_capability.dig("error", "code")).to eq(-32_003)
-    expect(missing_capability.dig("error", "data", "requiredCapabilities", "extensions")).to eq(
-      CLAIM_TASKS_EXTENSION => {}
-    )
-    expect(invalid.dig("result", "isError")).to be(true)
+    [ false, true ].each_with_index do |capable, id|
+      invalid = call_tool(arguments.merge(claim_duration_seconds: 29), id:, capable:)
+      expect(invalid.dig("result", "isError")).to be(true)
+    end
     expect(task_events_for_command(arguments.fetch(:command_id))).to be_empty
   end
 

@@ -6,6 +6,7 @@ module Coordinator
       end
 
       class Extension
+        CAPABILITIES: Hash[String, Hash[untyped, untyped]]
         GET_METHOD: String
         UPDATE_METHOD: String
         CANCEL_METHOD: String

@@ -86,7 +86,7 @@ RSpec.describe "VER-02 MCP compatibility assessments", :event_store do
     expect(command_events(arguments.fetch(:command_id))).to be_empty
   end
 
-  it "requires Tasks and rejects invalid non-passed evidence before Task allocation" do
+  it "rejects invalid evidence before Task allocation with or without advertised Tasks" do
     created = CandidateObligationScenario.create_obligation(prefix: "mcp-assessment-input")
     claim = CandidateObligationScenario.claim_obligation(created:, prefix: "mcp-assessment-input")
     arguments = assessment_arguments(
@@ -97,15 +97,11 @@ RSpec.describe "VER-02 MCP compatibility assessments", :event_store do
     )
     arguments[:assessment][:findings] = []
 
-    missing_capability = call_tool(arguments, id: 1, capable: false)
-    invalid = call_tool(arguments, id: 2)
-
-    expect(missing_capability.dig("error", "code")).to eq(-32_003)
-    expect(missing_capability.dig("error", "data", "requiredCapabilities", "extensions")).to eq(
-      ASSESSMENT_TASKS_EXTENSION => {}
-    )
-    expect(invalid.dig("error", "code")).to eq(-32_602)
-    expect(invalid.dig("error", "data", "code")).to eq("invalid_input")
+    [ false, true ].each_with_index do |capable, id|
+      invalid = call_tool(arguments, id:, capable:)
+      expect(invalid.dig("error", "code")).to eq(-32_602)
+      expect(invalid.dig("error", "data", "code")).to eq("invalid_input")
+    end
     expect(task_events_for_command(arguments.fetch(:command_id))).to be_empty
   end
 

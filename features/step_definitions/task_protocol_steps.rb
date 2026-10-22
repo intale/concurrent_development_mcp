@@ -1,11 +1,29 @@
 # frozen_string_literal: true
 
 Given("an MCP agent supports checkpointed Tasks") do
-  self.tasks_capable = true
+  self.client_capabilities = { extensions: { McpAcceptanceWorld::TASKS_EXTENSION => {} } }
 end
 
-Given("an MCP client does not support checkpointed Tasks") do
-  self.tasks_capable = false
+Given("an MCP client advertises {string}") do |declaration|
+  self.client_capabilities = {
+    "no extensions" => {},
+    "empty extensions" => { extensions: {} },
+    "an unrelated extension" => { extensions: { "example.test/other" => {} } }
+  }.fetch(declaration)
+end
+
+When("the client discovers the coordinator's asynchronous tools") do
+  discovered = mcp_request(method: "server/discover", params: {})
+  assert_acceptance_equal(
+    {}, discovered.dig("result", "capabilities", "extensions", McpAcceptanceWorld::TASKS_EXTENSION),
+    "Advertised server Tasks support"
+  )
+  assert_acceptance(
+    discovered.dig("result", "instructions").include?("Clients need not advertise Tasks support"),
+    "Discovery must explain that client Tasks advertisement is optional"
+  )
+  tools = mcp_request(method: "tools/list", params: {}).dig("result", "tools")
+  assert_acceptance(tools.any? { _1.fetch("name") == "change_set_create" }, "Mutation tool discovery")
 end
 
 When("agent {string} submits ChangeSet {string} with command {string}") do |agent_id, change_set_id, command_id|
@@ -420,37 +438,20 @@ Then("the newer WorkItem exists only on the write side of that response") do
   assert_acceptance_equal([], work_items, "Lagging projected WorkItems")
 end
 
-When("agent {string} attempts ChangeSet {string} with command {string}") do |agent_id, change_set_id, command_id|
-  @current_arguments = {
-    command_id:,
-    actor: { kind: "agent", id: agent_id },
-    change_set_id:,
-    goal: "Coordinate #{change_set_id}",
-    acceptance_criteria: [ "Tasks are mandatory" ]
-  }
-  @current_response = call_tool("change_set_create", @current_arguments)
-end
-
-Then("the server requires the Tasks extension") do
-  assert_acceptance_equal(-32_003, @current_response.dig("error", "code"), "Capability error code")
+Then("the agent can inspect its completed ChangeSet context without declaring Tasks") do
+  change_set_id = @current_arguments.fetch(:change_set_id)
+  context = await_read_model("Completed ChangeSet context for an unadvertised client") do
+    result = call_tool("coord_context", { change_set_id: }).dig("result", "structuredContent")
+    [ result.fetch("status") == "ok", result ]
+  end
   assert_acceptance_equal(
-    { McpAcceptanceWorld::TASKS_EXTENSION => {} },
-    @current_response.dig("error", "data", "requiredCapabilities", "extensions"),
-    "Required Tasks capability"
+    change_set_id, context.dig("data", "context", "change_set", "change_set_id"),
+    "Projected ChangeSet identity"
   )
-end
-
-Then("the rejected request writes no coordination facts") do
   assert_acceptance_equal(
-    [],
-    task_events_for_request(
-      @current_arguments.fetch(:command_id),
-      actor: @current_arguments.fetch(:actor)
-    ),
-    "Rejected Task submissions"
+    @current_arguments.fetch(:goal), context.dig("data", "context", "change_set", "goal"),
+    "Projected ChangeSet goal"
   )
-  assert_acceptance_equal([], command_events(@current_arguments.fetch(:command_id)), "Command facts")
-  assert_no_current_target_facts
 end
 
 

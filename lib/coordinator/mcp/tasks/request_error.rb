@@ -3,21 +3,10 @@
 module Coordinator::Mcp
   module Tasks
     class RequestError < ::MCP::Server::RequestHandlerError
-      MISSING_CAPABILITY_CODE = -32_003
       INVALID_PARAMS_CODE = -32_602
       INTERNAL_ERROR_CODE = -32_603
 
       class << self
-        def missing_capability(request)
-          new(
-            "Missing required client capability",
-            request,
-            error_type: :missing_required_client_capability,
-            error_code: MISSING_CAPABILITY_CODE,
-            error_data: { requiredCapabilities: Capability::REQUIRED_CAPABILITIES }
-          )
-        end
-
         def invalid_task_request(errors, request)
           new(
             "Invalid Task request",

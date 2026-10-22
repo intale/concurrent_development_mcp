@@ -27,13 +27,17 @@ RSpec.describe Coordinator::Mcp::Tasks::Server, :event_store, observability: tru
     expect(metric.data_points.sum(&:value)).to eq(2)
   end
 
-  it "covers every registry tool even when the client lacks the required capability" do
+  it "covers every registry tool without client capability metadata" do
     Coordinator::Mcp::ToolRegistry.all.each do |tool|
       result = server.handle(request("tools/call", "name" => tool.tool_name, "arguments" => {}))
-      expect(result.dig(:error, :code)).to eq(-32_003)
+      if result.key?(:error)
+        expect(result.dig(:error, :code)).to eq(-32_602), result.inspect
+      else
+        expect(result.fetch(:result)).to include(:content, :isError)
+      end
     end
     expect(mcp_spans.map { _1.attributes.fetch("mcp.tool.name") }).to contain_exactly(*Coordinator::Mcp::ToolRegistry.all.map(&:tool_name))
-    expect(mcp_spans.map { _1.attributes.fetch("outcome") }.uniq).to eq([ "denied" ])
+    expect(mcp_spans.map { _1.attributes.fetch("outcome") }.uniq - %w[ok error invalid]).to be_empty
   end
 
   it "bounds unknown caller-controlled labels and retains native parse/validation errors" do
