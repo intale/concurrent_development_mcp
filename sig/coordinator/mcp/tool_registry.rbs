@@ -1,7 +1,9 @@
 module Coordinator
   module Mcp
     module ToolRegistry
-      def self.all: () -> Array[singleton(Tool)]
+      type registered_tool = singleton(Tool) | singleton(Tools::TaskGet) | singleton(Tools::TaskCancel)
+
+      def self.all: () -> Array[registered_tool]
     end
   end
 end

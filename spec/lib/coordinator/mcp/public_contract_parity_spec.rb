@@ -50,7 +50,11 @@ RSpec.describe "MCP public contract parity" do
   it "publishes one named strict data contract for every public tool family" do
     mutation_tools.each do |tool|
       contract = Coordinator::Write::Tasks::TargetContractRegistry.fetch(tool.tool_name)
-      data_schemas = tool.output_schema.to_h.dig(:properties, :data, :oneOf)
+      accepted, terminal = tool.output_schema.to_h.fetch(:oneOf)
+      expect(accepted).to include(
+        title: "Coordinator::Mcp::Tasks::ResultV1::Created", type: "object", additionalProperties: false
+      )
+      data_schemas = terminal.dig(:properties, :data, :oneOf)
       receipt_schema = data_schemas.find { _1[:title] == contract.task_receipt_class.name }
 
       expect(receipt_schema).to include(type: "object", additionalProperties: false), tool.tool_name
@@ -65,6 +69,15 @@ RSpec.describe "MCP public contract parity" do
       schemas = tool.output_schema.to_h.dig(:properties, :data, :oneOf)
       expect(schemas).to all(include(type: "object", additionalProperties: false, title: a_string_matching(/\A.+\z/)))
     end
+  end
+
+  it "publishes strict lifecycle schemas separately from read-model query and domain-command contracts" do
+    get_tool = Coordinator::Mcp::Tools::TaskGet
+    cancel_tool = Coordinator::Mcp::Tools::TaskCancel
+    expect(get_tool.input_schema.to_h).to include(additionalProperties: false, required: [ "task_id" ])
+    expect(get_tool.output_schema.to_h.fetch(:oneOf)).to all(include(type: "object", additionalProperties: false))
+    expect(cancel_tool.input_schema.to_h).to eq(get_tool.input_schema.to_h)
+    expect(cancel_tool.output_schema.to_h).to include(type: "object", additionalProperties: false)
   end
 
   it "binds every emitted next-action name to its target input schema" do

@@ -36,7 +36,7 @@ When("agent {string} submits ChangeSet {string} with command {string}") do |agen
     acceptance_criteria: [ "Agents do not overlap" ]
   }
   @current_response = call_tool(@current_tool, @current_arguments)
-  @current_task_id = @current_response.dig("result", "taskId")
+  @current_task_id = task_handle(@current_response)
 end
 
 Then("the Task is durable before coordination begins") do
@@ -83,7 +83,7 @@ end
 
 When("the same command is retried and resolves to its original Task") do
   @retry_response = call_tool(@current_tool, @current_arguments)
-  @retry_task_id = @retry_response.dig("result", "taskId")
+  @retry_task_id = task_handle(@retry_response)
   assert_acceptance_equal(@first_task_id, @retry_task_id, "Replayed Task identity")
 end
 
@@ -115,7 +115,7 @@ end
 
 When("the exact completed command request is retried") do
   response = call_tool(@current_tool, @current_arguments)
-  @replayed_task_id = response.dig("result", "taskId")
+  @replayed_task_id = task_handle(response)
   @current_task_id = @replayed_task_id
 end
 
@@ -277,7 +277,7 @@ When(
     command_id:
   )
   @current_response = call_tool(@current_tool, @current_arguments)
-  @current_task_id = @current_response.dig("result", "taskId")
+  @current_task_id = task_handle(@current_response)
 end
 
 Then("the current Task completes with coordination denial {string}") do |code|
@@ -297,7 +297,7 @@ When("agent {string} submits the same ChangeSet with command {string}") do |agen
     actor: { kind: "agent", id: agent_id }
   )
   @current_response = call_tool(@current_tool, @current_arguments)
-  @current_task_id = @current_response.dig("result", "taskId")
+  @current_task_id = task_handle(@current_response)
 end
 
 Then("the current Task eventually completes with coordination denial {string}") do |code|
@@ -326,7 +326,8 @@ end
 
 Then("the current Task is cancelled") do
   state = task_request("tasks/get", @current_task_id)
-  assert_acceptance_equal({ "resultType" => "complete" }, @cancel_response.fetch("result"), "Cancel acknowledgement")
+  acknowledgement = @cancel_response.dig("result", "structuredContent") || @cancel_response.fetch("result")
+  assert_acceptance_equal({ "resultType" => "complete" }, acknowledgement, "Cancel acknowledgement")
   assert_acceptance_equal("cancelled", state.dig("result", "status"), "Cancelled Task status")
 end
 
@@ -436,6 +437,41 @@ Then("the newer WorkItem exists only on the write side of that response") do
     "Persisted WorkItem facts"
   )
   assert_acceptance_equal([], work_items, "Lagging projected WorkItems")
+end
+
+Then("the client receives a standard tool result containing the durable Task handle") do
+  result = @current_response.fetch("result")
+  assert_acceptance(!result.key?("taskId"), "An ordinary client must not receive a raw CreateTaskResult")
+  assert_acceptance_equal(false, result.fetch("isError"), "Submission error")
+  assert_acceptance_equal(@current_task_id, result.dig("structuredContent", "taskId"), "Nested Task handle")
+  assert_acceptance_equal(
+    result.fetch("structuredContent"), JSON.parse(result.fetch("content").first.fetch("text")),
+    "Model-visible acceptance and structured acceptance"
+  )
+  tools = mcp_request(method: "tools/list", params: {}).dig("result", "tools").map { _1.fetch("name") }
+  assert_acceptance(%w[task_get task_cancel].all? { tools.include?(_1) }, "Ordinary lifecycle discovery")
+end
+
+Then("the ordinary task_get tool reports committed effects without a projection read-back") do
+  response = call_tool("task_get", { task_id: @current_task_id })
+  assert_acceptance(response.dig("result", "content").any?, "Standard status tool content")
+  task = response.dig("result", "structuredContent")
+  assert_acceptance_equal("completed", task.fetch("status"), "Authoritative Task status")
+  assert_acceptance_equal(false, task.dig("result", "isError"), "Command error")
+  assert_acceptance_equal("committed", task.dig("result", "structuredContent", "completion", "effects"), "Committed effects")
+  assert_acceptance_equal(false, task.dig("result", "structuredContent", "completion", "read_back_required"), "Entity read-back requirement")
+end
+
+When("the ordinary client requests cancellation using task_cancel") do
+  @cancel_response = call_tool("task_cancel", { task_id: @current_task_id })
+  response = @cancel_response
+  assert_acceptance_equal(false, response.dig("result", "isError"), "Cancellation request error")
+  assert_acceptance(
+    response.dig("result", "content").any? { _1.fetch("text").include?("does not establish cancellation or rollback") },
+    "Cancellation acknowledgement must not promise rollback"
+  )
+  state = call_tool("task_get", { task_id: @current_task_id }).dig("result", "structuredContent")
+  assert_acceptance_equal("cancelled", state.fetch("status"), "Authoritative cancellation")
 end
 
 Then("the agent can inspect its completed ChangeSet context without declaring Tasks") do

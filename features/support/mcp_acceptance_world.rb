@@ -7,6 +7,10 @@ module McpAcceptanceWorld
 
   attr_writer :client_capabilities
 
+  def task_handle(response)
+    response.dig("result", "taskId") || response.dig("result", "structuredContent", "taskId")
+  end
+
   def call_tool(name, arguments, expected_status: 200, client_id: "default")
     response = mcp_request(
       method: "tools/call",
@@ -54,7 +58,7 @@ module McpAcceptanceWorld
 
   def submit_and_execute(tool, client_id: "default", task_timeout_seconds: LiveSubscriptions::DEFAULT_TIMEOUT_SECONDS, **arguments)
     response = call_tool(tool, arguments, client_id:)
-    task_id = response.dig("result", "taskId")
+    task_id = task_handle(response)
     assert_acceptance(task_id, "#{tool} did not return a Task handle: #{response.inspect}")
     start_process_subscriptions
     await_task_terminal(task_id, client_id:, timeout_seconds: task_timeout_seconds)
@@ -63,7 +67,7 @@ module McpAcceptanceWorld
 
   def submit_and_await(tool, client_id: "default", **arguments)
     response = call_tool(tool, arguments, client_id:)
-    task_id = response.dig("result", "taskId")
+    task_id = task_handle(response)
     assert_acceptance(task_id, "#{tool} did not return a Task handle: #{response.inspect}")
     start_process_subscriptions
     await_task_terminal(task_id, client_id:)
@@ -866,7 +870,7 @@ module McpAcceptanceWorld
 
   def remember_task_request(arguments, response)
     request_id = arguments[:command_id] || arguments["command_id"]
-    task_id = response.dig("result", "taskId")
+    task_id = task_handle(response)
     return unless request_id && task_id
 
     @task_ids_by_request ||= Hash.new { |index, key| index[key] = [] }
@@ -1051,10 +1055,12 @@ module McpAcceptanceWorld
   end
 
   def modern_params(params, client_id:)
+    # Domain journeys exercise native Tasks; ordinary-client scenarios explicitly
+    # override capabilities and assert their unmodified CallToolResult envelopes.
     params.merge(
       _meta: {
         "io.modelcontextprotocol/protocolVersion": PROTOCOL_VERSION,
-        "io.modelcontextprotocol/clientCapabilities": @client_capabilities || {},
+        "io.modelcontextprotocol/clientCapabilities": @client_capabilities || { extensions: { TASKS_EXTENSION => {} } },
         "io.modelcontextprotocol/clientInfo": { name: "cucumber/#{client_id}", version: "1.0" }
       }
     )

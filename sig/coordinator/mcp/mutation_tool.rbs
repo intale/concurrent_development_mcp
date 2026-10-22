@@ -6,7 +6,7 @@ module Coordinator
                             | (Hash[Symbol, untyped] value) -> untyped
       def self.operation: () -> String
                         | (String key) -> String
-      def self.call: (?server_context: ::MCP::ServerContext?, **untyped arguments) -> Tasks::ResultV1::Created
+        def self.call: (?server_context: ::MCP::ServerContext?, **untyped arguments) -> (Tasks::ResultV1::Created | ::MCP::Tool::Response)
     end
   end
 end

@@ -114,9 +114,11 @@ Feature: Durable MCP Task protocol
       Given an MCP client advertises "<capabilities>"
       When the client discovers the coordinator's asynchronous tools
       And agent "planner-1" submits ChangeSet "CS-CUC-CAPABILITY" with command "cmd-cuc-capability"
-      Then the Task is durable before coordination begins
+      Then the client receives a standard tool result containing the durable Task handle
+      And the Task is durable before coordination begins
       When the current Task completes through live subscriptions
       Then the current Task completes successfully
+      And the ordinary task_get tool reports committed effects without a projection read-back
       When the same command is retried through its original live Task
       Then the replayed Task exposes the same result
       And the command and ChangeSet facts exist only once
@@ -132,7 +134,8 @@ Feature: Durable MCP Task protocol
     Scenario: A client without a Tasks declaration cancels queued work
       Given an MCP client advertises "no extensions"
       When agent "planner-1" submits ChangeSet "CS-CUC-UNDECLARED-CANCEL" with command "cmd-cuc-undeclared-cancel"
-      And the agent cancels the current Task before execution
+      Then the client receives a standard tool result containing the durable Task handle
+      When the ordinary client requests cancellation using task_cancel
       And the Task executor later receives the cancelled Task
       Then the current Task is cancelled
       And the cancelled command writes no target coordination facts

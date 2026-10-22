@@ -1,0 +1,11 @@
+module Coordinator
+  module Mcp
+    module Tasks
+      module ResultSchemas
+        def self.created: () -> Hash[Symbol, untyped]
+        def self.detailed: () -> Hash[Symbol, untyped]
+        def self.acknowledgement: () -> Hash[Symbol, untyped]
+      end
+    end
+  end
+end

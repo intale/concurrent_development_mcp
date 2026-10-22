@@ -41,7 +41,13 @@ module Coordinator
           result = Container[operation].call(arguments)
           raise Tasks::RequestError.operation_failure(result.failure, arguments) if result.failure?
 
-          Container["mcp.tasks.result_mapper"].created(result.value!)
+          created = Container["mcp.tasks.result_mapper"].created(result.value!)
+          return created if Tasks::Extension.negotiated?(server_context)
+
+          Tasks::ToolResultPresenter.call(
+            created,
+            note: "Persist this taskId and poll task_get at pollIntervalMs for the authoritative outcome. Acceptance confirms the request is durable, not that its requested effects committed."
+          )
         end
 
         private

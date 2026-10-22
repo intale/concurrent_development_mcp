@@ -1,0 +1,9 @@
+module Coordinator
+  module Mcp
+    module Tasks
+      class TaskReferenceV1 < Shared::Value
+        def task_id: () -> String
+      end
+    end
+  end
+end

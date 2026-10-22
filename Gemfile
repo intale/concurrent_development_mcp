@@ -84,6 +84,7 @@ group :development, :test do
 end
 
 group :test do
+  gem "faraday", "~> 2.0"
   gem "timecop", ">= 0.9.11"
   gem "rack-test", ">= 2.2"
   gem "selenium-webdriver", ">= 4.0"

@@ -1,27 +1,14 @@
 module Coordinator
   module Mcp
     module Tasks
-      interface _TaskRequestContract
-        def call: (untyped input) -> Dry::Validation::Result
-      end
-
       class Extension
         CAPABILITIES: Hash[String, Hash[untyped, untyped]]
         GET_METHOD: String
         UPDATE_METHOD: String
         CANCEL_METHOD: String
 
-        def initialize: (
-          get_task: Coordinator::Write::Operations::GetCoordinationTask,
-          acknowledge_task_input: Coordinator::Write::Operations::AcknowledgeTaskInput,
-          cancel_task: Coordinator::Write::Operations::CancelCoordinationTask,
-          result_resolver: Coordinator::Write::Tasks::ResultResolver,
-          ?result_mapper: ResultMapper,
-          ?terminal_result_validator: TerminalResultValidator,
-          ?get_contract: _TaskRequestContract,
-          ?update_contract: _TaskRequestContract,
-          ?cancel_contract: _TaskRequestContract
-        ) -> void
+        def self.negotiated?: (::MCP::ServerContext? server_context) -> bool
+        def initialize: (lifecycle: Lifecycle) -> void
 
         def register: (::MCP::Server server) -> ::MCP::Server
       end

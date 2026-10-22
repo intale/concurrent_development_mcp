@@ -6,6 +6,10 @@ module Coordinator
       module_function
 
       def for(tool_name)
+        { oneOf: [ Tasks::ResultSchemas.created, terminal_for(tool_name) ] }
+      end
+
+      def terminal_for(tool_name)
         contract = Coordinator::Write::Tasks::TargetContractRegistry.fetch(tool_name)
         envelope = Schemas.envelope(
           data: {

@@ -1165,8 +1165,8 @@ module Coordinator
     register("tasks.result_resolver", memoize: true) do
       Write::Tasks::ResultResolver.new(event_store: self["event_store"])
     end
-    register("mcp.tasks.extension", memoize: true) do
-      Mcp::Tasks::Extension.new(
+    register("mcp.tasks.lifecycle", memoize: true) do
+      Mcp::Tasks::Lifecycle.new(
         get_task: self["operations.get_coordination_task"],
         acknowledge_task_input: self["operations.acknowledge_task_input"],
         cancel_task: self["operations.cancel_coordination_task"],
@@ -1174,6 +1174,9 @@ module Coordinator
         result_resolver: self["tasks.result_resolver"],
         terminal_result_validator: Mcp::Tasks::TerminalResultValidator.new
       )
+    end
+    register("mcp.tasks.extension", memoize: true) do
+      Mcp::Tasks::Extension.new(lifecycle: self["mcp.tasks.lifecycle"])
     end
     register("mcp.server", memoize: true) do
       Mcp::ServerFactory.new(tasks_extension: self["mcp.tasks.extension"]).call

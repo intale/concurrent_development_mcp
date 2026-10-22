@@ -1,0 +1,26 @@
+module Coordinator
+  module Mcp
+    module Tasks
+      interface _TaskRequestContract
+        def call: (untyped input) -> Dry::Validation::Result
+      end
+
+      class Lifecycle
+        def initialize: (
+          get_task: Coordinator::Write::Operations::GetCoordinationTask,
+          acknowledge_task_input: Coordinator::Write::Operations::AcknowledgeTaskInput,
+          cancel_task: Coordinator::Write::Operations::CancelCoordinationTask,
+          result_resolver: Coordinator::Write::Tasks::ResultResolver,
+          ?result_mapper: ResultMapper,
+          ?terminal_result_validator: TerminalResultValidator,
+          ?get_contract: _TaskRequestContract,
+          ?update_contract: _TaskRequestContract,
+          ?cancel_contract: _TaskRequestContract
+        ) -> void
+        def get: (Hash[untyped, untyped] params) -> ResultV1::detailed
+        def update: (Hash[untyped, untyped] params) -> ResultV1::Acknowledgement
+        def cancel: (Hash[untyped, untyped] params) -> ResultV1::Acknowledgement
+      end
+    end
+  end
+end

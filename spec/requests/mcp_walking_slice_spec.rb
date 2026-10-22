@@ -40,6 +40,8 @@ module McpWalkingSliceSpec
       "coordination_list",
       "attempt_list",
       "operation_get",
+      "task_get",
+      "task_cancel",
       "guidance_get",
       "decision_interpretation_list",
       "decision_get",
@@ -647,7 +649,7 @@ module McpWalkingSliceSpec
       id: 1,
       capable: false
     )
-    task_id = created.dig("result", "taskId")
+    task_id = created.dig("result", "structuredContent", "taskId")
 
     updated = task_request(
       "tasks/update",
@@ -686,9 +688,11 @@ module McpWalkingSliceSpec
       capable: false
     )
 
-    task_id = created.dig("result", "taskId")
+    task_id = created.dig("result", "structuredContent", "taskId")
     expect(task_id).to match(Coordinator::Shared::Types::UUID_V7_PATTERN)
-    expect(created.dig("result", "resultType")).to eq("task")
+    expect(created.dig("result", "content")).not_to be_empty
+    expect(created.dig("result", "resultType")).to eq("complete")
+    expect(created.dig("result", "structuredContent", "resultType")).to eq("task")
     expect(task_request("tasks/get", task_id:, id: 2, capable: false).dig("result", "status"))
       .to eq("working")
     expect(change_set_events(arguments.fetch(:change_set_id))).to be_empty
@@ -702,7 +706,9 @@ module McpWalkingSliceSpec
     )
 
     replay = call_tool("change_set_create", arguments, id: 4, capable: false)
-    expect(replay.dig("result", "taskId")).to eq(task_id)
+    expect(replay.dig("result", "structuredContent", "taskId")).to eq(task_id)
+    native_replay = call_tool("change_set_create", arguments, id: 5, capable: true)
+    expect(native_replay.dig("result", "taskId")).to eq(task_id)
     expect(task_events(task_id).count { _1.type == "CoordinationTaskSubmitted" }).to eq(1)
   end
 
@@ -746,7 +752,7 @@ module McpWalkingSliceSpec
       } },
       id: 3
     )
-    task_id = created.dig("result", "taskId")
+    task_id = created.dig("result", "structuredContent", "taskId")
     expect(task_id).to match(Coordinator::Shared::Types::UUID_V7_PATTERN)
     pending = conventional_request("tasks/get", { taskId: task_id }, id: 4)
     expect(pending.dig("result", "status")).to eq("working")
@@ -754,6 +760,59 @@ module McpWalkingSliceSpec
     completed = conventional_request("tasks/get", { taskId: task_id }, id: 5)
     expect(completed.dig("result", "status")).to eq("completed")
     expect(completed.dig("result", "result", "isError")).to be(false)
+  end
+
+  it "supports a real SDK client using only ordinary tools for asynchronous writes and cancellation", :event_store do
+    server = Puma::Server.new(Rails.application, nil, min_threads: 0, max_threads: 4)
+    server.add_tcp_listener("127.0.0.1", 0)
+    server.run
+    transport = MCP::Client::HTTP.new(url: "http://127.0.0.1:#{server.connected_ports.sole}/mcp")
+    client = MCP::Client.new(transport:)
+    client.connect(protocol_version: PROTOCOL_VERSION, capabilities: {})
+    expect(client.tools.map(&:name)).to include("task_get", "task_cancel", "development_artifact_capture")
+
+    arguments = {
+      command_id: "cmd-sdk-artifact", actor: { kind: "agent", id: "ordinary-sdk-client" },
+      scope: "project:sdk-client", title: "SDK checkpoint", kind: "repository_checkpoint", labels: [ "verified" ],
+      content: { encoding: "utf-8", media_type: "application/json", text: JSON.generate(note: "UTF-8 evidence 日本語", evidence: Array.new(150) { "completed native case" }) },
+      source: { kind: "generated", locator: "sdk:checkpoint", collector: "ordinary-sdk-client", revision: nil, observed_at: "2026-10-22T13:31:17.648000Z" }
+    }
+    response = client.call_tool(name: "development_artifact_capture", arguments:)
+    accepted = response.fetch("result")
+    expect(accepted.fetch("content")).to all(include("type" => "text"))
+    expect(accepted.fetch("isError")).to be(false)
+    task_id = accepted.fetch("structuredContent").fetch("taskId")
+    expect(accepted).not_to have_key("taskId")
+    expect(JSON.parse(accepted.fetch("content").first.fetch("text"))).to eq(accepted.fetch("structuredContent"))
+    expect(client.call_tool(name: "task_get", arguments: { task_id: }).dig("result", "structuredContent", "status")).to eq("working")
+    execute_task(task_id)
+    completed = client.call_tool(name: "task_get", arguments: { task_id: }).dig("result", "structuredContent")
+    expect(completed).to include("status" => "completed", "result" => include("isError" => false))
+    expect(completed.dig("result", "structuredContent", "completion")).to include("effects" => "committed", "read_back_required" => false)
+    expect(client.call_tool(name: "development_artifact_capture", arguments:).dig("result", "structuredContent", "taskId")).to eq(task_id)
+
+    denied = client.call_tool(name: "change_set_activate", arguments: {
+      command_id: "cmd-sdk-denied", actor: arguments.fetch(:actor), change_set_id: "missing-sdk-change-set"
+    }).dig("result", "structuredContent", "taskId")
+    execute_task(denied)
+    failure = client.call_tool(name: "task_get", arguments: { task_id: denied }).dig("result", "structuredContent")
+    expect(failure).to include("status" => "completed", "result" => include("isError" => true))
+
+    queued = client.call_tool(name: "change_set_create", arguments: {
+      command_id: "cmd-sdk-cancel", actor: arguments.fetch(:actor), change_set_id: "CS-sdk-cancel",
+      goal: "Cancel queued work", acceptance_criteria: [ "No target effects" ]
+    }).dig("result", "structuredContent", "taskId")
+    cancelled = client.call_tool(name: "task_cancel", arguments: { task_id: queued })
+    expect(cancelled.dig("result", "isError")).to be(false)
+    expect(cancelled.dig("result", "content").last.fetch("text")).to include("does not establish cancellation or rollback")
+    expect(client.call_tool(name: "task_get", arguments: { task_id: queued }).dig("result", "structuredContent", "status")).to eq("cancelled")
+    execute_task(queued)
+    expect(change_set_events("CS-sdk-cancel")).to be_empty
+    expect { client.call_tool(name: "task_get", arguments: { task_id: SecureRandom.uuid_v7 }) }
+      .to raise_error(MCP::Client::RequestHandlerError, /invalid/)
+  ensure
+    transport&.close
+    server&.stop(true)
   end
 
   it "retains MCP host protection" do

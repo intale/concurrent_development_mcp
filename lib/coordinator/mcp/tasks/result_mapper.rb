@@ -70,7 +70,7 @@ module Coordinator::Mcp
       end
 
       def acceptance_message(state)
-        return "The original Task is #{state.status}; retrieve its authoritative outcome through tasks/get. Do not resubmit a new mutation to confirm persistence." if state.terminal?
+        return "The original Task is #{state.status}; retrieve its authoritative outcome through task_get (or tasks/get for extension clients). Do not resubmit a new mutation to confirm persistence." if state.terminal?
 
         note = "The request is durably recorded, but its requested effects are not yet confirmed. Poll this Task at pollIntervalMs; entity reads may lag and cannot establish completion."
         [ state.status_message, note ].compact.join(" ")

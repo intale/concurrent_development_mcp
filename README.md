@@ -22,12 +22,18 @@ the available tools and server capabilities normally. Read tools return the
 latest available projections; mutations always return durable asynchronous Task
 handles, including for clients that have not declared Tasks support.
 
-Persist each returned `taskId` and poll `tasks/get` at `pollIntervalMs` until it
-is terminal. Initial acceptance confirms submission, not command completion.
+Ordinary clients receive a standard MCP tool result (`content` and
+`structuredContent`), with the Task handle in `structuredContent.taskId`.
+Persist it and call the discoverable `task_get` tool with `{ "task_id": "..." }`
+at `pollIntervalMs` until terminal. Use `task_cancel` for cooperative cancellation;
+its acknowledgement does not establish cancellation or roll back effects.
+Initial acceptance confirms submission, not command completion.
 Inspect the terminal result's `isError` and `structuredContent.completion` for
 the outcome and committed effects. Successful completion does not require an
-entity read-back, and projections may still lag. `tasks/update` and cooperative
-`tasks/cancel` are available without a Tasks capability declaration as well.
+entity read-back, and projections may still lag. Only modern clients explicitly
+advertising `io.modelcontextprotocol/tasks` receive extension-native
+`CreateTaskResult` responses. They may use `tasks/get`, `tasks/update`, and
+`tasks/cancel`; these protocol methods remain available without an admission gate.
 The supported MCP protocol, envelope, transport and host checks still apply;
 there is no synchronous mutation fallback.
 

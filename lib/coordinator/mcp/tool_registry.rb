@@ -11,6 +11,8 @@ module Coordinator
           Tools::CoordinationList,
           Tools::AttemptList,
           Tools::OperationGet,
+          Tools::TaskGet,
+          Tools::TaskCancel,
           Tools::GuidanceGet,
           Tools::DecisionInterpretationList,
           Tools::DecisionGet,

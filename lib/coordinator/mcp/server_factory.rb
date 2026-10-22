@@ -16,8 +16,10 @@ module Coordinator
         Actor fields are attribution labels, not authenticated identities.
         Clients need not advertise Tasks support. Discover available tools and server Tasks support
         normally; application tools and tasks/get, tasks/update and tasks/cancel require no Tasks opt-in.
-        Mutations return durable Task handles: persist each taskId, poll tasks/get at
-        pollIntervalMs, and use tasks/cancel for cooperative cancellation. Initial acceptance
+        Ordinary clients receive standard tool results with a durable Task handle in structuredContent.
+        Persist each taskId, call task_get with task_id at pollIntervalMs, and use task_cancel
+        for cooperative cancellation. Only modern clients explicitly advertising the Tasks extension
+        receive native CreateTaskResult responses and may poll tasks/get instead. Initial acceptance
         confirms only that the request is durable. Terminal results describe exactly which
         effects are durable: inspect result.isError and structuredContent.completion, not the
         Task status alone. A successful terminal receipt needs no entity read-back to prove

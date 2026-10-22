@@ -35,7 +35,8 @@ RSpec.describe Coordinator::Write::Tasks::TargetContractRegistry do
   it "publishes the exact success receipt shape and the strict error catalog per tool" do
     mutation_tools.each do |tool|
       contract = described_class.fetch(tool.tool_name)
-      data_variants = tool.to_h.dig(:outputSchema, :properties, :data, :oneOf)
+      terminal_schema = tool.to_h.fetch(:outputSchema).fetch(:oneOf).last
+      data_variants = terminal_schema.dig(:properties, :data, :oneOf)
       receipt_schema, error_schema = data_variants
 
       expect(receipt_schema.fetch(:required)).to contain_exactly(

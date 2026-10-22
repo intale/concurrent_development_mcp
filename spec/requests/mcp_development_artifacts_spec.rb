@@ -487,13 +487,13 @@ RSpec.describe "ART-01 MCP Development Artifacts" do
     locator_actions = resolve
       .dig("outputSchema", "properties", "next_actions", "items", "oneOf")
     capture_data = capture
-      .dig("outputSchema", "properties", "data", "oneOf", 0, "properties")
+      .dig("outputSchema", "oneOf", 1, "properties", "data", "oneOf", 0, "properties")
     classification_data = classification
-      .dig("outputSchema", "properties", "data", "oneOf", 0, "properties")
+      .dig("outputSchema", "oneOf", 1, "properties", "data", "oneOf", 0, "properties")
     update_data = update
-      .dig("outputSchema", "properties", "data", "oneOf", 0, "properties")
+      .dig("outputSchema", "oneOf", 1, "properties", "data", "oneOf", 0, "properties")
     declare_data = declare
-      .dig("outputSchema", "properties", "data", "oneOf", 0, "properties")
+      .dig("outputSchema", "oneOf", 1, "properties", "data", "oneOf", 0, "properties")
     expect(get_data).to include("artifact")
     expect(get_input).to include("artifact_id", "observation_id")
     expect(content_input).to include("artifact_id", "observation_id")

@@ -1,0 +1,9 @@
+module Coordinator
+  module Mcp
+    module Tasks
+      class ToolResultPresenter
+        def self.call: (ResultV1::Created | ResultV1::detailed | ResultV1::Acknowledgement result, ?note: String?) -> ::MCP::Tool::Response
+      end
+    end
+  end
+end
