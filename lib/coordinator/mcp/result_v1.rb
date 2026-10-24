@@ -9,6 +9,8 @@ module Coordinator::Mcp
     end
 
     Data = DomainError |
+           UsageSkills::PageData |
+           UsageSkills::DocumentData |
            Coordinator::Write::CommandReceiptData::Type |
            Coordinator::Read::QueryResultV1::Data
     Action = Coordinator::Write::NextAction | Coordinator::Read::NextAction

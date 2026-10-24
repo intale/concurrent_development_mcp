@@ -1,0 +1,10 @@
+module Coordinator
+  module Mcp
+    module UsageSkills
+      class Document < Summary
+        def instructions: () -> String
+        def assets: () -> Array[String]
+      end
+    end
+  end
+end

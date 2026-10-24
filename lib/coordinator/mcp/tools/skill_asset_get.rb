@@ -12,6 +12,12 @@ module Coordinator
         TEXT
         input_schema Schemas.skill_asset_get
         query "queries.skill_asset_get"
+
+        def self.call(server_context: nil, **arguments)
+          return super unless arguments[:scope] == UsageSkills::Catalog::SCOPE
+
+          response(UsageSkills::Query.new.asset(arguments))
+        end
       end
     end
   end

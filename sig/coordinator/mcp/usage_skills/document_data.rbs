@@ -1,0 +1,9 @@
+module Coordinator
+  module Mcp
+    module UsageSkills
+      class DocumentData < Shared::Value
+        def skill: () -> Document
+      end
+    end
+  end
+end

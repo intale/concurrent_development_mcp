@@ -19,7 +19,7 @@ RSpec.describe "Observability overhead" do
     request = JSON.generate(
       jsonrpc: "2.0", id: 1, method: "tools/call",
       params: {
-        name: "skill_list", arguments: { name: skill.name, limit: 10 },
+        name: "skill_list", arguments: { name: skill.name, scope: skill.scope, limit: 10 },
         _meta: {
           "io.modelcontextprotocol/protocolVersion" => "2026-07-28",
           "io.modelcontextprotocol/clientCapabilities" => { extensions: { "io.modelcontextprotocol/tasks" => {} } }

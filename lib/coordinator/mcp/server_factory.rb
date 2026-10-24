@@ -15,8 +15,9 @@ module Coordinator
         Coordinate checkpointed concurrent development across repositories; the server records facts,
         not Git/CI execution. Load the product entry guide with
         skill_get(name: "coordinator-getting-started", scope: "mcp:concurrent-development-coordinator").
-        Use skill_list in that exact scope for focused coordination, knowledge/import, search,
-        decision and integration/release guides. Tool descriptions and schemas remain in tools/list.
+        skill_list with no scope lists static built-in guides covering every server function;
+        they require no database, publication or installation. Each entry names its tools.
+        An explicit project scope lists stored Skill entities. Tool schemas remain in tools/list.
         Load project-specific Skills/guidance separately; scopes have no implicit precedence.
         Clients need not advertise Tasks support. Ordinary mutations return a durable Task handle
         in structuredContent; persist taskId and poll task_get(task_id: ...) at pollIntervalMs.
@@ -25,8 +26,8 @@ module Coordinator
         Reads may lag; commands recheck authoritative facts. Replay the exact command_id/payload
         after an unknown response; changed intent after a known outcome needs a new command_id.
         Cancellation never promises rollback. Actor labels are attribution, not authentication.
-        If usage Skills are not yet projected, tools remain available; use their live schemas and
-        ask the operator to run bin/install-mcp-skills. No bootstrap or freshness gate is imposed.
+        Built-in usage guides ship with the application; agents choose how to use retrieved
+        instructions. Project Skills and their assets are ordinary stored knowledge entities.
       TEXT
 
       def initialize(tasks_extension:)

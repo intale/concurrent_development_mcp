@@ -7,7 +7,7 @@ module Coordinator
         def details: () -> Hash[Symbol | String, untyped]
       end
 
-      type data = DomainError | Write::CommandReceiptData::value | Read::QueryResultV1::data
+      type data = DomainError | UsageSkills::PageData | UsageSkills::DocumentData | Write::CommandReceiptData::value | Read::QueryResultV1::data
       type action = Write::NextAction | Read::NextAction
 
       def status: () -> String

@@ -6,7 +6,7 @@ Feature: Current coordination runtime after history-transfer retirement
     Given an MCP agent supports checkpointed Tasks
 
   Scenario: A clean agent discovers product imports without a history-transfer endpoint
-    Given the product usage Skills are installed
+    Given the built-in server usage Skills are available
     When a clean agent asks the MCP endpoint how to migrate development memory
     Then the endpoint assigns project discovery to the agent without assuming paths or runtimes
     And the import-capable schemas require exact content and caller-owned provenance

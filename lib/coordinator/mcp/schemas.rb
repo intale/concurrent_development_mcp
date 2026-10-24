@@ -764,7 +764,7 @@ module Coordinator
             scope: { type: "string", minLength: 1, maxLength: Types::SKILL_SCOPE_MAXIMUM_BYTES },
             revision: {
               anyOf: [ { type: "integer", minimum: 1 }, { type: "null" } ],
-              description: "Omit for the latest available projected revision; provide a revision to pin one immutable snapshot."
+              description: "For built-in product Skills, pins the shipped bundle revision. In another scope, pins an available projected entity revision."
             }
           },
           required: %w[name scope]
@@ -774,6 +774,10 @@ module Coordinator
       def skill_list
         object_schema(
           properties: {
+            source: {
+              type: "string", enum: %w[server stored],
+              description: "Default is static server guides unless another scope is explicit. Use stored to query Skill entities across scopes."
+            },
             name: {
               anyOf: [
                 { type: "string", minLength: 1, maxLength: Types::SKILL_NAME_MAXIMUM_BYTES },

@@ -1,0 +1,8 @@
+module Coordinator
+  module Mcp
+    module UsageSkills
+      class ListContract < Dry::Validation::Contract
+      end
+    end
+  end
+end

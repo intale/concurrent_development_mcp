@@ -32,7 +32,7 @@ When("both scoped Skill facts reach the read side") do
 end
 
 Then("listing Skill {string} exposes both exact scopes") do |name|
-  page = call_tool("skill_list", { name:, limit: 20 })
+  page = call_tool("skill_list", { source: "stored", name:, limit: 20 })
     .dig("result", "structuredContent", "data", "page")
   assert_acceptance_equal(%w[home work], page.fetch("items").map { _1.fetch("scope") }.sort, "Exact scopes")
 end

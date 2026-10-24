@@ -2,6 +2,8 @@ module Coordinator
   module Mcp
     module UsageSkills
       class Catalog
+        FUNCTION_DESCRIPTIONS: Hash[String, String]
+        def self.build: (name: String, description: String, tools: Array[String], instructions: String) -> Definition
         SCOPE: String
         RELEASE: Integer
         ENTRY_SKILL: String

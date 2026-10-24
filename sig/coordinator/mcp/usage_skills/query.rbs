@@ -1,0 +1,18 @@
+module Coordinator
+  module Mcp
+    module UsageSkills
+      class Query
+        def list: (Hash[Symbol, untyped] input) -> ResultV1
+        def get: (Hash[Symbol, untyped] input) -> ResultV1
+        def asset: (Hash[Symbol, untyped] input) -> ResultV1
+
+        private
+
+        def summary: (Definition definition) -> Summary
+        def invalid: (Hash[Symbol | String, untyped] details) -> ResultV1
+        def not_found: (String code, String message, Hash[Symbol, untyped] details) -> ResultV1
+        def result: (status: String, summary: String, data: PageData | DocumentData | ResultV1::DomainError) -> ResultV1
+      end
+    end
+  end
+end

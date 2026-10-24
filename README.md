@@ -39,52 +39,26 @@ there is no synchronous mutation fallback.
 
 ### MCP usage Skills
 
-Product usage guides are ordinary versioned Skills in exact scope
-`mcp:concurrent-development-coordinator`. Start with:
+Call `skill_list` with no arguments to discover the built-in server capability
+guides. Each description lists its purpose and the tools it covers. Retrieve a
+guide through `skill_get`, starting with:
 
 ```json
 {"name":"coordinator-getting-started","scope":"mcp:concurrent-development-coordinator"}
 ```
 
-Pass that input to `skill_get`. The entry guide routes to focused Skills for
-development coordination, knowledge/imports, literal search, decisions/guidance,
-and integration/releases. `skill_list` in that scope discovers their descriptions.
-Project-specific development rules are separate Skills; no scope precedence is inferred.
+These are static application content, available without either database or
+subscription workers. They ship with the server and require no publication,
+installer, or local Skill files. Agents choose how to use the retrieved
+instructions. Responses identify their server source and bundle revision;
+they do not invent persisted events or publication provenance.
 
-After starting Rails and its coordinator subscriptions, explicitly install or
-update the bundled guides in the current Rails environment:
-
-```sh
-bin/install-mcp-skills
-```
-
-For a production container, the corresponding explicit operator command is:
-
-```sh
-docker compose --env-file .env.production --project-name concurrent-development-mcp-production -f docker-compose.production.yml exec web bin/install-mcp-skills
-```
-
-Nothing publishes automatically during startup/deployment. The command uses the
-public MCP JSON-RPC tools, not direct event-store or read-model writes. It manages
-only the six named product Skills in the exact product scope. Matching snapshots
-are authoritative no-ops; changed snapshots become new immutable revisions using
-optimistic expected revisions. Other Skills/scopes are untouched. Run the updater
-after an application update that changes the bundled guides.
-`MCP_USAGE_SKILL_TIMEOUT_SECONDS` controls the per-Task wait (default 60 seconds,
-range 0..3600); reaching it reports a pending handle without cancelling work.
-
-The command prints its run UUID and each durable Task handle before polling.
-Timeout/failure retains partial progress and never cancels or rolls it back.
-Poll `task_get` using a printed handle. For an interrupted request, the same bundle
-and observed revision can recover the same Task with
-`MCP_USAGE_SKILL_RUN_ID=<printed-uuid> bin/install-mcp-skills`; an advanced projection
-may instead lead to an authoritative no-op. A fresh reconciliation or corrected
-intent uses a new run UUID (omit the variable). Repeated unresolved revision
-conflicts stop after bounded attempts; refresh context before another run.
-
-`skill_get`/`skill_list` remain eventually consistent read-model queries. Publication
-success does not wait for projection freshness; there is no static fallback and
-missing/lagging documentation never prevents other MCP tools from serving requests.
+Project Skills and their assets remain ordinary stored knowledge entities.
+List them by an explicit exact project scope, or use `"source":"stored"` to
+discover entities across scopes. Retrieve a project Skill by exact name/scope;
+its read model remains eventually consistent. Stored project content cannot
+replace a built-in guide. Exact tool input/output contracts remain in MCP's
+`tools/list`.
 
 ### Environment setup
 

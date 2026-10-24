@@ -1,0 +1,15 @@
+module Coordinator
+  module Mcp
+    module UsageSkills
+      class Summary < Shared::Value
+        def source: () -> String
+        def skill_id: () -> String
+        def name: () -> String
+        def scope: () -> String
+        def revision: () -> Integer
+        def description: () -> String
+        def tools: () -> Array[String]
+      end
+    end
+  end
+end

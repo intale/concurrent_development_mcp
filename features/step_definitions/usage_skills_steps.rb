@@ -1,5 +1,10 @@
 # frozen_string_literal: true
 
+Given("the built-in server usage Skills are available") do
+  response = call_tool("skill_list", {})
+  assert_acceptance_equal("ok", response.dig("result", "structuredContent", "status"), "Static catalog availability")
+end
+
 Given("a project Skill has the same name as the product entry guide") do
   start_live_subscriptions
   submit_and_execute(
@@ -9,17 +14,14 @@ Given("a project Skill has the same name as the product entry guide") do
   )
 end
 
-Given("the product usage Skills are installed") do
-  install_product_usage_skills
-  @original_usage_documents = retrieve_product_usage_skills
+When("the client lists server Skills without a scope") do
+  @usage_default_page = call_tool("skill_list", {}).dig("result", "structuredContent", "data", "page")
 end
 
-When("the operator installs the bundled product usage Skills") do
-  install_product_usage_skills
-end
-
-When("the operator installs the bundled product usage Skills again") do
-  install_product_usage_skills
+Then("every public function belongs to one discoverable capability guide") do
+  tools = mcp_request(method: "tools/list", params: {}).dig("result", "tools").map { _1.fetch("name") }.sort
+  documented = @usage_default_page.fetch("items").flat_map { _1.fetch("tools") }.sort
+  assert_acceptance_equal(tools, documented, "Complete function coverage with no duplicates")
 end
 
 Then("discovery routes a new client to the product getting-started Skill") do
@@ -30,12 +32,16 @@ Then("discovery routes a new client to the product getting-started Skill") do
   assert_acceptance(instructions.include?(product_usage_catalog::SCOPE), "Exact product scope")
 end
 
-Then("the client can retrieve every bundled guide through skill_get") do
+Then("the client can retrieve every built-in guide immediately") do
   documents = retrieve_product_usage_skills
-  assert_acceptance_equal(product_usage_catalog.all.map(&:name).sort, documents.keys.sort, "Installed guide identities")
-  documents.each_value { assert_acceptance_equal(1, _1.fetch("revision"), "Initial product revision") }
-  page = call_tool("skill_list", { scope: product_usage_catalog::SCOPE, limit: 20 }).dig("result", "structuredContent", "data", "page")
-  assert_acceptance_equal(documents.keys.sort, page.fetch("items").map { _1.fetch("name") }.sort, "Discoverable guide names")
+  assert_acceptance_equal(product_usage_catalog.all.map(&:name).sort, documents.keys.sort, "Static guide identities")
+  product_usage_catalog.all.each do |definition|
+    document = documents.fetch(definition.name)
+    assert_acceptance_equal("server", document.fetch("source"), "Static source")
+    assert_acceptance_equal(product_usage_catalog::RELEASE, document.fetch("revision"), "Application bundle revision")
+    assert_acceptance_equal(definition.instructions, document.fetch("instructions"), "Shipped instructions")
+    assert_acceptance(!document.key?("published"), "No fabricated publication event")
+  end
 end
 
 Then("the project Skill is unchanged") do
@@ -44,132 +50,42 @@ Then("the project Skill is unchanged") do
       .dig("result", "structuredContent", "data", "skill")
     [ !skill.nil?, skill ]
   end
-  assert_acceptance_equal("Preserve this project's own instructions.", document.fetch("instructions"), "Unrelated project instructions")
-  assert_acceptance_equal(1, document.fetch("revision"), "Unrelated project revision")
+  assert_acceptance_equal("Preserve this project's own instructions.", document.fetch("instructions"), "Project entity content")
+  assert_acceptance_equal(1, document.fetch("revision"), "Project entity revision")
 end
 
-Then("every publication reports the existing revision without replacing a Skill") do
-  product_usage_catalog.all.each do |definition|
-    assert_acceptance(@usage_installer_output.include?("#{definition.name}: existing revision 1"), @usage_installer_output)
-  end
-  documents = retrieve_product_usage_skills
-  assert_acceptance_equal(
-    @original_usage_documents.transform_values { _1.values_at("skill_id", "revision") },
-    documents.transform_values { _1.values_at("skill_id", "revision") }, "Unchanged Skill identities/revisions"
-  )
-end
+When("the client pages through server Skills two at a time") do
+  @usage_paged_names = []
+  cursor = nil
+  loop do
+    page = call_tool("skill_list", { limit: 2, after_skill_id: cursor }).dig("result", "structuredContent", "data", "page")
+    @usage_paged_names.concat(page.fetch("items").map { _1.fetch("name") })
+    break unless page.fetch("has_more")
 
-When("the operator publishes an updated knowledge-management guide") do
-  original = product_usage_catalog.all.find { _1.name == "coordinator-knowledge-management" }
-  @updated_usage_definition = Coordinator::Mcp::UsageSkills::Definition.new(
-    original.to_h.merge(instructions: original.instructions + "\nUpdated package guidance.\n")
-  )
-  task_id = submit_and_execute(
-    "skill_publish", command_id: "usage-updated-knowledge-guide", actor: { kind: "agent", id: "usage-package-editor" },
-    name: original.name, scope: product_usage_catalog::SCOPE,
-    expected_revision: @original_usage_documents.fetch(original.name).fetch("revision"),
-    description: original.description, instructions: @updated_usage_definition.instructions, assets: []
-  )
-  @usage_update_result = call_tool("task_get", { task_id: }).dig("result", "structuredContent", "result", "structuredContent")
-end
-
-Then("the client retrieves the updated guide without retaining superseded read revisions") do
-  assert_acceptance_equal("committed", @usage_update_result.dig("completion", "effects"), "Updated publication")
-  assert_acceptance_equal(2, @usage_update_result.dig("data", "revision"), "Updated revision")
-  document = await_read_model("updated usage guide") do
-    skill = call_tool("skill_get", { name: @updated_usage_definition.name, scope: product_usage_catalog::SCOPE })
-      .dig("result", "structuredContent", "data", "skill")
-    [ skill && skill.fetch("revision") == 2, skill ]
-  end
-  assert_acceptance_equal(@updated_usage_definition.instructions, document.fetch("instructions"), "Updated instructions")
-  historical = call_tool("skill_get", { name: @updated_usage_definition.name, scope: product_usage_catalog::SCOPE, revision: 1 })
-    .dig("result", "structuredContent")
-  assert_acceptance_equal("not_found", historical.fetch("status"), "Superseded read revision is not retained")
-end
-
-Then("the other product guide revisions are unchanged") do
-  @original_usage_documents.except(@updated_usage_definition.name).each do |name, original|
-    document = call_tool("skill_get", { name:, scope: product_usage_catalog::SCOPE }).dig("result", "structuredContent", "data", "skill")
-    assert_acceptance_equal(original.values_at("skill_id", "revision"), document.values_at("skill_id", "revision"), "Other guide identity/revision")
+    cursor = page.fetch("next_skill_id")
   end
 end
 
-Given("no usage Skill Task workers are running") do
-  stop_live_subscriptions
-  @usage_pending_run_id = SecureRandom.uuid_v7
+Then("every built-in guide appears once in deterministic name order") do
+  assert_acceptance_equal(product_usage_catalog.all.map(&:name).sort, @usage_paged_names, "Static pagination")
 end
 
-When("the product installer times out on its first pending publication") do
-  run_product_usage_installer("MCP_USAGE_SKILL_RUN_ID" => @usage_pending_run_id, "MCP_USAGE_SKILL_TIMEOUT_SECONDS" => "0")
-  assert_acceptance(!@usage_installer_status.success?, "Pending install must report its unfinished state")
-  assert_acceptance(@usage_installer_output.include?("still working"), @usage_installer_output)
-  @usage_pending_task_id = @usage_installer_output[/Task ([0-9a-f-]{36})/, 1]
-  assert_acceptance(@usage_pending_task_id, "Printed pending Task handle")
+Then("an exact server Skill name filter selects one guide") do
+  page = call_tool("skill_list", { name: product_usage_catalog::ENTRY_SKILL }).dig("result", "structuredContent", "data", "page")
+  assert_acceptance_equal([ product_usage_catalog::ENTRY_SKILL ], page.fetch("items").map { _1.fetch("name") }, "Exact filter")
 end
 
-When("the unchanged run is resumed while workers are still stopped") do
-  run_product_usage_installer("MCP_USAGE_SKILL_RUN_ID" => @usage_pending_run_id, "MCP_USAGE_SKILL_TIMEOUT_SECONDS" => "0")
-  assert_acceptance(!@usage_installer_status.success?, "Resumed pending install must report its unfinished state")
-  @usage_resumed_task_id = @usage_installer_output[/Task ([0-9a-f-]{36})/, 1]
+When("the client requests unknown built-in content and a different bundle revision") do
+  @missing_usage_results = [
+    call_tool("skill_get", { name: "unknown-guide", scope: product_usage_catalog::SCOPE }),
+    call_tool("skill_get", { name: product_usage_catalog::ENTRY_SKILL, scope: product_usage_catalog::SCOPE, revision: product_usage_catalog::RELEASE + 1 }),
+    call_tool("skill_asset_get", { name: product_usage_catalog::ENTRY_SKILL, scope: product_usage_catalog::SCOPE, path: "missing.md" })
+  ].map { _1.dig("result", "structuredContent") }
 end
 
-Then("it reports the same working Task without cancelling it") do
-  assert_acceptance_equal(@usage_pending_task_id, @usage_resumed_task_id, "Recovered Task handle")
-  task = call_tool("task_get", { task_id: @usage_pending_task_id }).dig("result", "structuredContent")
-  assert_acceptance_equal("working", task.fetch("status"), "Retained working state")
-end
-
-When("the usage Skill workers start") do
-  start_live_subscriptions
-end
-
-Then("the original publication eventually becomes a retrievable Skill") do
-  task = await_task_terminal(@usage_pending_task_id)
-  assert_acceptance_equal(false, task.dig("result", "result", "isError"), "Original publication outcome")
-  first = product_usage_catalog.all.first
-  document = await_read_model("resumed entry guide") do
-    skill = call_tool("skill_get", { name: first.name, scope: product_usage_catalog::SCOPE }).dig("result", "structuredContent", "data", "skill")
-    [ skill && skill.fetch("instructions") == first.instructions, skill ]
+Then("each request returns a typed static not-found outcome") do
+  @missing_usage_results.each do |result|
+    assert_acceptance_equal("not_found", result.fetch("status"), "Static not-found")
+    assert_acceptance(result.dig("data", "code").start_with?("server_skill"), "Static error identity")
   end
-  assert_acceptance_equal(1, document.fetch("revision"), "Only one Skill revision")
-end
-
-Given("an authoritative product guide exists without its read projection") do
-  stop_read_model_subscriptions
-  first = product_usage_catalog.all.first
-  @prior_usage_instructions = "Previously published authoritative guide."
-  submit_and_execute(
-    "skill_publish", command_id: "usage-stale-guide", actor: { kind: "agent", id: "prior-usage-publisher" },
-    name: first.name, scope: product_usage_catalog::SCOPE, expected_revision: 0,
-    description: "Existing authoritative publication", instructions: @prior_usage_instructions, assets: []
-  )
-  payload = call_tool("skill_get", { name: first.name, scope: product_usage_catalog::SCOPE }).dig("result", "structuredContent")
-  assert_acceptance_equal("not_found", payload.fetch("status"), "Available lagging Skill view")
-end
-
-When("the installer exhausts its bounded revision-conflict attempts") do
-  run_product_usage_installer
-  assert_acceptance(!@usage_installer_status.success?, "Stale installation must report its conflict")
-  assert_acceptance(@usage_installer_output.include?("skill_revision_conflict"), @usage_installer_output)
-end
-
-Then("the updater restores its bundled snapshot as the next revision") do
-  name = @updated_usage_definition.name
-  assert_acceptance(@usage_installer_output.include?("#{name}: published revision 3"), @usage_installer_output)
-  original = product_usage_catalog.all.find { _1.name == name }
-  document = await_read_model("updated bundled snapshot") do
-    skill = call_tool("skill_get", { name:, scope: product_usage_catalog::SCOPE }).dig("result", "structuredContent", "data", "skill")
-    [ skill && skill.fetch("revision") == 3, skill ]
-  end
-  assert_acceptance_equal(original.instructions, document.fetch("instructions"), "Reconciled bundle content")
-end
-
-Then("it reports the conflict without replacing the authoritative guide") do
-  first = product_usage_catalog.all.first
-  document = await_read_model("retained original product guide") do
-    skill = call_tool("skill_get", { name: first.name, scope: product_usage_catalog::SCOPE }).dig("result", "structuredContent", "data", "skill")
-    [ !skill.nil?, skill ]
-  end
-  assert_acceptance_equal(1, document.fetch("revision"), "Original revision after denied update")
-  assert_acceptance_equal(@prior_usage_instructions, document.fetch("instructions"), "Original authoritative content")
 end

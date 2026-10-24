@@ -8,7 +8,7 @@ Feature: Development Artifact repository
   Rule: A clean agent discovers migration from MCP without a prescribed project layout
 
     Scenario: Endpoint instructions and schemas teach semantic client-side import
-      Given the product usage Skills are installed
+      Given the built-in server usage Skills are available
       When a clean agent asks the MCP endpoint how to migrate development memory
       Then the endpoint assigns project discovery to the agent without assuming paths or runtimes
       And the import-capable schemas require exact content and caller-owned provenance

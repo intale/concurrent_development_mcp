@@ -9,7 +9,7 @@ Feature: Advisory resource work intentions
   Rule: Shared work is the normal mode
 
     Scenario: Two agents declare shared work on the same file
-      Given the product usage Skills are installed
+      Given the built-in server usage Skills are available
       When both agents concurrently declare shared intentions for "config/routes.rb"
       Then both intention Tasks complete successfully
       And each active intention retains its agent, Attempt, purpose, context, and expiry
