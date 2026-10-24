@@ -91,12 +91,10 @@ Then("each active intention retains its agent, Attempt, purpose, context, and ex
 end
 
 Then("neither agent is promised that its eventual Git changes will merge cleanly") do
-  instructions = mcp_request(method: "server/discover", params: {}, client_id: "agent-a").dig("result", "instructions")
-  assert_acceptance(
-    instructions.include?("never queues, waits, preempts, or promises") &&
-      instructions.include?("shared changes will merge cleanly"),
-    "MCP guidance must state the advisory merge limitation"
-  )
+  definition = product_usage_catalog.all.find { _1.name == "coordinator-development-coordination" }
+  guide = call_tool("skill_get", { name: definition.name, scope: product_usage_catalog::SCOPE }, client_id: "agent-a")
+    .dig("result", "structuredContent", "data", "skill")
+  assert_acceptance_equal(definition.instructions, guide.fetch("instructions"), "Available advisory-work usage guide")
 end
 
 Given("agent A has an active {word} intention for {word} {word}") do |mode, kind, path|

@@ -27,9 +27,8 @@ module McpWalkingSliceSpec
     ).to eq({})
     instructions = discovered.dig("result", "instructions")
     expect(instructions).to include("Clients need not advertise Tasks support")
-    expect(instructions).to include("skill_asset_get returns text for UTF-8 assets")
-    expect(instructions).to include("canonical Base64 only for binary assets")
-    expect(instructions).to include("intention IDs, Resource IDs, fencing tokens")
+    expect(instructions).to include("coordinator-getting-started", "mcp:concurrent-development-coordinator")
+    expect(instructions.bytesize).to be < 2_000
     expect(instructions).not_to include("resource hashes")
     expect(instructions).not_to include("passive Base64 content")
 
@@ -271,6 +270,9 @@ module McpWalkingSliceSpec
   end
 
   it "teaches a clean agent to migrate client-visible development memory semantically" do
+    definition = Coordinator::Mcp::UsageSkills::Catalog.all.find { _1.name == "coordinator-knowledge-management" }
+    skill_row = create(:coordinator_read_skill, name: definition.name, scope: Coordinator::Mcp::UsageSkills::Catalog::SCOPE)
+    create(:coordinator_read_skill_revision, skill: skill_row, description: definition.description, instructions: definition.instructions)
     discovered = mcp_request(
       id: 1,
       method: "server/discover",
@@ -279,12 +281,9 @@ module McpWalkingSliceSpec
     )
     instructions = discovered.dig("result", "instructions").squish
 
-    expect(instructions).to include(
-      "inspect that project with the client's own available capabilities",
-      "never by a server-prescribed directory layout",
-      "The coordinator cannot read caller paths",
-      "capture an import_manifest last"
-    )
+    expect(instructions).to include(Coordinator::Mcp::UsageSkills::Catalog::SCOPE)
+    guide = call_tool("skill_get", { name: definition.name, scope: Coordinator::Mcp::UsageSkills::Catalog::SCOPE }, id: 3, capable: false)
+    expect(guide.dig("result", "structuredContent", "data", "skill", "instructions")).to eq(definition.instructions)
 
     tools = mcp_request(id: 2, method: "tools/list", params: {}).dig("result", "tools")
     artifact = tools.find { _1.fetch("name") == "development_artifact_capture" }

@@ -7,10 +7,13 @@ When("a clean agent asks the MCP endpoint how to migrate development memory") do
 end
 
 Then("the endpoint assigns project discovery to the agent without assuming paths or runtimes") do
-  instructions = @migration_discovery.dig("result", "instructions").squish
-  assert_acceptance(instructions.include?("client's own available capabilities"), "Client discovery guidance")
-  assert_acceptance(instructions.include?("never by a server-prescribed directory layout"), "Layout guidance")
-  assert_acceptance(instructions.include?("The coordinator cannot read caller paths"), "Server boundary guidance")
+  bootstrap = @migration_discovery.dig("result", "instructions")
+  assert_acceptance(bootstrap.include?(product_usage_catalog::SCOPE), "Exact usage Skill scope in discovery")
+  definition = product_usage_catalog.all.find { _1.name == "coordinator-knowledge-management" }
+  guide = call_tool("skill_get", { name: definition.name, scope: product_usage_catalog::SCOPE })
+    .dig("result", "structuredContent", "data", "skill")
+  assert_acceptance(guide, "Available knowledge-management guide")
+  assert_acceptance_equal(definition.instructions, guide.fetch("instructions"), "Complete product import guidance")
 
   surface = JSON.generate(
     @migration_tools.select do |tool|

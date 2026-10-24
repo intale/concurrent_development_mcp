@@ -1,0 +1,14 @@
+#!/usr/bin/env sh
+set -eu
+
+cd "$(dirname "$0")/.."
+exec bundle exec rails runner '
+  begin
+    run_id = Coordinator::Shared::Types::UuidV7[ENV.fetch("MCP_USAGE_SKILL_RUN_ID") { SecureRandom.uuid_v7 }]
+    timeout = Coordinator::Shared::Types::Coercible::Float.constrained(gteq: 0, lteq: 3600)[ENV.fetch("MCP_USAGE_SKILL_TIMEOUT_SECONDS", "60")]
+    Coordinator::Mcp::UsageSkills::Installer.new(server: Coordinator::Container["mcp.server"], run_id:, timeout_seconds: timeout).call
+  rescue Coordinator::Mcp::UsageSkills::InstallError, Dry::Types::ConstraintError => error
+    warn error.message
+    exit 1
+  end
+'

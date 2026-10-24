@@ -47,7 +47,12 @@ RSpec.describe "MCP development_search", :read_model do
     end
     expect(JSON.generate(tool.fetch("outputSchema"))).to include("retrieval_actions", "skill_get", "observation_id")
     instructions = rpc("server/discover", {}).dig("result", "instructions")
-    expect(instructions).to include("development_search", "one raw scalar", "positive", "live keyset", "three consecutive")
+    expect(instructions).to include(Coordinator::Mcp::UsageSkills::Catalog::ENTRY_SKILL, Coordinator::Mcp::UsageSkills::Catalog::SCOPE)
+    definition = Coordinator::Mcp::UsageSkills::Catalog.all.find { _1.name == "coordinator-development-search" }
+    guide = create(:coordinator_read_skill, name: definition.name, scope: Coordinator::Mcp::UsageSkills::Catalog::SCOPE)
+    create(:coordinator_read_skill_revision, skill: guide, instructions: definition.instructions, description: definition.description)
+    loaded = rpc("tools/call", { name: "skill_get", arguments: { name: definition.name, scope: guide.scope } })
+    expect(loaded.dig("result", "structuredContent", "data", "skill", "instructions")).to eq(definition.instructions)
   end
 
   it "returns a bounded available page and a schema-valid canonical retrieval action" do

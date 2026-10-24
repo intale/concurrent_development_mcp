@@ -1,0 +1,13 @@
+module Coordinator
+  module Mcp
+    module UsageSkills
+      class Catalog
+        SCOPE: String
+        RELEASE: Integer
+        ENTRY_SKILL: String
+        DEFINITIONS: Array[Definition]
+        def self.all: () -> Array[Definition]
+      end
+    end
+  end
+end
